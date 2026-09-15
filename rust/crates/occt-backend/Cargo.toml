@@ -1,0 +1,12 @@
+[package]
+name = "umlcad-v6-occt-backend"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+build = "build.rs"
+
+[dependencies]
+umlcad-v6-geometry-api = { path = "../geometry-api" }
+
+[build-dependencies]
+cmake = "0.1"

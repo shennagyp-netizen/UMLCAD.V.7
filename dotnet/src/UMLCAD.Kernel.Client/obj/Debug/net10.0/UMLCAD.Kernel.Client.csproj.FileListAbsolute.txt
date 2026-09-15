@@ -1,0 +1,16 @@
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/bin/Debug/net10.0/UMLCAD.Kernel.Client.deps.json
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/bin/Debug/net10.0/UMLCAD.Kernel.Client.dll
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/bin/Debug/net10.0/UMLCAD.Kernel.Client.pdb
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/bin/Debug/net10.0/UMLCAD.Framework.dll
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/bin/Debug/net10.0/UMLCAD.Framework.pdb
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.Kernel.Client.csproj.AssemblyReference.cache
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.Kernel.Client.GeneratedMSBuildEditorConfig.editorconfig
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.Kernel.Client.AssemblyInfoInputs.cache
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.Kernel.Client.AssemblyInfo.cs
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.Kernel.Client.csproj.CoreCompileInputs.cache
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.Kernel.Client.sourcelink.json
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.K.10A205A2.Up2Date
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.Kernel.Client.dll
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/refint/UMLCAD.Kernel.Client.dll
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/UMLCAD.Kernel.Client.pdb
+/Users/macbookairuser/Documents/UMLCAD.V.5/dotnet/src/UMLCAD.Kernel.Client/obj/Debug/net10.0/ref/UMLCAD.Kernel.Client.dll

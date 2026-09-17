@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, appendRelations, evaluateRelation, solveRelations, validateRelation, type GeometricRelation } from "../kernel/src/native-index.js";
+import { DesignProgram, appendRelations, evaluateRelation, solveRelations, validateRelation, type GeometricRelation } from "../kernel/api/src/native-index.js";
 
 function base(){
   const p=new DesignProgram();
@@ -80,7 +80,7 @@ test("relations are stored separately from legacy constraints",()=>{
 
 test("relations remain part of candidate validation",()=>{
   const p=new DesignProgram();
-  p.addGeometry("a",()=>({kind:"line",start:{x:0,y:0},end:{x:1,y:0}}));
+  p.addGeometry("a",()=>({kind:"line",start:{x:0,y:0},end:{x:10,y:0}}));
   p.addGeometry("b",()=>({kind:"line",start:{x:0,y:1},end:{x:1,y:0}}));
   const related=appendRelations(p.snapshot(),[{kind:"parallel",firstGeometryId:"a",secondGeometryId:"b"}]);
   const solved=solveRelations(related,{maxIterations:100});

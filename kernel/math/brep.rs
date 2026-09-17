@@ -1132,6 +1132,64 @@ mod tests {
     }
 
     #[test]
+    fn planar_region_with_hole_preserves_area_and_classifies_hole_region() {
+        let region = PlanarRegion3 {
+            origin: Vec3::new(0.0, 0.0, 0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0),Vec2::new(10.0,0.0),
+                Vec2::new(10.0,10.0),Vec2::new(0.0,10.0),
+            ],
+            holes: vec![vec![
+                Vec2::new(3.0,3.0),Vec2::new(7.0,3.0),
+                Vec2::new(7.0,7.0),Vec2::new(3.0,7.0),
+            ]],
+        };
+        assert!((region.area(tol()).unwrap() - 84.0).abs() <= 1.0e-12);
+        assert_eq!(
+            region.classify_point(Vec3::new(1.0,1.0,0.0),tol()).unwrap(),
+            RegionClass::Inside
+        );
+        assert_eq!(
+            region.classify_point(Vec3::new(5.0,5.0,0.0),tol()).unwrap(),
+            RegionClass::InsideHole
+        );
+        assert_eq!(
+            region.classify_point(Vec3::new(12.0,5.0,0.0),tol()).unwrap(),
+            RegionClass::Outside
+        );
+    }
+
+    #[test]
+    fn solid_rejects_reversed_global_orientation() {
+        let mut solid = tetra_brep();
+        for face in &mut solid.faces { face.orientation = !face.orientation; }
+        assert_eq!(solid.validate(tol()), Err(BRepError::InvalidSolidOrientation));
+    }
+
+    #[test]
+    fn boolean_support_is_deterministic_for_disjoint_and_touching_boxes() {
+        let a = box_a();
+        let disjoint = AxisAlignedBox {
+            min: Vec3::new(20.0,0.0,0.0),
+            max: Vec3::new(30.0,20.0,30.0),
+        };
+        let pieces = box_union(a, disjoint, tol()).unwrap();
+        assert_eq!(pieces.len(), 2);
+        let total: f64 = pieces.iter().map(|p| p.volume(tol()).unwrap()).sum();
+        assert!((total - 12000.0).abs() <= 1.0e-12);
+
+        let touching = AxisAlignedBox {
+            min: Vec3::new(10.0,0.0,0.0),
+            max: Vec3::new(20.0,20.0,30.0),
+        };
+        let pieces = box_union(a, touching, tol()).unwrap();
+        let total: f64 = pieces.iter().map(|p| p.volume(tol()).unwrap()).sum();
+        assert!((total - 12000.0).abs() <= 1.0e-12);
+    }
+
+    #[test]
     fn tetra_moments_are_exact() {
         let solid=tetra_brep();
         let m=solid.moments(tol()).unwrap();

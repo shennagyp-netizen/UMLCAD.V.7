@@ -30,6 +30,7 @@ pub mod nurbs_surface_ops;
 pub mod offsets;
 pub mod polynomial;
 pub mod predicates;
+pub mod quaternion;
 pub mod relation_jacobian;
 pub mod relations;
 pub mod scalar;

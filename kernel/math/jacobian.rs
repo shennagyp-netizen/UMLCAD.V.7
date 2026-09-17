@@ -277,6 +277,7 @@ pub fn analytic_constraint_jacobian(
 mod tests {
     use super::*;
     use crate::math::{
+        constraints::geometry_difference,
         geometry::{Arc, Circle, Geometry, Line, Point},
         snapshot::{Constraint, GeometryItem, Relation, SemanticSnapshot},
     };

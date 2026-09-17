@@ -1,5 +1,5 @@
 use super::geometry::{Geometry, Point};
-use super::snapshot::SemanticSnapshot;
+use super::snapshot::{GeometryItem, SemanticSnapshot};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TopologyVertex {
@@ -38,6 +38,43 @@ fn endpoint(g: &Geometry, start: bool) -> Option<Point> {
 }
 fn near(a: Point, b: Point, t: f64) -> bool { a.distance(b) <= t }
 
+fn model_scale(items: &[GeometryItem]) -> f64 {
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    let mut count = 0usize;
+
+    for item in items {
+        for start in [true, false] {
+            let Some(point) = endpoint(&item.geometry, start) else { continue };
+            if !point.x.is_finite() || !point.y.is_finite() { continue; }
+            min_x = min_x.min(point.x);
+            min_y = min_y.min(point.y);
+            max_x = max_x.max(point.x);
+            max_y = max_y.max(point.y);
+            count += 1;
+        }
+    }
+
+    if count < 2 {
+        return 0.0;
+    }
+    let scale = (max_x - min_x).hypot(max_y - min_y);
+    if scale.is_finite() && scale > 0.0 { scale } else { 0.0 }
+}
+
+fn topology_tolerance(items: &[GeometryItem]) -> f64 {
+    let scale = model_scale(items);
+    if scale > 0.0 {
+        // Vertex equivalence is relative to the model's geometric extent.
+        // This preserves the same topology under uniform unit/scale changes.
+        1.0e-8 * scale
+    } else {
+        0.0
+    }
+}
+
 fn incident_degree(edge: &TopologyEdge, vertex_id: &str) -> usize {
     if edge.closed { return 0; }
     usize::from(edge.start_vertex_id.as_deref() == Some(vertex_id))
@@ -45,9 +82,9 @@ fn incident_degree(edge: &TopologyEdge, vertex_id: &str) -> usize {
 }
 
 pub fn build_topology(snapshot: &SemanticSnapshot) -> Result<TopologyModel, String> {
-    let tolerance = 1e-8;
     let mut items = snapshot.geometry.clone();
     items.sort_by(|a, b| a.id.cmp(&b.id));
+    let tolerance = topology_tolerance(&items);
 
     let mut vertices = Vec::<TopologyVertex>::new();
     let mut edges = Vec::<TopologyEdge>::new();

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Kernel, type PartDefinition } from "../kernel/src/native-index.js";
+import { Kernel, type PartDefinition } from "../kernel/api/src/native-index.js";
 
 const definition: PartDefinition = (program) => {
   const width = program.parameter("width", 10);

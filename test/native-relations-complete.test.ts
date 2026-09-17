@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, appendRelations, evaluateRelation, isGeometricRelation, validateRelation, type GeometricRelation, type RelationPoint } from "../kernel/src/native-index.js";
+import { DesignProgram, appendRelations, evaluateRelation, isGeometricRelation, validateRelation, type GeometricRelation, type RelationPoint } from "../kernel/api/src/native-index.js";
 
 function relationFixture() {
   const p = new DesignProgram();

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { buildCad, StandardCadProgram, queryGeometry, validateCadStateOrdered, analyzeConstraints as v4AnalyzeConstraints, solveConstraints as v4SolveConstraints, evaluateDimensions as v4EvaluateDimensions, spatialDistance, spatialRelation, validateSpatialRules, exportDxfIntegrated, migrateSemanticReference, type Drawing, type Geometry, type GeometryQuery, type DesignProgramSnapshot, type SourceModule, parseTypeScriptModule, resolveSourceModuleDependencies, sourceModuleEvaluationOrder } from "../../vendor/UMLCAD.V.4/src/index.js";
+import { buildCad, StandardCadProgram, queryGeometry, validateCadStateOrdered, analyzeConstraints as v4AnalyzeConstraints, solveConstraints as v4SolveConstraints, evaluateDimensions as v4EvaluateDimensions, spatialDistance, spatialRelation, validateSpatialRules, exportDxfIntegrated, migrateSemanticReference, type Drawing, type Geometry, type GeometryQuery, type DesignProgramSnapshot, type SourceModule, parseTypeScriptModule, resolveSourceModuleDependencies, sourceModuleEvaluationOrder } from "../../../vendor/UMLCAD.V.4/src/index.js";
 import type { AssemblyBuildRequest, AssemblyBuildResult, AssemblyCache, AssemblyGeometryItem, BuildIdentity, ConstraintAnalysisRequest, ConstraintSolveRequest, DimensionEvaluationRequest, DxfExportRequest, GeometryQueryRequest, KernelApplication, PartBuildRequest, PartBuildResult, PartCache, PartSourceLoader, QueryRequest, SpatialAnalysisRequest } from "./contracts.js";
 
 function canonical(value: unknown): string {
@@ -62,7 +62,7 @@ export class V4KernelApplication implements KernelApplication {
     for (let i = 0; i < request.geometry.length; i += 1) for (let j = i + 1; j < request.geometry.length; j += 1) { const first = request.geometry[i]!, second = request.geometry[j]!; relations.push({ firstGeometryId: first.id, secondGeometryId: second.id, relation: spatialRelation(first.geometry, second.geometry, request.tolerance), distance: spatialDistance(first.geometry, second.geometry, request.tolerance) }); }
     return { diagnostics, relations };
   }
-  public async resolveReference(request: { readonly source: import("../../vendor/UMLCAD.V.4/src/index.js").SemanticReference; readonly migration: import("../../vendor/UMLCAD.V.4/src/index.js").ReferenceMigrationMap }) { return migrateSemanticReference(request.source, request.migration); }
+  public async resolveReference(request: { readonly source: import("../../../vendor/UMLCAD.V.4/src/index.js").SemanticReference; readonly migration: import("../../../vendor/UMLCAD.V.4/src/index.js").ReferenceMigrationMap }) { return migrateSemanticReference(request.source, request.migration); }
   public async exportDxf(request: DxfExportRequest) { return exportDxfIntegrated(request.snapshot, { export: request.options, ...(request.dimensions ? { dimensions: request.dimensions } : {}), ...(request.manufacturing ? { manufacturing: request.manufacturing } : {}) }); }
 
   public async query(request: QueryRequest): Promise<unknown> {

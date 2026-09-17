@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, appendRelations, evaluateRelation, type GeometricRelation } from "../kernel/src/native-index.js";
+import { DesignProgram, appendRelations, evaluateRelation, type GeometricRelation } from "../kernel/api/src/native-index.js";
 
 test("circle tangency supports explicit external and internal modes",()=>{
   const p=new DesignProgram();

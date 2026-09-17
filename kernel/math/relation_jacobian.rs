@@ -404,17 +404,15 @@ pub fn analytic_relation_jacobian(
                     }
                     (Geometry::Circle(a_circle), Geometry::Arc(b_arc)) => {
                         let (ga, gb) = circle_tangent_gradient(a_circle.center, a_circle.radius, b_arc.center, b_arc.radius, *mode)?;
-                        let va = ga;
                         let vb = vec![gb[0], gb[1], gb[2], 0.0, 0.0];
-                        add(&mut row, offsets[first], &va);
+                        add(&mut row, offsets[first], &ga);
                         add(&mut row, offsets[second], &vb);
                     }
                     (Geometry::Arc(a_arc), Geometry::Circle(b_circle)) => {
                         let (ga, gb) = circle_tangent_gradient(a_arc.center, a_arc.radius, b_circle.center, b_circle.radius, *mode)?;
                         let va = vec![ga[0], ga[1], ga[2], 0.0, 0.0];
-                        let vb = gb;
                         add(&mut row, offsets[first], &va);
-                        add(&mut row, offsets[second], &vb);
+                        add(&mut row, offsets[second], &gb);
                     }
                     (Geometry::Arc(a_arc), Geometry::Arc(b_arc)) => {
                         let (ga, gb) = circle_tangent_gradient(a_arc.center, a_arc.radius, b_arc.center, b_arc.radius, *mode)?;
@@ -539,7 +537,7 @@ pub fn analytic_relation_jacobian(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::geometry::{Arc, Circle, Geometry, Line, Point};
+    use super::super::geometry::{Circle, Geometry, Line};
     use super::super::snapshot::GeometryItem;
 
     fn line(id: &str, sx: f64, sy: f64, ex: f64, ey: f64) -> GeometryItem {
@@ -574,8 +572,7 @@ mod tests {
                 Geometry::Line(line) => {
                     let end = cursor + 4;
                     if column >= cursor && column < end {
-                        let local = column - cursor;
-                        match local {
+                        match column - cursor {
                             0 => line.start.x += delta,
                             1 => line.start.y += delta,
                             2 => line.end.x += delta,
@@ -682,7 +679,7 @@ mod tests {
                 Relation::Diameter { geometry_id: "c".into(), value: 3.0 },
                 Relation::Tangent { first_geometry_id: "a".into(), second_geometry_id: "c".into(), mode: TangentMode::External },
                 Relation::Midpoint { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, line_geometry_id: "a".into() },
-                Relation::PointOnLine { point: RelationPoint::Endpoint { geometry_id: "c".into(), point: Endpoint::Start }, line_geometry_id: "a".into() },
+                Relation::PointOnLine { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, line_geometry_id: "a".into() },
                 Relation::PointOnCircle { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, circle_geometry_id: "c".into() },
                 Relation::DistancePoints { first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, second: RelationPoint::Center { geometry_id: "c".into() }, value: 8.0 },
                 Relation::Symmetric {
@@ -693,9 +690,6 @@ mod tests {
             ],
         );
 
-        // The concentric/equal-radius rows use the same circle intentionally to
-        // isolate exact center/radius derivatives. All other rows are selected
-        // away from distance/angle/norm singularities.
         let analytic = analytic_relation_jacobian(&snapshot).unwrap();
         let base = residual_rows(&snapshot);
         assert_eq!(analytic.len(), base.len());

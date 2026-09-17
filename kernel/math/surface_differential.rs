@@ -342,7 +342,7 @@ pub fn derivatives_at(
             / w3,
         z: (duv_h.z * w2
             - du_h.z * w * dv_h.w
-            - dv_h.x * w * du_h.w
+            - dv_h.z * w * du_h.w
             + 2.0 * base_h.z * du_h.w * dv_h.w
             - base_h.z * w * duv_h.w)
             / w3,

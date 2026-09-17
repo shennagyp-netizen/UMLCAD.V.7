@@ -27,6 +27,8 @@ pub struct SolveOptions {
     pub residual_tolerance: f64,
     pub step_tolerance: f64,
     pub initial_damping: f64,
+    /// Retained for API compatibility. Supported production equations use the
+    /// complete analytic Jacobian authority rather than finite-difference probes.
     pub finite_difference_step: f64,
 }
 
@@ -157,18 +159,6 @@ fn model_scale(snapshot: &SemanticSnapshot) -> Result<f64, String> {
     } else {
         Err("degenerate model scale".into())
     }
-}
-
-fn parameter_scales(snapshot: &SemanticSnapshot, scale: f64) -> Vec<f64> {
-    let mut out = Vec::new();
-    for item in &snapshot.geometry {
-        match item.geometry {
-            Geometry::Line(_) => out.extend([scale, scale, scale, scale]),
-            Geometry::Circle(_) => out.extend([scale, scale, scale]),
-            Geometry::Arc(_) => out.extend([scale, scale, scale, 1.0, 1.0]),
-        }
-    }
-    out
 }
 
 fn rank_condition(
@@ -499,67 +489,10 @@ fn jac(
     values: &[f64],
     ids: &[String],
     offsets: &[usize],
-    step: f64,
-    base_residuals: &[f64],
-    model_scale_value: f64,
 ) -> Result<Vec<Vec<f64>>, String> {
-    let mut jacobian = vec![vec![0.0; values.len()]; base_residuals.len()];
     let current = candidate(snapshot, values, ids, offsets)?;
-    let analytic = analytic_constraint_jacobian(&current)
-        .map_err(|error| format!("analytic constraint jacobian: {error:?}"))?;
-    if analytic.len() > base_residuals.len() {
-        return Err("analytic constraint Jacobian has more rows than residual system".into());
-    }
-    for (row, values_row) in analytic.iter().enumerate() {
-        if values_row.len() != values.len() || values_row.iter().any(|value| !value.is_finite()) {
-            return Err(format!("invalid analytic constraint Jacobian row {row}"));
-        }
-        jacobian[row].clone_from_slice(values_row);
-    }
-    let analytic_rows = analytic.len();
-    if analytic_rows == base_residuals.len() {
-        return Ok(jacobian);
-    }
-
-    let parameter_scales = parameter_scales(snapshot, model_scale_value);
-    if parameter_scales.len() != values.len() {
-        return Err("solver parameter scale layout mismatch".into());
-    }
-
-    for column in 0..values.len() {
-        if !values[column].is_finite() {
-            return Err(format!("non-finite solver parameter at column {column}"));
-        }
-        let local_scale = values[column].abs().max(parameter_scales[column]);
-        let h = step * local_scale;
-        if !h.is_finite() || h == 0.0 {
-            return Err(format!("invalid finite-difference step at column {column}"));
-        }
-        let mut perturbed = values.to_vec();
-        perturbed[column] += h;
-        if !perturbed[column].is_finite() {
-            return Err(format!("finite-difference probe overflow at column {column}"));
-        }
-        let (next, _, _, _, _) = residuals(
-            snapshot,
-            &perturbed,
-            ids,
-            offsets,
-            model_scale_value,
-            f64::INFINITY,
-        )?;
-        if next.len() != base_residuals.len() || next.iter().any(|value| !value.is_finite()) {
-            return Err(format!("invalid residual at finite-difference probe column {column}"));
-        }
-        for row in analytic_rows..base_residuals.len() {
-            let derivative = (next[row] - base_residuals[row]) / h;
-            if !derivative.is_finite() {
-                return Err(format!("non-finite jacobian entry at row {row}, column {column}"));
-            }
-            jacobian[row][column] = derivative;
-        }
-    }
-    Ok(jacobian)
+    analytic_constraint_jacobian(&current)
+        .map_err(|error| format!("analytic constraint jacobian: {error:?}"))
 }
 
 fn finite(values: &[f64]) -> bool {
@@ -708,15 +641,7 @@ pub fn solve_snapshot(
             scale,
             options.residual_tolerance,
         )?;
-        let jacobian = jac(
-            snapshot,
-            &values,
-            &ids,
-            &offsets,
-            options.finite_difference_step,
-            &base_raw,
-            scale,
-        )?;
+        let jacobian = jac(snapshot, &values, &ids, &offsets)?;
         let linear = match scaled_damped_qr(&jacobian, &base_raw, damping, 1.0e-10) {
             Ok(report) => report,
             Err(_) => {

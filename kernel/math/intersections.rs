@@ -149,7 +149,8 @@ pub fn line_circle_2d(line: Line2, circle: Circle, tol: f64) -> Intersection2D {
         Ok(value) => value,
         Err(_) => return invalid_2d(IntersectionKind::Degenerate),
     };
-    let offset = line.origin.sub(circle.center);
+    let circle_center = Vec2::new(circle.center.x, circle.center.y);
+    let offset = line.origin.sub(circle_center);
     if !offset.is_finite() || !direction_length.is_finite() {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
@@ -275,7 +276,8 @@ pub fn circle_circle_2d(a: Circle, b: Circle, tol: f64) -> Intersection2D {
     }
     let h = h2_normalized.sqrt() * scale;
     let x = x_normalized * scale;
-    let base = a.center.add(delta.scale(x / distance));
+    let a_center = Vec2::new(a.center.x, a.center.y);
+    let base = a_center.add(delta.scale(x / distance));
     let unit_perp = Vec2::new(-delta.y / distance, delta.x / distance);
     let point_a = base.add(unit_perp.scale(h));
     let point_b = base.sub(unit_perp.scale(h));
@@ -805,7 +807,7 @@ mod tests {
             direction: Vec2::new(1.0, 0.0),
         };
         let circle = Circle {
-            center: Vec2::new(0.0, 0.0),
+            center: Point { x: 0.0, y: 0.0 },
             radius: 1.0,
         };
         assert_eq!(

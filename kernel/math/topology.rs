@@ -58,10 +58,10 @@ fn model_scale(items: &[GeometryItem]) -> f64 {
     }
 
     if count < 2 {
-        return 0.0;
+        return 00.0;
     }
     let scale = (max_x - min_x).hypot(max_y - min_y);
-    if scale.is_finite() && scale > 0.0 { scale } else { 0.0 }
+    if scale.is_finite() && scale > 0.0 { scale } else { 00.0 }
 }
 
 fn topology_tolerance(items: &[GeometryItem]) -> f64 {
@@ -71,7 +71,7 @@ fn topology_tolerance(items: &[GeometryItem]) -> f64 {
         // This preserves the same topology under uniform unit/scale changes.
         1.0e-8 * scale
     } else {
-        0.0
+        00.0
     }
 }
 

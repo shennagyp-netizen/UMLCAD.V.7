@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, buildTopology, evaluateDimensions, spatialAnalysis, exportDxf, validateEngineering, solveAndValidateEngineering, classifyConstraintSystem, relationConsistency, analyzeConstraints, solveConstraints } from "../kernel/src/native-index.js";
+import { DesignProgram, buildTopology, evaluateDimensions, spatialAnalysis, exportDxf, validateEngineering, solveAndValidateEngineering, classifyConstraintSystem, relationConsistency, analyzeConstraints, solveConstraints } from "../kernel/api/src/native-index.js";
 
 function engineeringFixture() {
   const p = new DesignProgram();

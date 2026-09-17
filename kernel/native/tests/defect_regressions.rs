@@ -3,7 +3,7 @@ use umlcad_kernel_rust::functions::{
     geometry::{Geometry, Line, Point},
     nurbs_surface::{NurbsSurface2D, Point3 as SurfacePoint3},
     nurbs_surface_differential::NurbsSurfaceDifferential,
-    snapshot::{Constraint, Endpoint, GeometryItem, Relation, SemanticSnapshot},
+    snapshot::{Constraint, Relation, SemanticSnapshot, GeometryItem},
     solver::{scaled_damped_qr, solve_snapshot, SolveOptions},
     spatial::point_distance,
     topology::build_topology,
@@ -61,55 +61,48 @@ fn topology_vertex_deduplication_scales_with_model_extent() {
 }
 
 #[test]
-fn solver_rejects_a_nonfinite_finite_difference_probe() {
-    let near_max = f64::MAX * 0.99999995;
-    assert!((near_max + 1.0e-7 * near_max).is_infinite());
-
-    let geometry = vec![
-        GeometryItem {
-            id: "a".into(),
-            geometry: Geometry::Circle(umlcad_kernel_rust::functions::geometry::Circle {
-                center: Point { x: near_max, y: 0.0 },
-                radius: 1.0,
-            }),
-            parameter_dependencies: vec![],
-        },
-        GeometryItem {
-            id: "b".into(),
+fn solver_uses_analytic_relation_jacobian_without_finite_difference() {
+    let model = SemanticSnapshot {
+        parameters: vec![],
+        geometry: vec![GeometryItem {
+            id: "c".into(),
             geometry: Geometry::Circle(umlcad_kernel_rust::functions::geometry::Circle {
                 center: Point { x: 0.0, y: 0.0 },
-                radius: 1.0,
+                radius: 2.0,
             }),
             parameter_dependencies: vec![],
-        },
-    ];
-
-    let mut model = SemanticSnapshot {
-        parameters: vec![],
-        geometry,
+        }],
         constraints: vec![],
         relations: vec![
             (
-                "concentric".into(),
-                Relation::Concentric {
-                    first_geometry_id: "a".into(),
-                    second_geometry_id: "b".into(),
+                "radius".into(),
+                Relation::Radius {
+                    geometry_id: "c".into(),
+                    value: 1.0,
                 },
             ),
         ],
-    };
-    model = model.deterministic();
+    }
+    .deterministic();
 
+    // This value would make the former finite-difference step overflow. The
+    // production solver must now ignore it because the analytic relation row
+    // is authoritative.
     let result = solve_snapshot(
         &model,
         SolveOptions {
-            max_iterations: 1,
+            max_iterations: 2,
+            finite_difference_step: f64::MAX,
             ..Default::default()
         },
-    );
+    )
+    .expect("analytic relation Jacobian should make the solve independent of finite differences");
 
-    let error = result.expect_err("non-finite finite-difference probe must be rejected");
-    assert!(error.contains("finite-difference probe") || error.contains("solver parameter"));
+    assert!(result.converged, "reason={:?}", result.reason);
+    assert_eq!(result.analysis.relation_count, 1);
+    assert_eq!(result.analysis.relation_equation_count, 1);
+    assert_eq!(result.analysis.rank, 1);
+    assert!(result.final_scaled_residual_norm <= 1.0e-12);
 }
 
 #[test]

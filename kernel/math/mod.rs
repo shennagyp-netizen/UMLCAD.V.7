@@ -31,7 +31,7 @@ pub mod relations;
 pub mod scalar;
 pub mod segments;
 pub mod snapshot;
-pub mod solver;
+pub mod solid;
 pub mod surfaces;
 pub mod surface_differential;
 pub mod sweeps;

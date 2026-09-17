@@ -1,4 +1,4 @@
-use super::geometry::{Geometry, Point, EPSILON};
+use super::geometry::{Geometry, Point};
 use super::snapshot::{Constraint, Endpoint};
 
 pub fn endpoint(g: &Geometry, e: Endpoint) -> Option<Point> {
@@ -86,8 +86,30 @@ pub fn residual(geometry: impl Fn(&str) -> Option<Geometry>, c: &Constraint) -> 
     }
 }
 
+/// Evaluate already-computed residuals against the exact caller tolerance.
+/// Invalid tolerances or non-finite residuals fail closed.
 pub fn satisfied(residuals: &[f64], tolerance: f64) -> bool {
-    residuals
-        .iter()
-        .all(|r| r.is_finite() && r.abs() <= tolerance.max(EPSILON))
+    if !tolerance.is_finite() || tolerance < 0.0 {
+        return false;
+    }
+    residuals.iter().all(|residual| {
+        residual.is_finite() && residual.abs() <= tolerance
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn satisfaction_does_not_inject_an_absolute_epsilon_floor() {
+        assert!(satisfied(&[5.0e-13], 1.0e-12));
+        assert!(!satisfied(&[5.0e-13], 1.0e-13));
+    }
+
+    #[test]
+    fn invalid_tolerance_fails_closed() {
+        assert!(!satisfied(&[0.0], f64::NAN));
+        assert!(!satisfied(&[0.0], -1.0));
+    }
 }

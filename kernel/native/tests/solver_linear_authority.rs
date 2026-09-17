@@ -67,15 +67,14 @@ fn an_inconsistent_linearization_is_proved_by_augmented_rank() {
 }
 
 #[test]
-fn column_unit_changes_do_not_change_the_undamped_physical_solution() {
+fn column_unit_changes_transform_the_step_covariantly() {
     let base = vec![vec![2.0, 1.0], vec![1.0, 3.0]];
     let scaled = vec![vec![2.0e-9, 1.0e9], vec![1.0e-9, 3.0e9]];
     let r = vec![4.0, -5.0];
     let base_report = scaled_damped_qr(&base, &r, 0.0, 1.0e-12).unwrap();
     let scaled_report = scaled_damped_qr(&scaled, &r, 0.0, 1.0e-12).unwrap();
-    for (lhs, rhs) in base_report.delta.iter().zip(scaled_report.delta.iter()) {
-        assert!((lhs - rhs).abs() < 1.0e-9);
-    }
+    assert!((base_report.delta[0] - scaled_report.delta[0] * 1.0e-9).abs() < 1.0e-9);
+    assert!((base_report.delta[1] - scaled_report.delta[1] * 1.0e9).abs() < 1.0e-9);
     assert_eq!(base_report.rank, scaled_report.rank);
 }
 

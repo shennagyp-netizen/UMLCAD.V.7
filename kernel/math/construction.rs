@@ -156,6 +156,302 @@ impl PlanarPolygon {
     }
 }
 
+fn line_intersection(
+    p: Vec2,
+    r: Vec2,
+    q: Vec2,
+    s: Vec2,
+    eps: f64,
+) -> Result<Vec2, ConstructionError> {
+    let denominator = r.cross(s);
+    if !denominator.is_finite() {
+        return Err(ConstructionError::Overflow);
+    }
+    if denominator.abs() <= eps {
+        return Err(ConstructionError::Degenerate);
+    }
+    let t = q.sub(p).cross(s) / denominator;
+    let result = p.add(r.scale(t));
+    if result.is_finite() { Ok(result) } else { Err(ConstructionError::Overflow) }
+}
+
+/// Exact signed offset of a strictly convex polygon using mitered joins.
+///
+/// Positive distance offsets toward the geometric exterior for CCW input and
+/// toward the geometric exterior for CW input as well; the polygon winding is
+/// preserved. Concave and near-180-degree vertices are deliberately outside
+/// the certified domain because their exact trim/topology behavior requires a
+/// separate intersection/topology contract.
+pub fn offset_convex_polygon(
+    polygon: &PlanarPolygon,
+    distance: f64,
+    tolerance: Tolerance,
+) -> Result<PlanarPolygon, ConstructionError> {
+    valid_tolerance(tolerance)?;
+    polygon.validate(tolerance)?;
+    if !distance.is_finite() {
+        return Err(ConstructionError::NonFinite);
+    }
+    if !polygon.is_convex(tolerance)? {
+        return Err(ConstructionError::Unsupported);
+    }
+    let eps = tolerance
+        .threshold(scale2(&polygon.vertices))
+        .map_err(|_| ConstructionError::InvalidTolerance)?;
+    let winding = polygon.signed_area().signum();
+    let n = polygon.vertices.len();
+    let mut shifted = Vec::with_capacity(n);
+
+    for i in 0..n {
+        let a = polygon.vertices[i];
+        let b = polygon.vertices[(i + 1) % n];
+        let edge = b.sub(a);
+        let length = edge.length();
+        if !length.is_finite() || length <= eps {
+            return Err(ConstructionError::Degenerate);
+        }
+        let outward = if winding > 0.0 {
+            Vec2::new(edge.y, -edge.x).scale(1.0 / length)
+        } else {
+            Vec2::new(-edge.y, edge.x).scale(1.0 / length)
+        };
+        shifted.push((a.add(outward.scale(distance)), b.add(outward.scale(distance))));
+    }
+
+    let mut vertices = Vec::with_capacity(n);
+    for i in 0..n {
+        let previous = shifted[(i + n - 1) % n];
+        let current = shifted[i];
+        vertices.push(line_intersection(
+            previous.0,
+            previous.1.sub(previous.0),
+            current.0,
+            current.1.sub(current.0),
+            eps,
+        )?);
+    }
+
+    let result = PlanarPolygon::new(vertices);
+    result.validate(tolerance)?;
+    Ok(result)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CircularPipe {
+    pub path_start: Vec3,
+    pub path_end: Vec3,
+    pub radius: f64,
+    pub reference: Vec3,
+}
+
+impl CircularPipe {
+    pub fn validate(&self, tolerance: Tolerance) -> Result<(), ConstructionError> {
+        valid_tolerance(tolerance)?;
+        if [self.path_start, self.path_end, self.reference]
+            .iter()
+            .any(|v| !v.is_finite()) || !self.radius.is_finite() {
+            return Err(ConstructionError::NonFinite);
+        }
+        let path = self.path_end.sub(self.path_start);
+        let scale = path.length().max(self.radius.abs()).max(1.0);
+        let eps = tolerance.threshold(scale)
+            .map_err(|_| ConstructionError::InvalidTolerance)?;
+        if path.length() <= eps || self.radius <= eps {
+            return Err(ConstructionError::Degenerate);
+        }
+        if self.reference.length() == 0.0 {
+            return Err(ConstructionError::SingularFrame);
+        }
+        Frame3::from_tangent(path, self.reference)?;
+        Ok(())
+    }
+
+    pub fn length(&self, tolerance: Tolerance) -> Result<f64, ConstructionError> {
+        self.validate(tolerance)?;
+        Ok(self.path_end.sub(self.path_start).length())
+    }
+
+    pub fn volume(&self, tolerance: Tolerance) -> Result<f64, ConstructionError> {
+        self.validate(tolerance)?;
+        let value = PI * self.radius * self.radius * self.length(tolerance)?;
+        if value.is_finite() { Ok(value) } else { Err(ConstructionError::Overflow) }
+    }
+
+    pub fn surface_point_at(
+        &self,
+        path_parameter: f64,
+        profile_angle: f64,
+        tolerance: Tolerance,
+    ) -> Result<Vec3, ConstructionError> {
+        self.validate(tolerance)?;
+        if !path_parameter.is_finite() || !profile_angle.is_finite()
+            || !(0.0..=1.0).contains(&path_parameter)
+        {
+            return Err(ConstructionError::OutOfDomain);
+        }
+        let delta = self.path_end.sub(self.path_start);
+        let frame = Frame3::from_tangent(delta, self.reference)?;
+        let center = self.path_start.add(delta.scale(path_parameter));
+        let radial = frame.normal.scale(self.radius * profile_angle.cos())
+            .add(frame.binormal.scale(self.radius * profile_angle.sin()));
+        let result = center.add(radial);
+        if result.is_finite() { Ok(result) } else { Err(ConstructionError::Overflow) }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VariableRadiusPipe {
+    pub path_start: Vec3,
+    pub path_end: Vec3,
+    pub start_radius: f64,
+    pub end_radius: f64,
+    pub reference: Vec3,
+}
+
+impl VariableRadiusPipe {
+    pub fn validate(&self, tolerance: Tolerance) -> Result<(), ConstructionError> {
+        valid_tolerance(tolerance)?;
+        if [self.path_start, self.path_end, self.reference]
+            .iter()
+            .any(|v| !v.is_finite())
+            || !self.start_radius.is_finite()
+            || !self.end_radius.is_finite()
+        {
+            return Err(ConstructionError::NonFinite);
+        }
+        let path = self.path_end.sub(self.path_start);
+        let scale = path.length()
+            .max(self.start_radius.abs())
+            .max(self.end_radius.abs())
+            .max(1.0);
+        let eps = tolerance.threshold(scale)
+            .map_err(|_| ConstructionError::InvalidTolerance)?;
+        if path.length() <= eps
+            || self.start_radius <= eps
+            || self.end_radius <= eps
+        {
+            return Err(ConstructionError::InvalidDimensions);
+        }
+        Frame3::from_tangent(path, self.reference)?;
+        Ok(())
+    }
+
+    pub fn radius_at(&self, parameter: f64, tolerance: Tolerance) -> Result<f64, ConstructionError> {
+        self.validate(tolerance)?;
+        if !parameter.is_finite() || !(0.0..=1.0).contains(&parameter) {
+            return Err(ConstructionError::OutOfDomain);
+        }
+        Ok(self.start_radius + (self.end_radius - self.start_radius) * parameter)
+    }
+
+    pub fn length(&self, tolerance: Tolerance) -> Result<f64, ConstructionError> {
+        self.validate(tolerance)?;
+        Ok(self.path_end.sub(self.path_start).length())
+    }
+
+    pub fn volume(&self, tolerance: Tolerance) -> Result<f64, ConstructionError> {
+        self.validate(tolerance)?;
+        let l = self.length(tolerance)?;
+        let a = self.start_radius;
+        let b = self.end_radius;
+        let value = PI * l * (a * a + a * b + b * b) / 3.0;
+        if value.is_finite() { Ok(value) } else { Err(ConstructionError::Overflow) }
+    }
+
+    pub fn surface_point_at(
+        &self,
+        path_parameter: f64,
+        profile_angle: f64,
+        tolerance: Tolerance,
+    ) -> Result<Vec3, ConstructionError> {
+        self.validate(tolerance)?;
+        if !path_parameter.is_finite() || !profile_angle.is_finite()
+            || !(0.0..=1.0).contains(&path_parameter)
+        {
+            return Err(ConstructionError::OutOfDomain);
+        }
+        let delta = self.path_end.sub(self.path_start);
+        let frame = Frame3::from_tangent(delta, self.reference)?;
+        let radius = self.radius_at(path_parameter, tolerance)?;
+        let center = self.path_start.add(delta.scale(path_parameter));
+        let radial = frame.normal.scale(radius * profile_angle.cos())
+            .add(frame.binormal.scale(radius * profile_angle.sin()));
+        let result = center.add(radial);
+        if result.is_finite() { Ok(result) } else { Err(ConstructionError::Overflow) }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CircularArcPipe {
+    pub center: Vec3,
+    pub path_radius: f64,
+    pub profile_radius: f64,
+    pub start_angle: f64,
+    pub end_angle: f64,
+}
+
+impl CircularArcPipe {
+    pub fn validate(&self, tolerance: Tolerance) -> Result<(), ConstructionError> {
+        valid_tolerance(tolerance)?;
+        if [self.center].iter().any(|v| !v.is_finite())
+            || !self.path_radius.is_finite()
+            || !self.profile_radius.is_finite()
+            || !self.start_angle.is_finite()
+            || !self.end_angle.is_finite()
+        {
+            return Err(ConstructionError::NonFinite);
+        }
+        let scale = self.path_radius.max(self.profile_radius).max(1.0);
+        let eps = tolerance.threshold(scale)
+            .map_err(|_| ConstructionError::InvalidTolerance)?;
+        let span = self.end_angle - self.start_angle;
+        if self.path_radius <= eps || self.profile_radius <= eps {
+            return Err(ConstructionError::InvalidDimensions);
+        }
+        if self.profile_radius >= self.path_radius {
+            return Err(ConstructionError::Unsupported);
+        }
+        if !span.is_finite() || span.abs() <= eps || span.abs() > 2.0 * PI {
+            return Err(ConstructionError::InvalidDimensions);
+        }
+        Ok(())
+    }
+
+    pub fn path_length(&self, tolerance: Tolerance) -> Result<f64, ConstructionError> {
+        self.validate(tolerance)?;
+        let value = self.path_radius * (self.end_angle - self.start_angle).abs();
+        if value.is_finite() { Ok(value) } else { Err(ConstructionError::Overflow) }
+    }
+
+    pub fn volume(&self, tolerance: Tolerance) -> Result<f64, ConstructionError> {
+        self.validate(tolerance)?;
+        let value = PI * self.profile_radius * self.profile_radius * self.path_length(tolerance)?;
+        if value.is_finite() { Ok(value) } else { Err(ConstructionError::Overflow) }
+    }
+
+    pub fn surface_point_at(
+        &self,
+        path_parameter: f64,
+        profile_angle: f64,
+        tolerance: Tolerance,
+    ) -> Result<Vec3, ConstructionError> {
+        self.validate(tolerance)?;
+        if !path_parameter.is_finite() || !profile_angle.is_finite()
+            || !(0.0..=1.0).contains(&path_parameter)
+        {
+            return Err(ConstructionError::OutOfDomain);
+        }
+        let theta = self.start_angle + (self.end_angle - self.start_angle) * path_parameter;
+        let radial = self.path_radius + self.profile_radius * profile_angle.cos();
+        let result = Vec3::new(
+            self.center.x + radial * theta.cos(),
+            self.center.y + radial * theta.sin(),
+            self.center.z + self.profile_radius * profile_angle.sin(),
+        );
+        if result.is_finite() { Ok(result) } else { Err(ConstructionError::Overflow) }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct LinearExtrusion {
     pub profile: PlanarPolygon,

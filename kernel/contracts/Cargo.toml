@@ -15,7 +15,6 @@ members = [
     "crates/kernel-integration-api",
     "crates/mesh-api",
     "crates/exchange-api",
-    "crates/occt-backend",
     "crates/reference-evolution-api",
     "crates/reference-migration-api",
 ]

@@ -272,6 +272,9 @@ mod tests {
         result.converged = false;
         result.reason = SolveReason::MaxIterations;
         result.final_scaled_residual_norm = result.initial_scaled_residual_norm;
+        result.analysis.variable_count = 2;
+        result.analysis.equation_count = 2;
+        result.analysis.rank = 1;
         let evidence = classify_with_linear_system(
             &result,
             &[vec![1.0, 1.0], vec![2.0, 2.0]],

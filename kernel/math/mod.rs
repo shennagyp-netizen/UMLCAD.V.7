@@ -52,3 +52,6 @@ pub mod trim;
 pub mod validation;
 pub mod vec;
 pub mod vec4;
+
+#[cfg(test)]
+mod convergence_metamorphic;

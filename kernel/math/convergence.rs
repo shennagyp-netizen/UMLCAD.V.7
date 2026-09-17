@@ -129,6 +129,81 @@ pub fn verify_terminal(
 /// exactly `iterations + 1`. Convergence requires both a satisfied residual
 /// criterion and, after at least one iteration, a satisfied step criterion.
 /// An initially satisfied system is allowed to converge at zero iterations.
+
+/// Evaluate convergence using only residuals at accepted iterates while keeping
+/// the solver's attempted-iteration count authoritative.
+///
+/// accepted_iterations + 1 must equal residual_history.len(). Rejected trial
+/// steps are intentionally absent from the history, so attempted_iterations
+/// may be larger than accepted_iterations. This keeps monotonicity evidence
+/// truthful without manufacturing rejected-step residuals or redefining the
+/// solver's iteration count.
+pub fn evaluate_accepted_history(
+    residual_history: &[f64],
+    final_step_norm: f64,
+    residual_tolerance: f64,
+    step_tolerance: f64,
+    accepted_iterations: usize,
+    attempted_iterations: usize,
+    max_iterations: usize,
+) -> ConvergenceEvidence {
+    let expected_history_len = accepted_iterations.checked_add(1);
+    let history_shape_valid = expected_history_len == Some(residual_history.len())
+        && accepted_iterations <= attempted_iterations;
+    let finite_history = !residual_history.is_empty()
+        && residual_history.iter().all(|value| value.is_finite() && *value >= 0.0);
+    let finite_inputs = history_shape_valid
+        && finite_history
+        && final_step_norm.is_finite()
+        && final_step_norm >= 0.0
+        && finite_tolerances(residual_tolerance, step_tolerance)
+        && max_iterations > 0;
+    if !finite_inputs {
+        return invalid_evidence(residual_history, final_step_norm, attempted_iterations);
+    }
+
+    let initial_residual = residual_history[0];
+    let final_residual = *residual_history.last().unwrap();
+    let residual_satisfied = final_residual <= residual_tolerance;
+    let step_satisfied = final_step_norm <= step_tolerance;
+    let residual_decreased = final_residual < initial_residual;
+    let monotone_nonincreasing = residual_history
+        .windows(2)
+        .all(|pair| pair[1] <= pair[0]);
+    let progress_ratio = if initial_residual > 0.0 {
+        final_residual / initial_residual
+    } else if final_residual == 0.0 {
+        0.0
+    } else {
+        f64::INFINITY
+    };
+
+    let status = if !monotone_nonincreasing {
+        ConvergenceStatus::Diverged
+    } else if residual_satisfied && (accepted_iterations == 0 || step_satisfied) {
+        ConvergenceStatus::Converged
+    } else if step_satisfied && !residual_satisfied {
+        ConvergenceStatus::Stagnated
+    } else if attempted_iterations >= max_iterations {
+        ConvergenceStatus::MaxIterations
+    } else {
+        ConvergenceStatus::Progressing
+    };
+
+    ConvergenceEvidence {
+        status,
+        initial_residual,
+        final_residual,
+        final_step_norm,
+        iterations: attempted_iterations,
+        residual_satisfied,
+        step_satisfied,
+        residual_decreased,
+        monotone_nonincreasing,
+        progress_ratio,
+    }
+}
+
 pub fn evaluate(
     residual_history: &[f64],
     final_step_norm: f64,
@@ -195,6 +270,54 @@ pub fn evaluate(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn accepted_history_allows_rejected_attempts_without_fabricating_history() {
+        let evidence = evaluate_accepted_history(
+            &[10.0, 5.0],
+            1.0,
+            1.0e-8,
+            1.0e-10,
+            1,
+            3,
+            10,
+        );
+        assert_eq!(evidence.status, ConvergenceStatus::Progressing);
+        assert_eq!(evidence.iterations, 3);
+        assert!(evidence.monotone_nonincreasing);
+        assert!(evidence.residual_decreased);
+    }
+
+    #[test]
+    fn accepted_history_uses_attempted_count_for_iteration_cap() {
+        let evidence = evaluate_accepted_history(
+            &[10.0, 5.0],
+            1.0,
+            1.0e-8,
+            1.0e-10,
+            1,
+            3,
+            3,
+        );
+        assert_eq!(evidence.status, ConvergenceStatus::MaxIterations);
+        assert_eq!(evidence.iterations, 3);
+    }
+
+    #[test]
+    fn accepted_history_rejects_more_accepted_than_attempted() {
+        let evidence = evaluate_accepted_history(
+            &[10.0, 5.0],
+            1.0,
+            1.0e-8,
+            1.0e-10,
+            2,
+            1,
+            10,
+        );
+        assert_eq!(evidence.status, ConvergenceStatus::Indeterminate);
+    }
+
+
     use super::*;
 
     #[test]

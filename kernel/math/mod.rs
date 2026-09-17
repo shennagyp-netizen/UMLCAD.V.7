@@ -6,6 +6,7 @@ pub mod constraints;
 pub mod conics3d;
 pub mod conditioning;
 pub mod constants;
+pub mod convergence;
 pub mod curve_differential;
 pub mod curves3d;
 pub mod diagnostics;

@@ -91,7 +91,7 @@ class Runner:
             "--bin",
             "kernel_host",
             "--manifest-path",
-            "kernel_rust/Cargo.toml",
+            "kernel/native/Cargo.toml",
         ]
         self.log("START kernel_host: " + " ".join(command))
         self.kernel = subprocess.Popen(
@@ -269,16 +269,16 @@ def main() -> int:
     runner = Runner(args.release, args.verbose)
     passed = True
     try:
-        passed &= runner.run("rust-regression", ["cargo", "test", "--manifest-path", "kernel_rust/Cargo.toml"], 900)
+        passed &= runner.run("rust-regression", ["cargo", "test", "--manifest-path", "kernel/native/Cargo.toml"], 900)
         passed &= runner.run(
             "rust-kernel-api-e2e",
-            ["cargo", "test", "--manifest-path", "kernel_rust/Cargo.toml", "--test", "kernel_api_integration_e2e", "--", "--nocapture"],
+            ["cargo", "test", "--manifest-path", "kernel/native/Cargo.toml", "--test", "kernel_api_integration_e2e", "--", "--nocapture"],
             900,
         )
         if args.release:
             passed &= runner.run(
                 "rust-kernel-api-e2e-release",
-                ["cargo", "test", "--release", "--manifest-path", "kernel_rust/Cargo.toml", "--test", "kernel_api_integration_e2e", "--", "--nocapture"],
+                ["cargo", "test", "--release", "--manifest-path", "kernel/native/Cargo.toml", "--test", "kernel_api_integration_e2e", "--", "--nocapture"],
                 900,
             )
 

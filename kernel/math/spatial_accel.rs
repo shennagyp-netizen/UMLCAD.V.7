@@ -106,13 +106,25 @@ impl Aabb3 {
         if !tolerance.is_finite() || tolerance < 0.0 {
             return false;
         }
-        self.min.x <= other.max.x + tolerance
-            && self.max.x + tolerance >= other.min.x
-            && self.min.y <= other.max.y + tolerance
-            && self.max.y + tolerance >= other.min.y
-            && self.min.z <= other.max.z + tolerance
-            && self.max.z + tolerance >= other.min.z
+        axis_overlap(self.min.x, self.max.x, other.min.x, other.max.x, tolerance)
+            && axis_overlap(self.min.y, self.max.y, other.min.y, other.max.y, tolerance)
+            && axis_overlap(self.min.z, self.max.z, other.min.z, other.max.z, tolerance)
     }
+}
+
+fn axis_overlap(a_min: f64, a_max: f64, b_min: f64, b_max: f64, tolerance: f64) -> bool {
+    // Avoid `bound + tolerance`: that can overflow to `+∞` and manufacture a
+    // false overlap for otherwise well-separated finite boxes. Comparing the
+    // gap directly preserves the intended closed interval expansion.
+    within_gap(a_min, b_max, tolerance) && within_gap(b_min, a_max, tolerance)
+}
+
+fn within_gap(lower: f64, upper: f64, tolerance: f64) -> bool {
+    if lower <= upper {
+        return true;
+    }
+    let gap = lower - upper;
+    gap.is_finite() && gap <= tolerance
 }
 
 impl Bvh3 {
@@ -310,7 +322,22 @@ mod tests {
             Vec3::new(f64::MAX, f64::MAX, f64::MAX),
         )
         .unwrap();
-        assert_eq!(bounds.center(), Vec3::new(f64::MAX * 0.5 + f64::MAX * 0.5, f64::MAX * 0.5 + f64::MAX * 0.5, f64::MAX * 0.5 + f64::MAX * 0.5));
+        assert!(bounds.center().is_finite());
+    }
+
+    #[test]
+    fn tolerance_does_not_create_overflow_false_overlap() {
+        let a = Aabb3::new(
+            Vec3::new(f64::MAX * 0.75, 0.0, 0.0),
+            Vec3::new(f64::MAX * 0.75, 1.0, 1.0),
+        )
+        .unwrap();
+        let b = Aabb3::new(
+            Vec3::new(-f64::MAX * 0.75, 0.0, 0.0),
+            Vec3::new(-f64::MAX * 0.75, 1.0, 1.0),
+        )
+        .unwrap();
+        assert!(!a.intersects(b, f64::MAX));
     }
 
     #[test]

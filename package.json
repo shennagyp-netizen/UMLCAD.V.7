@@ -10,7 +10,7 @@
     "test:native": "node --test --import tsx \"test/native-*.test.ts\"",
     "check": "npm run build && npm test",
     "check:native": "npm run build:native && npm run test:native",
-    "serve": "node kernel/server.mjs"
+    "serve": "node kernel/api/server.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",

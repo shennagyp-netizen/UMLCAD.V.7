@@ -40,6 +40,7 @@ pub enum DistanceError {
     Degenerate,
     InvalidParameter,
     Overflow,
+    Indeterminate,
 }
 
 fn checked_point(origin: Vec3, direction: Vec3, t: f64) -> Result<Vec3, DistanceError> {
@@ -354,20 +355,19 @@ pub fn line_line_3d(
         if c <= 1.0 + tol {
             c = 1.0;
         } else {
-            return Err(DistanceError::Indeterminate.into());
+            return Err(DistanceError::Indeterminate);
         }
     } else if c < -1.0 {
         if c >= -1.0 - tol {
             c = -1.0;
         } else {
-            return Err(DistanceError::Indeterminate.into());
+            return Err(DistanceError::Indeterminate);
         }
     }
     let den = 1.0 - c * c;
     if !den.is_finite() {
         return Err(DistanceError::Overflow);
     }
-
     if den.abs() <= tol {
         let t = w.dot(u);
         if !t.is_finite() {

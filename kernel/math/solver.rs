@@ -7,13 +7,19 @@ use super::{
     snapshot::{Constraint, SemanticSnapshot},
 };
 use nalgebra::{DMatrix, DVector};
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct LinearSolveReport {
     pub delta: Vec<f64>,
     pub rank: usize,
     pub degrees_of_freedom: usize,
+    /// 2-norm condition estimate of the internally column-normalized Jacobian.
+    /// It describes the normalized linear system, not the raw input Jacobian.
+    /// Uniform changes of parameter units leave this diagnostic invariant because
+    /// each nonzero column is normalized before the singular-value decomposition.
     pub condition_number: f64,
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct SolveOptions {
     pub max_iterations: usize,
@@ -22,6 +28,7 @@ pub struct SolveOptions {
     pub initial_damping: f64,
     pub finite_difference_step: f64,
 }
+
 impl Default for SolveOptions {
     fn default() -> Self {
         Self {
@@ -33,6 +40,7 @@ impl Default for SolveOptions {
         }
     }
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum SolveReason {
     Converged,
@@ -40,12 +48,14 @@ pub enum SolveReason {
     Singular,
     InvalidDomain,
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConstraintResidualReport {
     pub residuals: Vec<f64>,
     pub norm: f64,
     pub kind: String,
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConstraintAnalysis {
     pub residuals: Vec<ConstraintResidualReport>,
@@ -59,11 +69,13 @@ pub struct ConstraintAnalysis {
     pub variable_count: usize,
     pub equation_count: usize,
     pub rank: usize,
+    /// Condition estimate of the internally column-normalized Jacobian.
     pub condition_estimate: f64,
     pub well_conditioned: bool,
     pub relation_count: usize,
     pub relation_equation_count: usize,
 }
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConstraintSolveResult {
     pub converged: bool,
@@ -76,6 +88,7 @@ pub struct ConstraintSolveResult {
     pub analysis: ConstraintAnalysis,
     pub geometry: Vec<(String, Geometry)>,
 }
+
 fn rank_condition(s: &DVector<f64>, tol: f64) -> (usize, f64) {
     let max = s
         .iter()
@@ -96,6 +109,7 @@ fn rank_condition(s: &DVector<f64>, tol: f64) -> (usize, f64) {
     }
     (rank, if rank == 0 { f64::INFINITY } else { max / min })
 }
+
 pub fn scaled_damped_qr(
     j: &[Vec<f64>],
     r: &[f64],
@@ -168,6 +182,7 @@ pub fn scaled_damped_qr(
         condition_number: cond,
     })
 }
+
 fn enc(g: &Geometry) -> Vec<f64> {
     match g {
         Geometry::Line(x) => vec![x.start.x, x.start.y, x.end.x, x.end.y],
@@ -175,6 +190,7 @@ fn enc(g: &Geometry) -> Vec<f64> {
         Geometry::Arc(x) => vec![x.center.x, x.center.y, x.radius, x.start_angle, x.end_angle],
     }
 }
+
 fn dec(t: &Geometry, v: &[f64]) -> Geometry {
     match t {
         Geometry::Line(_) => Geometry::Line(Line {
@@ -193,6 +209,7 @@ fn dec(t: &Geometry, v: &[f64]) -> Geometry {
         }),
     }
 }
+
 fn vars(s: &SemanticSnapshot) -> (Vec<String>, Vec<usize>) {
     let mut ids = Vec::with_capacity(s.geometry.len());
     let mut o = vec![0];
@@ -202,6 +219,7 @@ fn vars(s: &SemanticSnapshot) -> (Vec<String>, Vec<usize>) {
     }
     (ids, o)
 }
+
 fn candidate(
     s: &SemanticSnapshot,
     v: &[f64],
@@ -217,6 +235,7 @@ fn candidate(
     }
     Ok(x)
 }
+
 fn residuals(
     s: &SemanticSnapshot,
     v: &[f64],
@@ -280,6 +299,7 @@ fn residuals(
     }
     Ok((raw, scaled, reports, req, rok))
 }
+
 fn jac(
     s: &SemanticSnapshot,
     v: &[f64],
@@ -290,19 +310,36 @@ fn jac(
 ) -> Result<Vec<Vec<f64>>, String> {
     let mut j = vec![vec![0.0; v.len()]; base.len()];
     for c in 0..v.len() {
+        if !v[c].is_finite() {
+            return Err(format!("non-finite solver parameter at column {c}"));
+        }
         let mut p = v.to_vec();
         let h = step.max(1e-12) * v[c].abs().max(1.0);
+        if !h.is_finite() || h <= 0.0 {
+            return Err(format!("non-finite finite-difference step at column {c}"));
+        }
         p[c] += h;
+        if !p[c].is_finite() {
+            return Err(format!("finite-difference probe overflow at column {c}"));
+        }
         let (n, _, _, _, _) = residuals(s, &p, ids, o)?;
+        if n.iter().any(|x| !x.is_finite()) {
+            return Err(format!("non-finite residual at finite-difference probe column {c}"));
+        }
         for r in 0..base.len() {
-            j[r][c] = (n[r] - base[r]) / h
+            j[r][c] = (n[r] - base[r]) / h;
+            if !j[r][c].is_finite() {
+                return Err(format!("non-finite jacobian entry at row {r}, column {c}"));
+            }
         }
     }
     Ok(j)
 }
+
 fn finite(v: &[f64]) -> bool {
     v.iter().all(|x| x.is_finite())
 }
+
 fn materialize(
     s: &SemanticSnapshot,
     v: &[f64],
@@ -318,6 +355,7 @@ fn materialize(
     }
     Ok(out)
 }
+
 fn analysis(
     s: &SemanticSnapshot,
     v: &[f64],
@@ -349,6 +387,7 @@ fn analysis(
         relation_equation_count: req,
     })
 }
+
 pub fn solve_snapshot(
     s: &SemanticSnapshot,
     o: SolveOptions,

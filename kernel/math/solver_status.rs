@@ -5,6 +5,7 @@
 //! Classification is deliberately fail-closed: a status is only claimed when
 //! the available evidence is sufficient to justify it.
 
+use super::convergence::{TerminalConvergenceEvidence, TerminalConvergenceStatus};
 use super::linear_consistency::{LinearConsistencyEvidence, LinearSystemStatus};
 use super::solver::{ConstraintSolveResult, SolveReason};
 
@@ -12,6 +13,7 @@ use super::solver::{ConstraintSolveResult, SolveReason};
 pub enum SolverStatus {
     Converged,
     ConvergedWithWarning,
+    Stagnated,
     Diverged,
     Singular,
     IllConditioned,
@@ -23,6 +25,7 @@ pub enum SolverStatus {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SolverStatusEvidence {
     pub status: SolverStatus,
+    pub terminal_status: Option<TerminalConvergenceStatus>,
     pub residual_reduced: bool,
     pub final_residual_finite: bool,
     pub final_step_finite: bool,
@@ -91,6 +94,7 @@ pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
 
     SolverStatusEvidence {
         status,
+        terminal_status: None,
         residual_reduced,
         final_residual_finite,
         final_step_finite,
@@ -101,6 +105,60 @@ pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
         equation_count: result.analysis.equation_count,
         iterations: result.iterations,
     }
+}
+
+/// Refine the status using an independently verified terminal convergence
+/// certificate.
+///
+/// The certificate is required to identify the same terminal residual, step,
+/// and iteration count as the solver result. A mismatched certificate is treated
+/// as indeterminate instead of being silently combined with the result.
+///
+/// This function is diagnostic only: it does not change solver iteration control
+/// or introduce a new `SolveReason`. In particular, `Stagnated` means the
+/// terminal certificate proved a small step while the residual remained above
+/// tolerance; the production solver may still have continued beyond that state.
+pub fn classify_with_terminal_convergence(
+    result: &ConstraintSolveResult,
+    terminal: &TerminalConvergenceEvidence,
+) -> SolverStatusEvidence {
+    let mut evidence = classify(result);
+    evidence.terminal_status = Some(terminal.status);
+
+    let terminal_matches = terminal.iterations == result.iterations
+        && terminal.final_residual.to_bits() == result.final_scaled_residual_norm.to_bits()
+        && terminal.final_step_norm.to_bits() == result.final_step_norm.to_bits();
+    if !terminal_matches {
+        evidence.status = SolverStatus::Indeterminate;
+        return evidence;
+    }
+
+    evidence.status = match terminal.status {
+        TerminalConvergenceStatus::Converged => {
+            if result.converged && result.reason == SolveReason::Converged {
+                evidence.status
+            } else {
+                SolverStatus::Indeterminate
+            }
+        }
+        TerminalConvergenceStatus::Stagnated => {
+            if !result.converged && result.reason == SolveReason::MaxIterations {
+                SolverStatus::Stagnated
+            } else {
+                SolverStatus::Indeterminate
+            }
+        }
+        TerminalConvergenceStatus::NotConverged => {
+            if result.converged || result.reason == SolveReason::Converged {
+                SolverStatus::Indeterminate
+            } else {
+                evidence.status
+            }
+        }
+        TerminalConvergenceStatus::Indeterminate => SolverStatus::Indeterminate,
+    };
+
+    evidence
 }
 
 /// Refine the diagnostic classification when an independent linear-consistency
@@ -202,6 +260,7 @@ mod tests {
         assert!(result.converged);
         let evidence = classify(&result);
         assert_eq!(evidence.status, SolverStatus::Converged);
+        assert_eq!(evidence.terminal_status, None);
         assert!(evidence.final_residual_finite);
         assert!(evidence.final_step_finite);
         assert!(evidence.final_step_norm >= 0.0);
@@ -284,6 +343,74 @@ mod tests {
         let evidence = classify(&result);
         assert_eq!(evidence.status, SolverStatus::Indeterminate);
         assert!(!evidence.final_step_finite);
+    }
+
+    #[test]
+    fn terminal_convergence_certificate_can_confirm_convergence() {
+        let result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        let terminal = super::super::convergence::verify_terminal(
+            result.final_scaled_residual_norm,
+            result.final_step_norm,
+            1.0e-8,
+            1.0e-10,
+            result.iterations,
+        );
+        assert_eq!(terminal.status, TerminalConvergenceStatus::Converged);
+        let evidence = classify_with_terminal_convergence(&result, &terminal);
+        assert_eq!(evidence.status, SolverStatus::Converged);
+        assert_eq!(evidence.terminal_status, Some(TerminalConvergenceStatus::Converged));
+    }
+
+    #[test]
+    fn terminal_stagnation_certificate_refines_max_iterations() {
+        let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        result.converged = false;
+        result.reason = SolveReason::MaxIterations;
+        result.final_scaled_residual_norm = result.initial_scaled_residual_norm.max(1.0);
+        result.final_step_norm = 0.0;
+        result.analysis.valid = true;
+        let terminal = super::super::convergence::verify_terminal(
+            result.final_scaled_residual_norm,
+            result.final_step_norm,
+            1.0e-8,
+            1.0e-10,
+            result.iterations,
+        );
+        assert_eq!(terminal.status, TerminalConvergenceStatus::Stagnated);
+        let evidence = classify_with_terminal_convergence(&result, &terminal);
+        assert_eq!(evidence.status, SolverStatus::Stagnated);
+    }
+
+    #[test]
+    fn mismatched_terminal_certificate_fails_closed() {
+        let result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        let mut terminal = super::super::convergence::verify_terminal(
+            result.final_scaled_residual_norm,
+            result.final_step_norm,
+            1.0e-8,
+            1.0e-10,
+            result.iterations,
+        );
+        terminal.final_step_norm = terminal.final_step_norm + 1.0;
+        terminal.status = TerminalConvergenceStatus::NotConverged;
+        let evidence = classify_with_terminal_convergence(&result, &terminal);
+        assert_eq!(evidence.status, SolverStatus::Indeterminate);
+        assert_eq!(evidence.terminal_status, Some(TerminalConvergenceStatus::NotConverged));
+    }
+
+    #[test]
+    fn terminal_not_converged_cannot_override_solver_convergence() {
+        let result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        let terminal = super::super::convergence::verify_terminal(
+            result.final_scaled_residual_norm,
+            result.final_step_norm,
+            0.0,
+            0.0,
+            result.iterations,
+        );
+        let evidence = classify_with_terminal_convergence(&result, &terminal);
+        assert_eq!(terminal.status, TerminalConvergenceStatus::NotConverged);
+        assert_eq!(evidence.status, SolverStatus::Indeterminate);
     }
 
     #[test]

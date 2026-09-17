@@ -222,6 +222,7 @@ mod tests {
         let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         result.converged = false;
         result.reason = SolveReason::MaxIterations;
+        result.final_scaled_residual_norm = result.initial_scaled_residual_norm;
         let mut consistency = inconsistent_evidence(&result);
         consistency.equation_count += 1;
         let evidence = classify_with_linear_consistency(&result, &consistency);

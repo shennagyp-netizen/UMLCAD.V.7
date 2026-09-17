@@ -87,9 +87,9 @@ mod tests {
     }
 
     #[test]
-    fn absolute_component_is_not_falsely_claimed_scale_invariant() {
+    fn absolute_component_remains_absolute_across_scales() {
         let tolerance = Tolerance::new(1.0e-3, 0.0).unwrap();
-        assert!(tolerance.approximately_equal(0.0, 5.0e-4, 1.0).unwrap());
-        assert!(!tolerance.approximately_equal(0.0, 5.0e-4, 1.0e6).unwrap());
+        assert_eq!(tolerance.threshold(1.0), Ok(1.0e-3));
+        assert_eq!(tolerance.threshold(1.0e6), Ok(1.0e-3));
     }
 }

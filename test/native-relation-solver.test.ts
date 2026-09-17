@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, solveConstraints, type GeometricRelation } from "../kernel/src/native-index.js";
+import { DesignProgram, solveConstraints, type GeometricRelation } from "../kernel/api/src/native-index.js";
 
 test("native solver integrates relations into the same equation system",()=>{
   const p=new DesignProgram();

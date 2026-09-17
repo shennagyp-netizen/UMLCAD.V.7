@@ -7,6 +7,7 @@
 use super::{
     constraints::endpoint,
     geometry::{Geometry, Line, Point},
+    relations::evaluate_relation,
     snapshot::{Endpoint, Relation, RelationPoint, SemanticSnapshot, TangentMode},
 };
 
@@ -538,31 +539,92 @@ pub fn analytic_relation_jacobian(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::geometry::{Circle, Line};
+    use super::super::geometry::{Arc, Circle, Geometry, Line, Point};
+    use super::super::snapshot::GeometryItem;
 
-    fn line(id: &str, sx: f64, sy: f64, ex: f64, ey: f64) -> super::super::snapshot::GeometryItem {
-        super::super::snapshot::GeometryItem {
+    fn line(id: &str, sx: f64, sy: f64, ex: f64, ey: f64) -> GeometryItem {
+        GeometryItem {
             id: id.into(),
             geometry: Geometry::Line(Line { start: Point { x: sx, y: sy }, end: Point { x: ex, y: ey } }),
             parameter_dependencies: vec![],
         }
     }
 
-    fn circle(id: &str, x: f64, y: f64, r: f64) -> super::super::snapshot::GeometryItem {
-        super::super::snapshot::GeometryItem {
+    fn circle(id: &str, x: f64, y: f64, r: f64) -> GeometryItem {
+        GeometryItem {
             id: id.into(),
             geometry: Geometry::Circle(Circle { center: Point { x, y }, radius: r }),
             parameter_dependencies: vec![],
         }
     }
 
-    fn snapshot(geometry: Vec<super::super::snapshot::GeometryItem>, relations: Vec<Relation>) -> SemanticSnapshot {
+    fn snapshot(geometry: Vec<GeometryItem>, relations: Vec<Relation>) -> SemanticSnapshot {
         SemanticSnapshot {
             parameters: vec![],
             geometry,
             constraints: vec![],
             relations: relations.into_iter().enumerate().map(|(i, relation)| (format!("r{i}"), relation)).collect(),
         }
+    }
+
+    fn set_parameter(snapshot: &mut SemanticSnapshot, column: usize, delta: f64) {
+        let mut cursor = 0usize;
+        for item in &mut snapshot.geometry {
+            match &mut item.geometry {
+                Geometry::Line(line) => {
+                    let end = cursor + 4;
+                    if column >= cursor && column < end {
+                        let local = column - cursor;
+                        match local {
+                            0 => line.start.x += delta,
+                            1 => line.start.y += delta,
+                            2 => line.end.x += delta,
+                            3 => line.end.y += delta,
+                            _ => unreachable!(),
+                        }
+                        return;
+                    }
+                    cursor = end;
+                }
+                Geometry::Circle(circle) => {
+                    let end = cursor + 3;
+                    if column >= cursor && column < end {
+                        match column - cursor {
+                            0 => circle.center.x += delta,
+                            1 => circle.center.y += delta,
+                            2 => circle.radius += delta,
+                            _ => unreachable!(),
+                        }
+                        return;
+                    }
+                    cursor = end;
+                }
+                Geometry::Arc(arc) => {
+                    let end = cursor + 5;
+                    if column >= cursor && column < end {
+                        match column - cursor {
+                            0 => arc.center.x += delta,
+                            1 => arc.center.y += delta,
+                            2 => arc.radius += delta,
+                            3 => arc.start_angle += delta,
+                            4 => arc.end_angle += delta,
+                            _ => unreachable!(),
+                        }
+                        return;
+                    }
+                    cursor = end;
+                }
+            }
+        }
+        panic!("parameter column {column} not found");
+    }
+
+    fn residual_rows(snapshot: &SemanticSnapshot) -> Vec<f64> {
+        snapshot
+            .relations
+            .iter()
+            .flat_map(|(_, relation)| evaluate_relation(snapshot, relation).unwrap().residuals)
+            .collect()
     }
 
     #[test]
@@ -601,10 +663,71 @@ mod tests {
     }
 
     #[test]
+    fn analytic_rows_match_central_difference_oracle() {
+        let snapshot = snapshot(
+            vec![
+                line("a", 0.0, 0.0, 3.0, 0.0),
+                line("b", 0.0, 2.0, 4.0, 3.0),
+                circle("c", 8.0, 2.0, 1.5),
+            ],
+            vec![
+                Relation::Parallel { first_geometry_id: "a".into(), second_geometry_id: "b".into() },
+                Relation::Perpendicular { first_geometry_id: "a".into(), second_geometry_id: "b".into() },
+                Relation::EqualLength { first_geometry_id: "a".into(), second_geometry_id: "b".into() },
+                Relation::Angle { first_geometry_id: "a".into(), second_geometry_id: "b".into(), radians: 0.2 },
+                Relation::Collinear { first_geometry_id: "a".into(), second_geometry_id: "b".into() },
+                Relation::Concentric { first_geometry_id: "c".into(), second_geometry_id: "c".into() },
+                Relation::EqualRadius { first_geometry_id: "c".into(), second_geometry_id: "c".into() },
+                Relation::Radius { geometry_id: "c".into(), value: 2.0 },
+                Relation::Diameter { geometry_id: "c".into(), value: 3.0 },
+                Relation::Tangent { first_geometry_id: "a".into(), second_geometry_id: "c".into(), mode: TangentMode::External },
+                Relation::Midpoint { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, line_geometry_id: "a".into() },
+                Relation::PointOnLine { point: RelationPoint::Endpoint { geometry_id: "c".into(), point: Endpoint::Start }, line_geometry_id: "a".into() },
+                Relation::PointOnCircle { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, circle_geometry_id: "c".into() },
+                Relation::DistancePoints { first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, second: RelationPoint::Center { geometry_id: "c".into() }, value: 8.0 },
+                Relation::Symmetric {
+                    first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
+                    second: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start },
+                    about: RelationPoint::Center { geometry_id: "c".into() },
+                },
+            ],
+        );
+
+        // The concentric/equal-radius rows use the same circle intentionally to
+        // isolate exact center/radius derivatives. All other rows are selected
+        // away from distance/angle/norm singularities.
+        let analytic = analytic_relation_jacobian(&snapshot).unwrap();
+        let base = residual_rows(&snapshot);
+        assert_eq!(analytic.len(), base.len());
+
+        let (_, offsets) = layout(&snapshot);
+        let columns = offsets.last().copied().unwrap_or(0);
+        let h = 1.0e-6;
+        for column in 0..columns {
+            let mut plus = snapshot.clone();
+            let mut minus = snapshot.clone();
+            set_parameter(&mut plus, column, h);
+            set_parameter(&mut minus, column, -h);
+            let plus_values = residual_rows(&plus);
+            let minus_values = residual_rows(&minus);
+            for row in 0..analytic.len() {
+                let numerical = (plus_values[row] - minus_values[row]) / (2.0 * h);
+                let expected = analytic[row][column];
+                let scale = numerical.abs().max(expected.abs()).max(1.0);
+                assert!((numerical - expected).abs() <= 5.0e-5 * scale,
+                    "row {row}, col {column}: analytic={expected:.12e}, numerical={numerical:.12e}");
+            }
+        }
+    }
+
+    #[test]
     fn nondifferentiable_point_on_line_fails_closed() {
         let snapshot = snapshot(
             vec![line("a", 0.0, 0.0, 1.0, 0.0), line("b", 0.0, 1.0, 1.0, 1.0)],
-            vec![Relation::PointOnLine { point: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, line_geometry_id: "b".into() }],
+            vec![Relation::PointOnLine {
+                point: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
+                line_geometry_id: "b".into(),
+            }],
         );
         assert_eq!(analytic_relation_jacobian(&snapshot), Err(RelationJacobianError::Indeterminate));
     }

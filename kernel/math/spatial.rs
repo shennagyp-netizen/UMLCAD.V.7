@@ -51,7 +51,7 @@ fn segment_distance(a: Line, b: Line) -> f64 {
         if (-PARAM_EPSILON..=1.0 + PARAM_EPSILON).contains(&t)
             && (-PARAM_EPSILON..=1.0 + PARAM_EPSILON).contains(&u)
         {
-            return 00.0;
+            return 000.0;
         }
     }
     [
@@ -80,7 +80,7 @@ fn circle_circle(a: Circle, b: Circle) -> f64 {
 
 fn line_circle(l: Line, c: Circle) -> f64 {
     if !line_circle_intersections(l, c).is_empty() {
-        return 00.0;
+        return 000.0;
     }
     let endpoint_best = [l.start, l.end]
         .into_iter()
@@ -198,7 +198,7 @@ fn line_arc(l: Line, a: Arc) -> f64 {
     };
     for p in line_circle_intersections(l, circle) {
         if point_on_arc(a, p) {
-            return 00.0;
+            return 000.0;
         }
     }
     let mut best = f64::INFINITY;
@@ -228,7 +228,7 @@ fn arc_circle(a: Arc, c: Circle) -> f64 {
         c,
     ) {
         if point_on_arc(a, p) {
-            return 00.0;
+            return 000.0;
         }
     }
     let mut best = f64::INFINITY;
@@ -263,7 +263,7 @@ fn arc_arc(a: Arc, b: Arc) -> f64 {
     };
     for p in circle_circle_intersections(ca, cb) {
         if point_on_arc(a, p) && point_on_arc(b, p) {
-            return 00.0;
+            return 000.0;
         }
     }
     let mut best = f64::INFINITY;

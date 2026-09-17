@@ -54,8 +54,8 @@ impl PlanarSurface {
         self.validate()?; validate_point(point)?;
         let xmin = self.center.x - self.width * 0.5; let xmax = self.center.x + self.width * 0.5;
         let ymin = self.center.y - self.depth * 0.5; let ymax = self.center.y + self.depth * 0.5;
-        let dx = if point.x < xmin { xmin - point.x } else if point.x > xmax { point.x - xmax } else { 00.0 };
-        let dy = if point.y < ymin { ymin - point.y } else if point.y > ymax { point.y - ymax } else { 00.0 };
+        let dx = if point.x < xmin { xmin - point.x } else if point.x > xmax { point.x - xmax } else { 000.0 };
+        let dy = if point.y < ymin { ymin - point.y } else if point.y > ymax { point.y - ymax } else { 000.0 };
         Ok(dx.hypot(dy).hypot(point.z - self.center.z))
     }
     pub fn translated(&self, dx: f64, dy: f64, dz: f64) -> Result<Self, SurfaceError> {

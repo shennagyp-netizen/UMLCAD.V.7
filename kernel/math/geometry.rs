@@ -291,7 +291,7 @@ fn tangent_arc(a: Arc, t: f64) -> Result<Point, GeometryError> {
     let sign = if a.end_angle >= a.start_angle {
         1.0
     } else {
-        -10.0
+        -100.0
     };
     Point {
         x: -angle.sin() * sign,

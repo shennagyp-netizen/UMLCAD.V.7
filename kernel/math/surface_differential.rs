@@ -88,21 +88,27 @@ fn deboor(t: f64, degree: usize, knots: &[f64], control: &[H]) -> H {
     work[degree]
 }
 
-fn base_net(surface: &NurbsSurface2D) -> Vec<Vec<H>> {
+fn base_net(surface: &NurbsSurface2D, weight_scale: f64) -> Result<Vec<Vec<H>>, NurbsSurfaceError> {
     let nu = count(&surface.knots_u, surface.degree_u);
     let nv = count(&surface.knots_v, surface.degree_v);
-    (0..nu)
+    let net = (0..nu)
         .map(|i| {
             (0..nv)
                 .map(|j| {
                     let k = i * nv + j;
                     let p = surface.control_points[k];
-                    let w = surface.weights[k];
+                    let w = surface.weights[k] / weight_scale;
                     H { x: p.x * w, y: p.y * w, z: p.z * w, w }
                 })
-                .collect()
+                .collect::<Vec<_>>()
         })
-        .collect()
+        .collect::<Vec<_>>();
+    if net.iter().flatten().any(|point| {
+        !point.x.is_finite() || !point.y.is_finite() || !point.z.is_finite() || !point.w.is_finite()
+    }) {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    Ok(net)
 }
 
 fn du_net(
@@ -237,7 +243,7 @@ fn quotient2(p: H, d: H, dd: H) -> Result<Point3, NurbsSurfaceError> {
     let q = Point3 {
         x: (dd.x * w2 - p.x * w * dd.w - 2.0 * d.x * w * d.w + 2.0 * p.x * d.w * d.w) / w3,
         y: (dd.y * w2 - p.y * w * dd.w - 2.0 * d.y * w * d.w + 2.0 * p.y * d.w * d.w) / w3,
-        z: (dd.z * w2 - p.z * w * dd.w - 2.0 * d.z * w * d.w + 2.0 * p.z * d.w * d.w) / w3,
+        z: (dd.z * w2 - p.z * w * dd.w - 2.0 * d.z * w * dd.w + 2.0 * p.z * d.w * d.w) / w3,
     };
     if q.x.is_finite() && q.y.is_finite() && q.z.is_finite() {
         Ok(q)
@@ -260,7 +266,8 @@ pub fn derivatives_at(
         return Err(NurbsSurfaceError::OutOfDomain);
     }
 
-    let base_net = base_net(surface);
+    let weight_scale = surface.normalized_weight_scale()?;
+    let base_net = base_net(surface, weight_scale)?;
     let base_h = eval_net(
         &base_net,
         surface.degree_u,
@@ -447,10 +454,10 @@ mod tests {
             1,
             1,
             vec![
-                crate::math::nurbs_surface::Point3 { x: 0.0, y: 0.0, z: 0.0 },
-                crate::math::nurbs_surface::Point3 { x: 0.0, y: 1.0, z: 0.0 },
-                crate::math::nurbs_surface::Point3 { x: 1.0, y: 0.0, z: 0.0 },
-                crate::math::nurbs_surface::Point3 { x: 1.0, y: 1.0, z: 0.0 },
+                Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                Point3 { x: 0.0, y: 1.0, z: 0.0 },
+                Point3 { x: 1.0, y: 0.0, z: 0.0 },
+                Point3 { x: 1.0, y: 1.0, z: 0.0 },
             ],
             vec![1.0; 4],
             vec![0.0, 0.0, 1.0, 1.0],
@@ -473,5 +480,34 @@ mod tests {
     fn planar_patch_has_zero_gaussian_curvature() {
         let k = curvature_at(&patch(), 0.5, 0.5, 1.0e-12).unwrap();
         assert!(k.gaussian.abs() < 1.0e-12 && k.mean.abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn second_differentials_are_invariant_under_extreme_uniform_weight_scaling() {
+        for scale in [1.0e-200, 1.0e200] {
+            let surface = NurbsSurface2D::new(
+                1,
+                1,
+                vec![
+                    Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                    Point3 { x: 0.0, y: 1.0, z: 0.0 },
+                    Point3 { x: 1.0, y: 0.0, z: 0.0 },
+                    Point3 { x: 1.0, y: 1.0, z: 0.0 },
+                ],
+                vec![scale; 4],
+                vec![0.0, 0.0, 1.0, 1.0],
+                vec![0.0, 0.0, 1.0, 1.0],
+            );
+            let d = derivatives_at(&surface, 0.3, 0.7).unwrap();
+            assert!((d.du.x - 1.0).abs() < 1.0e-12);
+            assert!(d.du.y.abs() < 1.0e-12 && d.du.z.abs() < 1.0e-12);
+            assert!((d.dv.y - 1.0).abs() < 1.0e-12);
+            assert!(d.dv.x.abs() < 1.0e-12 && d.dv.z.abs() < 1.0e-12);
+            assert!(d.duu.x.abs() < 1.0e-12 && d.duu.y.abs() < 1.0e-12 && d.duu.z.abs() < 1.0e-12);
+            assert!(d.duv.x.abs() < 1.0e-12 && d.duv.y.abs() < 1.0e-12 && d.duv.z.abs() < 1.0e-12);
+            assert!(d.dvv.x.abs() < 1.0e-12 && d.dvv.y.abs() < 1.0e-12 && d.dvv.z.abs() < 1.0e-12);
+            let k = curvature_at(&surface, 0.3, 0.7, 1.0e-12).unwrap();
+            assert!(k.gaussian.abs() < 1.0e-12 && k.mean.abs() < 1.0e-12);
+        }
     }
 }

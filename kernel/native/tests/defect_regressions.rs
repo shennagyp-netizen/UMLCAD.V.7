@@ -3,7 +3,7 @@ use umlcad_kernel_rust::functions::{
     geometry::{Geometry, Line, Point},
     nurbs_surface::{NurbsSurface2D, Point3 as SurfacePoint3},
     nurbs_surface_differential::NurbsSurfaceDifferential,
-    snapshot::{Constraint, Endpoint, GeometryItem, SemanticSnapshot},
+    snapshot::{Constraint, Endpoint, GeometryItem, Relation, SemanticSnapshot},
     solver::{scaled_damped_qr, solve_snapshot, SolveOptions},
     spatial::point_distance,
     topology::build_topology,
@@ -64,36 +64,44 @@ fn topology_vertex_deduplication_scales_with_model_extent() {
 fn solver_rejects_a_nonfinite_finite_difference_probe() {
     let near_max = f64::MAX * 0.99999995;
     assert!((near_max + 1.0e-7 * near_max).is_infinite());
+
     let geometry = vec![
         GeometryItem {
             id: "a".into(),
-            geometry: Geometry::Line(Line {
-                start: Point { x: near_max, y: 0.0 },
-                end: Point { x: near_max * 0.5, y: 1.0 },
+            geometry: Geometry::Circle(umlcad_kernel_rust::functions::geometry::Circle {
+                center: Point { x: near_max, y: 0.0 },
+                radius: 1.0,
             }),
             parameter_dependencies: vec![],
         },
         GeometryItem {
             id: "b".into(),
-            geometry: Geometry::Line(Line {
-                start: Point { x: 0.0, y: 0.0 },
-                end: Point { x: 1.0, y: 1.0 },
+            geometry: Geometry::Circle(umlcad_kernel_rust::functions::geometry::Circle {
+                center: Point { x: 0.0, y: 0.0 },
+                radius: 1.0,
             }),
             parameter_dependencies: vec![],
         },
     ];
-    let constraints = vec![(
-        "coincident".into(),
-        Constraint::Coincident {
-            first_geometry_id: "a".into(),
-            first_point: Endpoint::Start,
-            second_geometry_id: "b".into(),
-            second_point: Endpoint::Start,
-        },
-    )];
+
+    let mut model = SemanticSnapshot {
+        parameters: vec![],
+        geometry,
+        constraints: vec![],
+        relations: vec![
+            (
+                "concentric".into(),
+                Relation::Concentric {
+                    first_geometry_id: "a".into(),
+                    second_geometry_id: "b".into(),
+                },
+            ),
+        ],
+    };
+    model = model.deterministic();
 
     let result = solve_snapshot(
-        &snapshot(geometry, constraints),
+        &model,
         SolveOptions {
             max_iterations: 1,
             ..Default::default()

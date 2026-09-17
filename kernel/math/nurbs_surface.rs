@@ -82,9 +82,11 @@ impl NurbsSurface2D {
         if self.weights.len() != self.control_points.len() {
             return Err(NurbsSurfaceError::InvalidWeightCount);
         }
-        if self.control_points.iter().any(|p| {
-            !p.x.is_finite() || !p.y.is_finite() || !p.z.is_finite()
-        }) {
+        if self
+            .control_points
+            .iter()
+            .any(|p| !p.x.is_finite() || !p.y.is_finite() || !p.z.is_finite())
+        {
             return Err(NurbsSurfaceError::NonFinite);
         }
         if self.weights.iter().any(|w| !w.is_finite()) {
@@ -110,6 +112,14 @@ impl NurbsSurface2D {
             self.knots_v[self.degree_v],
             self.knots_v[count_v],
         ))
+    }
+
+    fn normalized_weight_scale(&self) -> Result<f64, NurbsSurfaceError> {
+        let scale = self.weights.iter().copied().fold(0.0, f64::max);
+        if !scale.is_finite() || scale <= 0.0 {
+            return Err(NurbsSurfaceError::InvalidWeight);
+        }
+        Ok(scale)
     }
 
     pub fn point_at(&self, u: f64, v: f64) -> Result<Point3, NurbsSurfaceError> {
@@ -206,6 +216,7 @@ impl NurbsSurface2D {
     fn evaluate_homogeneous(&self, u: f64, v: f64) -> HomogeneousPoint {
         let count_u = self.control_count_u_unchecked();
         let count_v = self.control_count_v_unchecked();
+        let weight_scale = self.normalized_weight_scale().unwrap_or(1.0);
         let span_u = find_span(u, self.degree_u, &self.knots_u, count_u);
         let mut rows = Vec::with_capacity(count_v);
         for v_index in 0..count_v {
@@ -214,7 +225,7 @@ impl NurbsSurface2D {
                 let u_index = span_u - self.degree_u + local;
                 let index = u_index * count_v + v_index;
                 let point = self.control_points[index];
-                let weight = self.weights[index];
+                let weight = self.weights[index] / weight_scale;
                 work.push(HomogeneousPoint {
                     xw: point.x * weight,
                     yw: point.y * weight,
@@ -375,5 +386,32 @@ mod tests {
         assert!((point.x - 0.25).abs() < 1e-12);
         assert!((point.y - 0.75).abs() < 1e-12);
         assert!((point.z - 1.25).abs() < 1e-12);
+    }
+
+    #[test]
+    fn huge_uniform_weights_do_not_overflow_surface_evaluation() {
+        let surface = NurbsSurface2D::new(
+            1,
+            1,
+            vec![
+                Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                Point3 { x: 0.0, y: 1.0e200, z: 1.0e200 },
+                Point3 { x: 1.0e200, y: 0.0, z: 2.0e200 },
+                Point3 { x: 1.0e200, y: 1.0e200, z: 3.0e200 },
+            ],
+            vec![1.0e200; 4],
+            vec![0.0, 0.0, 1.0, 1.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+        );
+        let point = surface.point_at(0.25, 0.75).unwrap();
+        let expected = Point3 {
+            x: 0.25e200,
+            y: 0.75e200,
+            z: 1.25e200,
+        };
+        let scale = expected.x.abs().max(expected.y.abs()).max(expected.z.abs());
+        assert!((point.x - expected.x).abs() <= 1.0e-12 * scale);
+        assert!((point.y - expected.y).abs() <= 1.0e-12 * scale);
+        assert!((point.z - expected.z).abs() <= 1.0e-12 * scale);
     }
 }

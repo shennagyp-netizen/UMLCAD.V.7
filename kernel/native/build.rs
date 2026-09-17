@@ -115,6 +115,7 @@ const PRODUCTION_TESTS: &str = r#"
 #[cfg(test)]
 mod production_row_scaling_tests {
     use super::*;
+    use super::snapshot::GeometryItem;
 
     fn scaled_snapshot(scale: f64) -> SemanticSnapshot {
         SemanticSnapshot {

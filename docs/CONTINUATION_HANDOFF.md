@@ -3,39 +3,40 @@
 ## Snapshot
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
-- Completed milestone branch: `milestone/solver-analytic-relation-jacobian`
-- Completed milestone head: `b0561bfabff6e6d4b60fae7fecfead00bf8e6b05`
-- This handoff records the state immediately before advancing `main`.
+- Current milestone branch: `milestone/solver-status-authority`
+- Previous completed milestone: `milestone/solver-analytic-relation-jacobian`
 
 ## Completed mathematical-authority state
-The hardened math station and comprehensive cross-layer E2E gate are merged to `main`.
+The hardened math station and comprehensive cross-layer E2E gate are merged to `main` and post-merge green.
 
 The V7 math program has strong implemented/tested foundations across M1-M7, M11 spatial/tessellation, and M12 GPU abstraction groundwork. The full M0-M16 roadmap is not complete.
 
 ## Completed M10 relation-Jacobian station
 `kernel/math/relation_jacobian.rs` is the analytic authority for the current relation residual equations. Central differences are used only as an independent verification oracle. Nondifferentiable configurations fail closed as `Indeterminate`.
 
-`kernel/math/jacobian.rs` now emits the complete production Jacobian in exact residual order:
-1. analytic constraint rows;
-2. analytic relation rows.
+`kernel/math/jacobian.rs` emits the production Jacobian in exact residual order: analytic constraint rows followed by analytic relation rows. The production solver therefore uses analytic relation derivatives for the currently supported relation set.
 
-The existing production solver therefore consumes analytic relation derivatives directly for the supported relation set. The former production finite-difference relation fallback is no longer used for these current equations.
+A regression in `kernel/native/tests/defect_regressions.rs` sets `finite_difference_step = f64::MAX` in a relation-only radius solve and still converges, proving the supported production relation solve is independent of finite-difference probing.
 
-`kernel/native/tests/defect_regressions.rs` contains a relation-only radius solve that deliberately sets `finite_difference_step = f64::MAX`; it converges, providing regression evidence that the production relation path is independent of finite-difference probing.
+## Current M10 status-authority station
+`kernel/math/solver_status.rs` adds a conservative typed `SolverStatus` authority around the existing immutable `ConstraintSolveResult` evidence. It distinguishes currently provable states such as `Converged`, `ConvergedWithWarning`, `Diverged`, `Singular`, `IllConditioned`, `MaxIterations`, and `Indeterminate` without fabricating unsupported `Inconsistent`, `InvalidInput`, or `Cancelled` states from insufficient evidence.
 
-## Validation achieved
-For milestone head `b0561bfabff6e6d4b60fae7fecfead00bf8e6b05`:
-- Rust kernel validation: green, including `137 passed; 0 failed; 0 ignored` in the library tests and `23 passed; 0 failed; 0 ignored` in aggressive integration coverage.
-- Comprehensive E2E: green, including full Rust debug/release, typed Rust API E2E, .NET framework discovery/full suite, production black-box HTTP E2E, Demo E2E, and raw HTTP red-team checks.
-- The E2E run used Python 3.13, .NET 10.0.401, and Rust 1.98.1 on GitHub Actions.
+The classifier is diagnostic-only in this station: numerical solver control flow is unchanged. Four unit tests cover healthy convergence, singular result evidence, no-progress max-iteration behavior, and non-finite/indeterminate evidence.
 
-## Immediate continuation
-1. Fast-forward/merge the validated milestone to `main` and verify post-merge Rust + E2E.
-2. Continue M10 with explicit solver status semantics for singular/indeterminate cases.
-3. Strengthen rank, conditioning, convergence and step-acceptance verification.
-4. Expand analytic relation/constraint coverage and adversarial cases.
-5. Continue remaining M8/M9 construction and B-Rep mathematical authority.
-6. Then advance GPU conformance/performance/final-red-team M13-M16.
+## Verification gate
+Do not merge the status-authority milestone until both GitHub Actions gates are green on its exact final head:
+- `.github/workflows/rust-kernel.yml`
+- `.github/workflows/e2e.yml`, running `python3 tests/e2e/run.py --release --verbose`
+
+The comprehensive E2E gate runs full Rust debug/release suites, typed Rust API E2E, .NET framework discovery/full suite, production black-box HTTP E2E, Demo E2E, raw HTTP red-team checks, and rejects ignored Rust tests.
+
+## Immediate continuation after this station
+1. Merge the fully validated status-authority station to `main` and verify post-merge Rust + E2E.
+2. Continue M10 with explicit inconsistent/rank-revealing analysis where the mathematics can prove it.
+3. Strengthen condition estimates, residual/step monotonicity, stagnation and convergence verification.
+4. Remove or strictly type the remaining generic finite-difference fallback once all intended Jacobian equation families have authoritative derivatives.
+5. Continue broader analytic relation/constraint adversarial coverage.
+6. Then continue M8/M9 construction and B-Rep mathematical authority, followed later by M13-M16 GPU/conformance/performance/final-red-team work.
 
 ## Non-negotiable authority rules
 - CPU math is normative.

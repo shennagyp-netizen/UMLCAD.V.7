@@ -1,13 +1,20 @@
 # Kernel E2E Coverage Matrix
 
-The integration gate deliberately has three boundaries. No single test substitutes for the others.
+The integration gate deliberately has multiple boundaries. No single test substitutes for the others.
 
 | Boundary | Test layer | What is proven |
 | --- | --- | --- |
 | Kernel library API | `kernel/native/tests/kernel_api_integration_e2e.rs` | Typed `KernelRequest` dispatch, numerical geometry behavior, linear solve, snapshot solve/analyze, dimensions, engineering evidence, DXF, adversarial solver inputs |
+| .NET Framework contract/unit layer | `dotnet/tests/UMLCAD.Framework.Tests` | Complete Framework test project, including semantic builds, compiled models, identity collisions, client behavior, adversarial cases, and real-kernel E2E tests |
 | Production .NET boundary | `dotnet/tests/UMLCAD.Kernel.Integration.Tests/KernelBlackBoxE2ETests.cs` | `RustKernelService` JSON/HTTP transport, compiled-model identity, graph nodes, diagnostics, concurrency, invalid geometry, stale references, malformed schema |
-| Process/wire boundary | `tests/e2e/run.py` | Real `kernel_host` lifecycle, readiness, cleanup, unknown endpoint, malformed JSON, unsupported schema/geometry, aggregate failure reporting |
+| Process/wire boundary | `tests/e2e/run.py` | Real `kernel_host` lifecycle, readiness, cleanup, explicit repository-path validation, test discovery, unknown endpoint, malformed JSON, unsupported schema/geometry, aggregate failure reporting |
 | Application path | `projects/demo/Demo.csproj -- --e2e` | Real Bench Vise semantic definition through package creation, Rust evaluation, compiled model validation, nested assembly assertions |
+
+## Test discovery invariant
+
+`tests/e2e/run.py` resolves the repository root from its own location and validates the Rust manifest, both .NET test projects, and the demo project before execution. It explicitly runs `dotnet test --list-tests` for `UMLCAD.Framework.Tests` and fails the gate if the project exposes zero tests or does not expose `RustKernelEndToEndTests`.
+
+The Framework project is then executed **without a test filter**. The previous `Category=KernelEndToEnd` filter selected only the five real-kernel tests in `RustKernelEndToEndTests.cs` and silently excluded the rest of the Framework suite. Those tests remain covered because the full project now runs after the kernel host is started.
 
 ## KernelRequest operation coverage
 

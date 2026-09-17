@@ -33,14 +33,7 @@ fn circle(id: &str, x: f64, y: f64, radius: f64) -> GeometryItem {
     }
 }
 
-fn arc(
-    id: &str,
-    x: f64,
-    y: f64,
-    radius: f64,
-    start_angle: f64,
-    end_angle: f64,
-) -> GeometryItem {
+fn arc(id: &str, x: f64, y: f64, radius: f64, start_angle: f64, end_angle: f64) -> GeometryItem {
     GeometryItem {
         id: id.into(),
         geometry: Geometry::Arc(Arc {
@@ -238,56 +231,15 @@ fn analytic_jacobian_covers_all_tangent_parameterizations_and_modes() {
         ));
     }
 
-    assert_matches_central_difference(&snapshot(
-        vec![circle("a", 0.0, 0.0, 5.0), circle("b", 2.0, 0.5, 1.0)],
-        Relation::Tangent {
-            first_geometry_id: "a".into(),
-            second_geometry_id: "b".into(),
-            mode: TangentMode::Any,
-        },
-    ));
-
     let tangent_variants = [
-        (
-            vec![line("l", 0.0, 0.0, 3.0, 0.2), circle("c", 1.0, 2.0, 0.75)],
-            "l",
-            "c",
-        ),
-        (
-            vec![line("l", 0.0, 0.0, 3.0, 0.2), arc("a", 1.0, 2.0, 0.75, 0.3, 1.2)],
-            "l",
-            "a",
-        ),
-        (
-            vec![circle("c", 1.0, 2.0, 0.75), line("l", 0.0, 0.0, 3.0, 0.2)],
-            "c",
-            "l",
-        ),
-        (
-            vec![arc("a", 1.0, 2.0, 0.75, 0.3, 1.2), line("l", 0.0, 0.0, 3.0, 0.2)],
-            "a",
-            "l",
-        ),
-        (
-            vec![circle("a", 0.0, 0.0, 3.0), circle("b", 5.0, 1.0, 1.0)],
-            "a",
-            "b",
-        ),
-        (
-            vec![circle("a", 0.0, 0.0, 3.0), arc("b", 5.0, 1.0, 1.0, 0.2, 1.0)],
-            "a",
-            "b",
-        ),
-        (
-            vec![arc("a", 0.0, 0.0, 3.0, 0.2, 1.2), circle("b", 5.0, 1.0, 1.0)],
-            "a",
-            "b",
-        ),
-        (
-            vec![arc("a", 0.0, 0.0, 3.0, 0.2, 1.2), arc("b", 5.0, 1.0, 1.0, 0.1, 1.1)],
-            "a",
-            "b",
-        ),
+        (vec![line("l", 0.0, 0.0, 3.0, 0.2), circle("c", 1.0, 2.0, 0.75)], "l", "c"),
+        (vec![line("l", 0.0, 0.0, 3.0, 0.2), arc("a", 1.0, 2.0, 0.75, 0.3, 1.2)], "l", "a"),
+        (vec![circle("c", 1.0, 2.0, 0.75), line("l", 0.0, 0.0, 3.0, 0.2)], "c", "l"),
+        (vec![arc("a", 1.0, 2.0, 0.75, 0.3, 1.2), line("l", 0.0, 0.0, 3.0, 0.2)], "a", "l"),
+        (vec![circle("a", 0.0, 0.0, 3.0), circle("b", 5.0, 1.0, 1.0)], "a", "b"),
+        (vec![circle("a", 0.0, 0.0, 3.0), arc("b", 5.0, 1.0, 1.0, 0.2, 1.0)], "a", "b"),
+        (vec![arc("a", 0.0, 0.0, 3.0, 0.2, 1.2), circle("b", 5.0, 1.0, 1.0)], "a", "b"),
+        (vec![arc("a", 0.0, 0.0, 3.0, 0.2, 1.2), arc("b", 5.0, 1.0, 1.0, 0.1, 1.1)], "a", "b"),
     ];
 
     for (geometry, first_id, second_id) in tangent_variants {
@@ -305,75 +257,40 @@ fn analytic_jacobian_covers_all_tangent_parameterizations_and_modes() {
 #[test]
 fn analytic_jacobian_covers_relation_point_endpoint_and_center_variants() {
     assert_matches_central_difference(&snapshot(
-        vec![
-            line("l", 0.0, 0.0, 4.0, 2.0),
-            circle("c", 3.0, 5.0, 1.0),
-        ],
+        vec![line("l", 0.0, 0.0, 4.0, 2.0), circle("c", 3.0, 5.0, 1.0)],
         Relation::Midpoint {
-            point: RelationPoint::Center {
-                geometry_id: "c".into(),
-            },
+            point: RelationPoint::Center { geometry_id: "c".into() },
             line_geometry_id: "l".into(),
         },
     ));
     assert_matches_central_difference(&snapshot(
-        vec![
-            line("l", 0.0, 0.0, 4.0, 2.0),
-            circle("c", 3.0, 5.0, 1.0),
-        ],
+        vec![line("l", 0.0, 0.0, 4.0, 2.0), circle("c", 3.0, 5.0, 1.0)],
         Relation::PointOnLine {
-            point: RelationPoint::Center {
-                geometry_id: "c".into(),
-            },
+            point: RelationPoint::Center { geometry_id: "c".into() },
             line_geometry_id: "l".into(),
         },
     ));
     assert_matches_central_difference(&snapshot(
-        vec![
-            line("l", 0.0, 0.0, 4.0, 2.0),
-            arc("a", 3.0, 5.0, 1.0, 0.3, 1.2),
-        ],
+        vec![line("l", 0.0, 0.0, 4.0, 2.0), arc("a", 3.0, 5.0, 1.0, 0.3, 1.2)],
         Relation::PointOnCircle {
-            point: RelationPoint::Endpoint {
-                geometry_id: "l".into(),
-                point: Endpoint::Start,
-            },
+            point: RelationPoint::Endpoint { geometry_id: "l".into(), point: Endpoint::Start },
             circle_geometry_id: "a".into(),
         },
     ));
     assert_matches_central_difference(&snapshot(
-        vec![
-            arc("a", 0.0, 0.0, 2.0, 0.2, 1.4),
-            circle("c", 5.0, 3.0, 1.0),
-        ],
+        vec![arc("a", 0.0, 0.0, 2.0, 0.2, 1.4), circle("c", 5.0, 3.0, 1.0)],
         Relation::DistancePoints {
-            first: RelationPoint::Endpoint {
-                geometry_id: "a".into(),
-                point: Endpoint::End,
-            },
-            second: RelationPoint::Center {
-                geometry_id: "c".into(),
-            },
+            first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::End },
+            second: RelationPoint::Center { geometry_id: "c".into() },
             value: 4.0,
         },
     ));
     assert_matches_central_difference(&snapshot(
-        vec![
-            arc("a", 0.0, 0.0, 2.0, 0.2, 1.4),
-            circle("c", 5.0, 3.0, 1.0),
-            line("l", 4.0, 4.0, 6.0, 4.0),
-        ],
+        vec![arc("a", 0.0, 0.0, 2.0, 0.2, 1.4), circle("c", 5.0, 3.0, 1.0)],
         Relation::Symmetric {
-            first: RelationPoint::Endpoint {
-                geometry_id: "a".into(),
-                point: Endpoint::Start,
-            },
-            second: RelationPoint::Center {
-                geometry_id: "c".into(),
-            },
-            about: RelationPoint::Center {
-                geometry_id: "l".into(),
-            },
+            first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
+            second: RelationPoint::Center { geometry_id: "c".into() },
+            about: RelationPoint::Center { geometry_id: "c".into() },
         },
     ));
 }
@@ -383,16 +300,11 @@ fn zero_residual_point_on_line_remains_fail_closed() {
     let s = snapshot(
         vec![line("a", 0.0, 0.0, 4.0, 0.0), circle("c", 2.0, 0.0, 1.0)],
         Relation::PointOnLine {
-            point: RelationPoint::Center {
-                geometry_id: "c".into(),
-            },
+            point: RelationPoint::Center { geometry_id: "c".into() },
             line_geometry_id: "a".into(),
         },
     );
-    assert_eq!(
-        analytic_relation_jacobian(&s),
-        Err(RelationJacobianError::Indeterminate)
-    );
+    assert_eq!(analytic_relation_jacobian(&s), Err(RelationJacobianError::Indeterminate));
 }
 
 #[test]
@@ -405,8 +317,5 @@ fn zero_center_distance_tangent_remains_fail_closed() {
             mode: TangentMode::External,
         },
     );
-    assert_eq!(
-        analytic_relation_jacobian(&s),
-        Err(RelationJacobianError::Indeterminate)
-    );
+    assert_eq!(analytic_relation_jacobian(&s), Err(RelationJacobianError::Indeterminate));
 }

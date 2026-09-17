@@ -487,6 +487,11 @@ impl BoxChamfer {
         Ok(())
     }
 
+    /// Exact material volume for equal-distance cuts on all twelve box edges.
+    ///
+    /// The removed volume is the twelve central triangular prisms plus the
+    /// eight independent corner unions, yielding
+    /// 2*d^2*(width + depth + height) - 6*d^3.
     pub fn volume(&self, tolerance: Tolerance) -> Result<f64, ConstructionError> {
         self.validate(tolerance)?;
         let d = self.distance;
@@ -651,7 +656,7 @@ mod tests {
         assert!((fillet.volume(tol()).unwrap() - expected_fillet).abs() <= 1.0e-9);
 
         let chamfer = BoxChamfer { width: 20.0, depth: 30.0, height: 40.0, distance: 2.0 };
-        assert_eq!(chamfer.volume(tol()).unwrap(), 7560.0);
+        assert_eq!(chamfer.volume(tol()).unwrap(), 23328.0);
 
         let shell = ClosedBoxShell { width: 20.0, depth: 30.0, height: 40.0, thickness: 2.0 };
         assert_eq!(shell.inner_dimensions(tol()).unwrap(), (16.0, 26.0, 36.0));

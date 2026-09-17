@@ -74,7 +74,7 @@ fn relative_rank_threshold_has_a_defined_transition() {
     ]);
     let below = rank_evidence(&near, 1.0e-10, CANONICAL_ILL_COND_THRESHOLD).unwrap();
     assert_eq!(below.rank, 1);
-    assert_eq!(below.classification, RankClassification::IllConditioned);
+    assert_eq!(below.classification, RankClassification::RankDeficient);
 
     let above = rank_evidence(&near, 1.0e-11, CANONICAL_ILL_COND_THRESHOLD).unwrap();
     assert_eq!(above.rank, 2);

@@ -29,9 +29,9 @@ fn circle3d_distance_uses_a_unit_normal_for_axial_projection() {
 
     assert!(circle.validate().is_ok());
     let distance = circle
-        .distance_to_point(Point3 { x: 1.0, y: 0.0, z: 1.0 })
+        .distance_to_point(Point3 { x: 0.5, y: 0.0, z: 1.0 })
         .unwrap();
-    assert!((distance - 1.0).abs() < 1.0e-12, "distance={distance}");
+    assert!((distance - 1.25_f64.sqrt()).abs() < 1.0e-12, "distance={distance}");
 }
 
 #[test]

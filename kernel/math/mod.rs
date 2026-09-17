@@ -18,6 +18,7 @@ pub mod geometry;
 pub mod interval;
 pub mod intersections;
 pub mod jacobian;
+pub mod jacobian_authority_exhaustive;
 pub mod linalg;
 pub mod linear_consistency;
 pub mod mat;

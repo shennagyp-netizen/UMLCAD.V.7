@@ -1,14 +1,14 @@
-//! Analytic Jacobians for the current semantic constraint equations.
+//! Analytic Jacobian authority for semantic constraints and relations.
 //!
-//! The Jacobian is evaluated directly from the immutable snapshot geometry;
-//! no finite-difference perturbation is used for supported constraints. Rows
-//! correspond exactly to the residual equations emitted by `constraints`.
-//! Undefined derivatives, such as distance at coincident points, are reported
-//! as `Indeterminate` rather than guessed.
+//! Rows are emitted in exactly the same order as the residual system:
+//! constraints first, followed by relations. Finite differences are not used
+//! by this production authority; they remain an independent verification oracle
+//! in the dedicated relation-Jacobian tests.
 
 use super::{
     constraints::endpoint,
     geometry::{Arc, Circle, Geometry, Line, Point},
+    relation_jacobian::analytic_relation_jacobian,
     snapshot::{Constraint, Endpoint, SemanticSnapshot},
 };
 
@@ -31,8 +31,7 @@ pub fn geometry_vector_layout(snapshot: &SemanticSnapshot) -> (Vec<String>, Vec<
             Geometry::Circle(_) => 3,
             Geometry::Arc(_) => 5,
         };
-        let next = offsets.last().copied().unwrap_or(0) + width;
-        offsets.push(next);
+        offsets.push(offsets.last().copied().unwrap_or(0) + width);
     }
     (ids, offsets)
 }
@@ -239,6 +238,9 @@ pub fn analytic_constraint_jacobian(
                             ..
                         }) => {
                             let delta = end_angle - start_angle;
+                            if !delta.is_finite() || delta == 0.0 {
+                                return Err(JacobianError::Indeterminate);
+                            }
                             let sign = delta.signum();
                             add_block(
                                 &mut row,
@@ -253,7 +255,18 @@ pub fn analytic_constraint_jacobian(
         }
     }
 
-    if rows.iter().all(|row| finite_row(row)) {
+    let relation_rows = analytic_relation_jacobian(snapshot).map_err(|error| match error {
+        super::relation_jacobian::RelationJacobianError::UnknownGeometry => JacobianError::UnknownGeometry,
+        super::relation_jacobian::RelationJacobianError::InvalidDomain => JacobianError::InvalidDomain,
+        super::relation_jacobian::RelationJacobianError::NonFinite => JacobianError::NonFinite,
+        super::relation_jacobian::RelationJacobianError::Indeterminate => JacobianError::Indeterminate,
+    })?;
+    if relation_rows.iter().any(|row| row.len() != total || !finite_row(row)) {
+        return Err(JacobianError::NonFinite);
+    }
+    rows.extend(relation_rows);
+
+    if rows.iter().all(|row| row.len() == total && finite_row(row)) {
         Ok(rows)
     } else {
         Err(JacobianError::NonFinite)
@@ -265,19 +278,27 @@ mod tests {
     use super::*;
     use crate::math::{
         geometry::{Arc, Circle, Geometry, Line, Point},
-        snapshot::{Constraint, GeometryItem, SemanticSnapshot},
+        snapshot::{Constraint, GeometryItem, Relation, SemanticSnapshot},
     };
 
-    fn snap(g: Vec<GeometryItem>, c: Vec<Constraint>) -> SemanticSnapshot {
+    fn snap(
+        geometry: Vec<GeometryItem>,
+        constraints: Vec<Constraint>,
+        relations: Vec<Relation>,
+    ) -> SemanticSnapshot {
         SemanticSnapshot {
             parameters: vec![],
-            geometry: g,
-            constraints: c
+            geometry,
+            constraints: constraints
                 .into_iter()
                 .enumerate()
                 .map(|(i, constraint)| (format!("c{i}"), constraint))
                 .collect(),
-            relations: vec![],
+            relations: relations
+                .into_iter()
+                .enumerate()
+                .map(|(i, relation)| (format!("r{i}"), relation))
+                .collect(),
         }
     }
 
@@ -293,13 +314,10 @@ mod tests {
                 parameter_dependencies: vec![],
             }],
             vec![
-                Constraint::Horizontal {
-                    entity_id: "l".into(),
-                },
-                Constraint::Vertical {
-                    entity_id: "l".into(),
-                },
+                Constraint::Horizontal { entity_id: "l".into() },
+                Constraint::Vertical { entity_id: "l".into() },
             ],
+            vec![],
         );
         let jacobian = analytic_constraint_jacobian(&snapshot).unwrap();
         assert_eq!(jacobian.len(), 2);
@@ -336,6 +354,7 @@ mod tests {
                 second_geometry_id: "l".into(),
                 second_point: Endpoint::Start,
             }],
+            vec![],
         );
         let jacobian = analytic_constraint_jacobian(&snapshot).unwrap();
         assert_eq!(jacobian.len(), 2);
@@ -361,6 +380,7 @@ mod tests {
                 second_endpoint: None,
                 value: 5.0,
             }],
+            vec![],
         );
         let jacobian = analytic_constraint_jacobian(&snapshot).unwrap();
         assert_eq!(jacobian[0], vec![-0.6, -0.8, 0.6, 0.8]);
@@ -394,7 +414,29 @@ mod tests {
                 second_endpoint: Some(Endpoint::Start),
                 value: 0.0,
             }],
+            vec![],
         );
         assert_eq!(analytic_constraint_jacobian(&snapshot), Err(JacobianError::Indeterminate));
+    }
+
+    #[test]
+    fn relation_rows_are_appended_after_constraint_rows() {
+        let snapshot = snap(
+            vec![GeometryItem {
+                id: "c".into(),
+                geometry: Geometry::Circle(Circle {
+                    center: Point { x: 0.0, y: 0.0 },
+                    radius: 2.0,
+                }),
+                parameter_dependencies: vec![],
+            }],
+            vec![],
+            vec![Relation::Radius {
+                geometry_id: "c".into(),
+                value: 1.0,
+            }],
+        );
+        let jacobian = analytic_constraint_jacobian(&snapshot).unwrap();
+        assert_eq!(jacobian, vec![vec![0.0, 0.0, 1.0]]);
     }
 }

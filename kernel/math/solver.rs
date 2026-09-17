@@ -2,7 +2,7 @@
 
 use super::{
     constraints::{geometry_difference, residual as constraint_residual},
-    convergence::{verify_terminal, TerminalConvergenceStatus},
+    convergence::{evaluate_accepted_history, ConvergenceStatus},
     geometry::{Arc, Circle, Geometry, Line, Point},
     jacobian::analytic_constraint_jacobian,
     relations::evaluate_relation,
@@ -680,6 +680,7 @@ pub fn solve_snapshot(
     let mut rank = 0usize;
     let mut condition = f64::INFINITY;
     let mut last_step_norm = 0.0;
+    let mut accepted_scaled_residual_history = vec![initial_scaled_residual_norm];
 
     for iteration in 1..=options.max_iterations {
         let (base_raw, _, _, relation_equations, relations_satisfied) = residuals(
@@ -763,16 +764,19 @@ pub fn solve_snapshot(
 
         if proposed_scaled_norm < current_scaled_norm {
             values = proposal;
+            accepted_scaled_residual_history.push(proposed_scaled_norm);
             last_step_norm = candidate_step_norm;
             damping = (damping * 0.3).max(1.0e-12);
-            let terminal = verify_terminal(
-                proposed_scaled_norm,
+            let convergence = evaluate_accepted_history(
+                &accepted_scaled_residual_history,
                 candidate_step_norm,
                 options.residual_tolerance,
                 options.step_tolerance,
+                accepted_scaled_residual_history.len().saturating_sub(1),
                 iteration,
+                options.max_iterations,
             );
-            if terminal.status == TerminalConvergenceStatus::Converged
+            if convergence.status == ConvergenceStatus::Converged
                 && proposed_relations_satisfied
             {
                 let final_analysis = analysis(

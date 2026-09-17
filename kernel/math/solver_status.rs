@@ -116,6 +116,31 @@ pub fn classify_with_linear_consistency(
     evidence
 }
 
+/// Compute the linear-consistency witness from an explicit linearization and
+/// feed it into the solver-status authority.
+///
+/// This is intentionally separate from solver iteration control. Callers must
+/// supply the exact Jacobian/residual linearization they want classified, and
+/// the result is rejected rather than guessed when dimensions or numerical
+/// inputs are invalid.
+pub fn classify_with_linear_system(
+    result: &ConstraintSolveResult,
+    jacobian: &[Vec<f64>],
+    residual: &[f64],
+    rank_tol: f64,
+    ill_cond_threshold: f64,
+) -> Result<SolverStatusEvidence, super::linalg::LinAlgError> {
+    let matrix = super::linalg::from_rows(jacobian)?;
+    let rhs = nalgebra::DVector::from_iterator(residual.len(), residual.iter().copied().map(|value| -value));
+    let consistency = super::linear_consistency::classify_linear_system(
+        &matrix,
+        &rhs,
+        rank_tol,
+        ill_cond_threshold,
+    )?;
+    Ok(classify_with_linear_consistency(result, &consistency))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,5 +264,41 @@ mod tests {
         .unwrap();
         assert_eq!(evidence.status, LinearSystemStatus::Inconsistent);
         assert!(evidence.augmented_rank > evidence.coefficient_rank);
+    }
+
+    #[test]
+    fn explicit_linear_system_api_proves_inconsistency_without_solver_guessing() {
+        let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        result.converged = false;
+        result.reason = SolveReason::MaxIterations;
+        result.final_scaled_residual_norm = result.initial_scaled_residual_norm;
+        let evidence = classify_with_linear_system(
+            &result,
+            &[vec![1.0, 1.0], vec![2.0, 2.0]],
+            &[2.0, 5.0],
+            1.0e-10,
+            1.0e10,
+        )
+        .unwrap();
+        assert_eq!(evidence.status, SolverStatus::Inconsistent);
+    }
+
+    #[test]
+    fn explicit_linear_system_api_fails_closed_on_invalid_jacobian_dimensions() {
+        let result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        let error = classify_with_linear_system(
+            &result,
+            &[vec![1.0], vec![2.0, 2.0]],
+            &[2.0, 5.0],
+            1.0e-10,
+            1.0e10,
+        );
+        assert_eq!(
+            error,
+            Err(super::super::linalg::LinAlgError::DimensionMismatch {
+                lhs: (2, 1),
+                rhs: (0, 0)
+            })
+        );
     }
 }

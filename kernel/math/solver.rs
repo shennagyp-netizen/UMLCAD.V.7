@@ -269,6 +269,15 @@ pub fn scaled_damped_qr(
 
     let svd = a.svd(true, true);
     let (rank, condition_number) = rank_condition(&svd.singular_values, tolerance)?;
+    let max_singular = svd
+        .singular_values
+        .iter()
+        .copied()
+        .fold(0.0, f64::max);
+    let rank_threshold = tolerance * max_singular;
+    if !rank_threshold.is_finite() {
+        return Err("non-finite rank threshold".into());
+    }
     let u = svd.u.ok_or("SVD left vectors unavailable")?;
     let vt = svd.v_t.ok_or("SVD right vectors unavailable")?;
     let b = DVector::from_iterator(rows, r.iter().map(|value| -*value));
@@ -281,6 +290,9 @@ pub fn scaled_damped_qr(
         let singular = svd.singular_values[k];
         if !singular.is_finite() {
             return Err("non-finite singular value".into());
+        }
+        if damping == 0.0 && singular <= rank_threshold {
+            continue;
         }
         let denominator = singular * singular + damping;
         if !denominator.is_finite() || denominator == 0.0 {

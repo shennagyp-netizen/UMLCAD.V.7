@@ -4,12 +4,14 @@
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
 - Main head at handoff update: `8fea60633c4f95f0175d18faa54878e7af9f44a6` before this documentation commit
-- Latest completed roadmap family: M10 — Constraints / Jacobian / solver
+- Latest completed roadmap family: M8 — CAD construction mathematics
 - Latest merged M10 closure PR: #27, `math: complete solver result status authority`
 - PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
+- Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
+- PR #28 merge commit: `fdb34d5a1e03ed399f900848b6dbe96da71d1a13`
 
 ## Completed mathematical-authority state
-Main is post-merge green through the completed M10 family. M0-M16 remains active; M8 and M9 are still incomplete roadmap families and are the next construction/B-Rep work.
+Main is post-merge green through the completed M8 and M10 families. M0-M16 remains active; M9 is now the next incomplete P0 family: B-Rep / solid mathematics.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -91,6 +93,8 @@ For PR #27:
 
 M10 family status: **Implemented / Tested / CPU-validated by authoritative CI**.
 
+M8 family status: **Implemented / Tested / CPU-validated by authoritative CI** for its declared certified construction domains.
+
 The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, black-box HTTP, Demo, raw HTTP red-team, release-path, and ignored-test checks.
 
 ## Immediate continuation
@@ -98,8 +102,12 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 2. Audit every remaining supported constraint/relation family for explicit analytic Jacobian coverage; unsupported equations must fail explicitly rather than re-enter finite differences.
 3. Review the solver's non-convergence classification so rejected-trial, stagnation, singular, invalid-domain, and max-iteration states remain explicit and mathematically distinguishable.
 4. Harden solver-result rank/conditioning/DOF evidence against contradictory terminal states and numerical boundary transitions.
-5. Start M8 construction mathematics next: consolidate offsets, sweeps, loft/blend, fillet/chamfer, shell/thickening, frame/twist, singularity/self-intersection, and G0/G1/G2 continuity authority. Then complete M9 B-Rep/solid mathematics.
+5. Start M9 B-Rep/solid mathematics next: unified edge/face/wire/coedge incidence, orientation/closure/manifoldness, inside/outside classification, surface-region correspondence, exact volume/area/centroid/inertia, and Boolean-support intersection/union/difference/split/imprint mathematics.
 6. Keep GPU work deferred until the CPU mathematical families are closed; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+
+## M8 completion boundary
+
+M8 is closed for the certified domains recorded in `kernel/math/GAP_MATRIX.md`. Arbitrary freeform offset/fillet/chamfer/topology construction requires new explicit mathematical contracts and is not silently included.
 
 ## M10 completion boundary
 

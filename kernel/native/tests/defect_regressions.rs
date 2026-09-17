@@ -62,13 +62,14 @@ fn topology_vertex_deduplication_scales_with_model_extent() {
 
 #[test]
 fn solver_rejects_a_nonfinite_finite_difference_probe() {
-    let max = f64::MAX;
+    let near_max = f64::MAX * 0.99999995;
+    assert!((near_max + 1.0e-7 * near_max).is_infinite());
     let geometry = vec![
         GeometryItem {
             id: "a".into(),
             geometry: Geometry::Line(Line {
-                start: Point { x: max, y: 0.0 },
-                end: Point { x: max * 0.5, y: 1.0 },
+                start: Point { x: near_max, y: 0.0 },
+                end: Point { x: near_max * 0.5, y: 1.0 },
             }),
             parameter_dependencies: vec![],
         },

@@ -9,7 +9,7 @@ var e2e = args.Any(x => string.Equals(x, "--e2e", StringComparison.Ordinal));
 var root = FindRepositoryRoot();
 Console.WriteLine($"[UMLCAD] Repository root: {root}");
 
-var kernelManifest = Path.Combine(root, "kernel_rust", "Cargo.toml");
+var kernelManifest = Path.Combine(root, "kernel", "native", "Cargo.toml");
 var viewerDirectory = Path.Combine(root, "viewer");
 if (!File.Exists(kernelManifest))
     throw new FileNotFoundException($"Rust kernel manifest was not found: {kernelManifest}");
@@ -122,7 +122,7 @@ static string FindRepositoryRoot()
         var full = Path.GetFullPath(explicitRoot);
         if (IsRepositoryRoot(full))
             return full;
-        throw new DirectoryNotFoundException($"UMLCAD_REPOSITORY_ROOT does not contain kernel_rust/Cargo.toml and viewer/package.json: {full}");
+        throw new DirectoryNotFoundException($"UMLCAD_REPOSITORY_ROOT does not contain kernel/native/Cargo.toml and viewer/package.json: {full}");
     }
 
     foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
@@ -142,7 +142,7 @@ static string FindRepositoryRoot()
 }
 
 static bool IsRepositoryRoot(string directory) =>
-    File.Exists(Path.Combine(directory, "kernel_rust", "Cargo.toml")) &&
+    File.Exists(Path.Combine(directory, "kernel", "native", "Cargo.toml")) &&
     File.Exists(Path.Combine(directory, "viewer", "package.json"));
 
 static Process StartProcess(string workingDirectory, string executable, string arguments)

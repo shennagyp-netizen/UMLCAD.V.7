@@ -149,15 +149,14 @@ mod tests {
     }
 
     #[test]
-    fn tiny_step_with_unsatisfied_residual_is_stagnation() {
-        let evidence = evaluate(&[10.0, 9.999999], 1.0e-12, 1.0e-8, 1.0e-10, 8, 100);
+    fn mismatched_history_shape_fails_closed() {
+        let evidence = evaluate(&[10.0, 9.0], 1.0e-12, 1.0e-8, 1.0e-10, 2, 100);
         assert_eq!(evidence.status, ConvergenceStatus::Indeterminate);
     }
 
     #[test]
     fn tiny_step_with_unsatisfied_residual_is_stagnation_with_matching_history() {
-        let history = vec![10.0; 9];
-        let mut history = history;
+        let mut history = vec![10.0; 9];
         history[8] = 9.999999;
         let evidence = evaluate(&history, 1.0e-12, 1.0e-8, 1.0e-10, 8, 100);
         assert_eq!(evidence.status, ConvergenceStatus::Stagnated);
@@ -238,5 +237,31 @@ mod tests {
         let evidence = evaluate(&[5.0, 0.0], 0.0, 1.0e-8, 1.0e-10, 1, 100);
         assert_eq!(evidence.status, ConvergenceStatus::Converged);
         assert_eq!(evidence.progress_ratio, 0.0);
+    }
+
+    #[test]
+    fn positive_scaling_of_residuals_and_residual_tolerance_preserves_status() {
+        let base = evaluate(&[100.0, 50.0, 10.0], 1.0e-8, 1.0, 1.0e-7, 2, 100);
+        let scaled = evaluate(&[1.0e8, 5.0e7, 1.0e7], 1.0e-8, 1.0e6, 1.0e-7, 2, 100);
+        assert_eq!(base.status, scaled.status);
+        assert!((base.progress_ratio - scaled.progress_ratio).abs() < 1.0e-15);
+    }
+
+    #[test]
+    fn tightening_residual_tolerance_cannot_turn_nonconvergence_into_convergence() {
+        let loose = evaluate(&[1.0, 1.0e-6], 1.0e-12, 1.0e-5, 1.0e-10, 1, 100);
+        let tight = evaluate(&[1.0, 1.0e-6], 1.0e-12, 1.0e-7, 1.0e-10, 1, 100);
+        assert_eq!(loose.status, ConvergenceStatus::Converged);
+        assert_ne!(tight.status, ConvergenceStatus::Converged);
+    }
+
+    #[test]
+    fn adding_a_smaller_accepted_residual_preserves_monotonicity() {
+        let base = evaluate(&[10.0, 5.0], 1.0e-2, 1.0e-8, 1.0e-10, 1, 100);
+        let extended = evaluate(&[10.0, 5.0, 2.0], 1.0e-2, 1.0e-8, 1.0e-10, 2, 100);
+        assert!(base.monotone_nonincreasing);
+        assert!(extended.monotone_nonincreasing);
+        assert_eq!(base.residual_satisfied, extended.residual_satisfied);
+        assert!(extended.progress_ratio < base.progress_ratio);
     }
 }

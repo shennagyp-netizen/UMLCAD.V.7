@@ -1,0 +1,27 @@
+name: Comprehensive E2E gate
+
+on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+  pull_request:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Run comprehensive E2E and red-team gate
+        run: python3 tests/e2e/run.py --release --verbose

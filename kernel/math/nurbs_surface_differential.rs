@@ -125,6 +125,7 @@ fn de_boor(t: f64, span: usize, degree: usize, knots: &[f64], work: &mut [Homoge
 
 fn evaluate_homogeneous(surface: &NurbsSurface2D, u: f64, v: f64) -> Result<HomogeneousPoint, NurbsSurfaceError> {
     validate_query(surface, u, v)?;
+    let weight_scale = surface.normalized_weight_scale()?;
     let control_u = control_count_u(surface);
     let control_v = control_count_v(surface);
     let span_u = span(u, surface.degree_u, &surface.knots_u, control_u);
@@ -135,13 +136,18 @@ fn evaluate_homogeneous(surface: &NurbsSurface2D, u: f64, v: f64) -> Result<Homo
             let u_index = span_u - surface.degree_u + local;
             let index = u_index * control_v + v_index;
             let point = surface.control_points[index];
-            let weight = surface.weights[index];
+            let weight = surface.weights[index] / weight_scale;
             work.push(HomogeneousPoint {
                 xw: point.x * weight,
                 yw: point.y * weight,
                 zw: point.z * weight,
                 w: weight,
             });
+        }
+        if work.iter().any(|point| {
+            !point.xw.is_finite() || !point.yw.is_finite() || !point.zw.is_finite() || !point.w.is_finite()
+        }) {
+            return Err(NurbsSurfaceError::Overflow);
         }
         rows.push(de_boor(u, span_u, surface.degree_u, &surface.knots_u, &mut work));
     }
@@ -150,7 +156,11 @@ fn evaluate_homogeneous(surface: &NurbsSurface2D, u: f64, v: f64) -> Result<Homo
     for local in 0..=surface.degree_v {
         work.push(rows[span_v - surface.degree_v + local]);
     }
-    Ok(de_boor(v, span_v, surface.degree_v, &surface.knots_v, &mut work))
+    let result = de_boor(v, span_v, surface.degree_v, &surface.knots_v, &mut work);
+    if !result.xw.is_finite() || !result.yw.is_finite() || !result.zw.is_finite() || !result.w.is_finite() {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    Ok(result)
 }
 
 fn evaluate_homogeneous_derivative_u(surface: &NurbsSurface2D, u: f64, v: f64) -> Result<HomogeneousPoint, NurbsSurfaceError> {
@@ -158,6 +168,7 @@ fn evaluate_homogeneous_derivative_u(surface: &NurbsSurface2D, u: f64, v: f64) -
     if surface.degree_u == 0 {
         return Err(NurbsSurfaceError::InvalidDegree);
     }
+    let weight_scale = surface.normalized_weight_scale()?;
     let control_u = control_count_u(surface);
     let control_v = control_count_v(surface);
     let derivative_count = control_u - 1;
@@ -174,28 +185,40 @@ fn evaluate_homogeneous_derivative_u(surface: &NurbsSurface2D, u: f64, v: f64) -
             let b = (u_index + 1) * control_v + v_index;
             let pa = surface.control_points[a];
             let pb = surface.control_points[b];
-            let wa = surface.weights[a];
-            let wb = surface.weights[b];
+            let wa = surface.weights[a] / weight_scale;
+            let wb = surface.weights[b] / weight_scale;
             let denominator = surface.knots_u[u_index + surface.degree_u + 1] - surface.knots_u[u_index + 1];
             if denominator == 0.0 {
                 return Err(NurbsSurfaceError::InvalidDomain);
             }
             let factor = degree / denominator;
-            work.push(HomogeneousPoint {
+            let value = HomogeneousPoint {
                 xw: (pb.x * wb - pa.x * wa) * factor,
                 yw: (pb.y * wb - pa.y * wa) * factor,
                 zw: (pb.z * wb - pa.z * wa) * factor,
                 w: (wb - wa) * factor,
-            });
+            };
+            if [value.xw, value.yw, value.zw, value.w].iter().any(|value| !value.is_finite()) {
+                return Err(NurbsSurfaceError::Overflow);
+            }
+            work.push(value);
         }
-        rows.push(de_boor(u, span_u, derivative_degree, derivative_knots, &mut work));
+        let row = de_boor(u, span_u, derivative_degree, derivative_knots, &mut work);
+        if [row.xw, row.yw, row.zw, row.w].iter().any(|value| !value.is_finite()) {
+            return Err(NurbsSurfaceError::Overflow);
+        }
+        rows.push(row);
     }
     let span_v = span(v, surface.degree_v, &surface.knots_v, control_v);
     let mut work = Vec::with_capacity(surface.degree_v + 1);
     for local in 0..=surface.degree_v {
         work.push(rows[span_v - surface.degree_v + local]);
     }
-    Ok(de_boor(v, span_v, surface.degree_v, &surface.knots_v, &mut work))
+    let result = de_boor(v, span_v, surface.degree_v, &surface.knots_v, &mut work);
+    if [result.xw, result.yw, result.zw, result.w].iter().any(|value| !value.is_finite()) {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    Ok(result)
 }
 
 fn evaluate_homogeneous_derivative_v(surface: &NurbsSurface2D, u: f64, v: f64) -> Result<HomogeneousPoint, NurbsSurfaceError> {
@@ -203,6 +226,7 @@ fn evaluate_homogeneous_derivative_v(surface: &NurbsSurface2D, u: f64, v: f64) -
     if surface.degree_v == 0 {
         return Err(NurbsSurfaceError::InvalidDegree);
     }
+    let weight_scale = surface.normalized_weight_scale()?;
     let control_u = control_count_u(surface);
     let control_v = control_count_v(surface);
     let derivative_count = control_v - 1;
@@ -220,27 +244,39 @@ fn evaluate_homogeneous_derivative_v(surface: &NurbsSurface2D, u: f64, v: f64) -
             let b = u_index * control_v + v_index + 1;
             let pa = surface.control_points[a];
             let pb = surface.control_points[b];
-            let wa = surface.weights[a];
-            let wb = surface.weights[b];
+            let wa = surface.weights[a] / weight_scale;
+            let wb = surface.weights[b] / weight_scale;
             let denominator = surface.knots_v[v_index + surface.degree_v + 1] - surface.knots_v[v_index + 1];
             if denominator == 0.0 {
                 return Err(NurbsSurfaceError::InvalidDomain);
             }
             let factor = degree / denominator;
-            work.push(HomogeneousPoint {
+            let value = HomogeneousPoint {
                 xw: (pb.x * wb - pa.x * wa) * factor,
                 yw: (pb.y * wb - pa.y * wa) * factor,
                 zw: (pb.z * wb - pa.z * wa) * factor,
                 w: (wb - wa) * factor,
-            });
+            };
+            if [value.xw, value.yw, value.zw, value.w].iter().any(|value| !value.is_finite()) {
+                return Err(NurbsSurfaceError::Overflow);
+            }
+            work.push(value);
         }
-        columns.push(de_boor(v, span_v, derivative_degree, derivative_knots, &mut work));
+        let column = de_boor(v, span_v, derivative_degree, derivative_knots, &mut work);
+        if [column.xw, column.yw, column.zw, column.w].iter().any(|value| !value.is_finite()) {
+            return Err(NurbsSurfaceError::Overflow);
+        }
+        columns.push(column);
     }
     let mut work = Vec::with_capacity(surface.degree_u + 1);
     for local in 0..=surface.degree_u {
         work.push(columns[span_u - surface.degree_u + local]);
     }
-    Ok(de_boor(u, span_u, surface.degree_u, &surface.knots_u, &mut work))
+    let result = de_boor(u, span_u, surface.degree_u, &surface.knots_u, &mut work);
+    if [result.xw, result.yw, result.zw, result.w].iter().any(|value| !value.is_finite()) {
+        return Err(NurbsSurfaceError::Overflow);
+    }
+    Ok(result)
 }
 
 fn quotient_derivative(base: HomogeneousPoint, derivative: HomogeneousPoint) -> Result<Point3, NurbsSurfaceError> {
@@ -264,4 +300,49 @@ fn quotient_derivative(base: HomogeneousPoint, derivative: HomogeneousPoint) -> 
         return Err(NurbsSurfaceError::Overflow);
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn planar_patch(weights: Vec<f64>) -> NurbsSurface2D {
+        NurbsSurface2D::new(
+            1,
+            1,
+            vec![
+                Point3 { x: 0.0, y: 0.0, z: 0.0 },
+                Point3 { x: 0.0, y: 1.0, z: 0.0 },
+                Point3 { x: 1.0, y: 0.0, z: 0.0 },
+                Point3 { x: 1.0, y: 1.0, z: 0.0 },
+            ],
+            weights,
+            vec![0.0, 0.0, 1.0, 1.0],
+            vec![0.0, 0.0, 1.0, 1.0],
+        )
+    }
+
+    fn assert_point_close(actual: Point3, expected: Point3) {
+        assert!((actual.x - expected.x).abs() < 1.0e-12);
+        assert!((actual.y - expected.y).abs() < 1.0e-12);
+        assert!((actual.z - expected.z).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn planar_patch_has_known_first_differentials() {
+        let surface = planar_patch(vec![1.0; 4]);
+        assert_point_close(surface.derivative_u_at(0.3, 0.7).unwrap(), Point3 { x: 1.0, y: 0.0, z: 0.0 });
+        assert_point_close(surface.derivative_v_at(0.3, 0.7).unwrap(), Point3 { x: 0.0, y: 1.0, z: 0.0 });
+        assert_point_close(surface.normal_at(0.3, 0.7).unwrap(), Point3 { x: 0.0, y: 0.0, z: 1.0 });
+    }
+
+    #[test]
+    fn first_differentials_are_invariant_under_extreme_uniform_weight_scaling() {
+        for scale in [1.0e-200, 1.0e200] {
+            let surface = planar_patch(vec![scale; 4]);
+            assert_point_close(surface.derivative_u_at(0.3, 0.7).unwrap(), Point3 { x: 1.0, y: 0.0, z: 0.0 });
+            assert_point_close(surface.derivative_v_at(0.3, 0.7).unwrap(), Point3 { x: 0.0, y: 1.0, z: 0.0 });
+            assert_point_close(surface.normal_at(0.3, 0.7).unwrap(), Point3 { x: 0.0, y: 0.0, z: 1.0 });
+        }
+    }
 }

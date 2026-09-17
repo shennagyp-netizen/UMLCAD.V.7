@@ -1,0 +1,19 @@
+name: Rust kernel validation
+
+on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+  pull_request:
+
+jobs:
+  rust-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run Rust kernel test suite
+        run: cargo test --manifest-path kernel/native/Cargo.toml

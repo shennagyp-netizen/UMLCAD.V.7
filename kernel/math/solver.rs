@@ -73,6 +73,9 @@ pub struct ConstraintAnalysis {
     pub variable_count: usize,
     pub equation_count: usize,
     pub rank: usize,
+    /// Number of linearized equation rows beyond numerical row rank.
+    /// This is dependency evidence for the current Jacobian row space.
+    pub dependent_equation_count: usize,
     pub condition_estimate: f64,
     pub well_conditioned: bool,
     pub relation_count: usize,
@@ -603,6 +606,7 @@ fn analysis(
         variable_count: values.len(),
         equation_count: raw.len(),
         rank,
+        dependent_equation_count: raw.len().saturating_sub(rank),
         condition_estimate: condition,
         well_conditioned: condition.is_finite() && condition < 1.0e10,
         relation_count: snapshot.relations.len(),

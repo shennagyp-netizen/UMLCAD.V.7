@@ -1,13 +1,15 @@
 //! Conservative semantic classification for solver results.
 //!
 //! This module does not alter the numerical solver. It converts the existing
-//! immutable `ConstraintSolveResult` evidence into an explicit authority status.
+//! immutable solver evidence into an explicit authority status. The classifier
+//! consumes the private implementation result so the public terminal-authority
+//! wrapper can embed the verified status without a module dependency cycle.
 //! Classification is deliberately fail-closed: a status is only claimed when
 //! the available evidence is sufficient to justify it.
 
 use super::convergence::{TerminalConvergenceEvidence, TerminalConvergenceStatus};
 use super::linear_consistency::{LinearConsistencyEvidence, LinearSystemStatus};
-use super::solver::{ConstraintSolveResult, SolveReason};
+use super::solver_legacy::SolveReason;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SolverStatus {
@@ -20,6 +22,44 @@ pub enum SolverStatus {
     Inconsistent,
     MaxIterations,
     Indeterminate,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SolverClassificationInput {
+    pub converged: bool,
+    pub reason: SolveReason,
+    pub final_residual_norm: f64,
+    pub final_scaled_residual_norm: f64,
+    pub initial_scaled_residual_norm: f64,
+    pub final_step_norm: f64,
+    pub analysis_valid: bool,
+    pub well_conditioned: bool,
+    pub rank: usize,
+    pub equation_count: usize,
+    pub variable_count: usize,
+    pub condition_estimate: f64,
+    pub iterations: usize,
+}
+
+/// Convert the private numerical result into the backend-neutral classification contract.
+pub(crate) fn input_from_legacy(
+    result: &super::solver_legacy::ConstraintSolveResult,
+) -> SolverClassificationInput {
+    SolverClassificationInput {
+        converged: result.converged,
+        reason: result.reason.clone(),
+        final_residual_norm: result.final_residual_norm,
+        final_scaled_residual_norm: result.final_scaled_residual_norm,
+        initial_scaled_residual_norm: result.initial_scaled_residual_norm,
+        final_step_norm: result.final_step_norm,
+        analysis_valid: result.analysis.valid,
+        well_conditioned: result.analysis.well_conditioned,
+        rank: result.analysis.rank,
+        equation_count: result.analysis.equation_count,
+        variable_count: result.analysis.variable_count,
+        condition_estimate: result.analysis.condition_estimate,
+        iterations: result.iterations,
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -54,21 +94,21 @@ pub struct SolverStatusEvidence {
 ///
 /// `Inconsistent`, `InvalidInput`, and `Cancelled` need richer upstream evidence
 /// than the current result type carries and are therefore not fabricated here.
-pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
-    let final_residual_finite = result.final_residual_norm.is_finite()
-        && result.final_scaled_residual_norm.is_finite()
-        && result.analysis.valid;
-    let final_step_finite = result.final_step_norm.is_finite() && result.final_step_norm >= 0.0;
-    let residual_reduced = result.final_scaled_residual_norm < result.initial_scaled_residual_norm;
-    let rank_complete = result.analysis.rank >= result.analysis.equation_count.min(result.analysis.variable_count);
-    let condition_finite = result.analysis.condition_estimate.is_finite() && rank_complete;
-    let well_conditioned = result.analysis.well_conditioned && rank_complete;
+pub fn classify(input: &SolverClassificationInput) -> SolverStatusEvidence {
+    let final_residual_finite = input.final_residual_norm.is_finite()
+        && input.final_scaled_residual_norm.is_finite()
+        && input.analysis_valid;
+    let final_step_finite = input.final_step_norm.is_finite() && input.final_step_norm >= 0.0;
+    let residual_reduced = input.final_scaled_residual_norm < input.initial_scaled_residual_norm;
+    let rank_complete = input.rank >= input.equation_count.min(input.variable_count);
+    let condition_finite = input.condition_estimate.is_finite() && rank_complete;
+    let well_conditioned = input.well_conditioned && rank_complete;
 
     let status = if !final_residual_finite || !final_step_finite {
         SolverStatus::Indeterminate
     } else {
-        match result.reason {
-            SolveReason::Converged if result.converged => {
+        match input.reason {
+            SolveReason::Converged if input.converged => {
                 if well_conditioned {
                     SolverStatus::Converged
                 } else {
@@ -98,12 +138,12 @@ pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
         residual_reduced,
         final_residual_finite,
         final_step_finite,
-        final_step_norm: result.final_step_norm,
+        final_step_norm: input.final_step_norm,
         condition_finite,
         well_conditioned,
-        rank: result.analysis.rank,
-        equation_count: result.analysis.equation_count,
-        iterations: result.iterations,
+        rank: input.rank,
+        equation_count: input.equation_count,
+        iterations: input.iterations,
     }
 }
 
@@ -119,15 +159,15 @@ pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
 /// terminal certificate proved a small step while the residual remained above
 /// tolerance; the production solver may still have continued beyond that state.
 pub fn classify_with_terminal_convergence(
-    result: &ConstraintSolveResult,
+    input: &SolverClassificationInput,
     terminal: &TerminalConvergenceEvidence,
 ) -> SolverStatusEvidence {
-    let mut evidence = classify(result);
+    let mut evidence = classify(input);
     evidence.terminal_status = Some(terminal.status);
 
-    let terminal_matches = terminal.iterations == result.iterations
-        && terminal.final_residual.to_bits() == result.final_scaled_residual_norm.to_bits()
-        && terminal.final_step_norm.to_bits() == result.final_step_norm.to_bits();
+    let terminal_matches = terminal.iterations == input.iterations
+        && terminal.final_residual.to_bits() == input.final_scaled_residual_norm.to_bits()
+        && terminal.final_step_norm.to_bits() == input.final_step_norm.to_bits();
     if !terminal_matches {
         evidence.status = SolverStatus::Indeterminate;
         return evidence;
@@ -135,21 +175,21 @@ pub fn classify_with_terminal_convergence(
 
     evidence.status = match terminal.status {
         TerminalConvergenceStatus::Converged => {
-            if result.converged && result.reason == SolveReason::Converged {
+            if input.converged && input.reason == SolveReason::Converged {
                 evidence.status
             } else {
                 SolverStatus::Indeterminate
             }
         }
         TerminalConvergenceStatus::Stagnated => {
-            if !result.converged && result.reason == SolveReason::MaxIterations {
+            if !input.converged && input.reason == SolveReason::MaxIterations {
                 SolverStatus::Stagnated
             } else {
                 SolverStatus::Indeterminate
             }
         }
         TerminalConvergenceStatus::NotConverged => {
-            if result.converged || result.reason == SolveReason::Converged {
+            if input.converged || input.reason == SolveReason::Converged {
                 SolverStatus::Indeterminate
             } else {
                 evidence.status
@@ -169,14 +209,14 @@ pub fn classify_with_terminal_convergence(
 /// the API fail-closed: mismatched or insufficient evidence leaves the original
 /// status untouched.
 pub fn classify_with_linear_consistency(
-    result: &ConstraintSolveResult,
+    input: &SolverClassificationInput,
     consistency: &LinearConsistencyEvidence,
 ) -> SolverStatusEvidence {
-    let mut evidence = classify(result);
-    let dimensions_match = consistency.variable_count == result.analysis.variable_count
-        && consistency.equation_count == result.analysis.equation_count;
+    let mut evidence = classify(input);
+    let dimensions_match = consistency.variable_count == input.variable_count
+        && consistency.equation_count == input.equation_count;
     if dimensions_match
-        && !result.converged
+        && !input.converged
         && evidence.final_residual_finite
         && consistency.status == LinearSystemStatus::Inconsistent
     {
@@ -193,7 +233,7 @@ pub fn classify_with_linear_consistency(
 /// the result is rejected rather than guessed when dimensions or numerical
 /// inputs are invalid.
 pub fn classify_with_linear_system(
-    result: &ConstraintSolveResult,
+    input: &SolverClassificationInput,
     jacobian: &[Vec<f64>],
     residual: &[f64],
     rank_tol: f64,
@@ -207,7 +247,7 @@ pub fn classify_with_linear_system(
         rank_tol,
         ill_cond_threshold,
     )?;
-    Ok(classify_with_linear_consistency(result, &consistency))
+    Ok(classify_with_linear_consistency(input, &consistency))
 }
 
 #[cfg(test)]
@@ -216,8 +256,8 @@ mod tests {
     use crate::math::{
         geometry::{Geometry, Line, Point},
         snapshot::{Constraint, GeometryItem, SemanticSnapshot},
-        solver::{solve_snapshot, SolveOptions},
     };
+    use super::super::solver_legacy::{solve_snapshot, ConstraintSolveResult, SolveOptions};
     use nalgebra::{DMatrix, DVector};
 
     fn base_snapshot() -> SemanticSnapshot {
@@ -258,7 +298,7 @@ mod tests {
     fn converged_well_conditioned_result_is_classified_as_converged() {
         let result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         assert!(result.converged);
-        let evidence = classify(&result);
+        let evidence = classify(&input_from_legacy(&result));
         assert_eq!(evidence.status, SolverStatus::Converged);
         assert_eq!(evidence.terminal_status, None);
         assert!(evidence.final_residual_finite);
@@ -276,7 +316,7 @@ mod tests {
         result.analysis.rank = 2;
         result.analysis.condition_estimate = 25.0;
         result.analysis.well_conditioned = true;
-        let evidence = classify(&result);
+        let evidence = classify(&input_from_legacy(&result));
         assert_eq!(evidence.status, SolverStatus::ConvergedWithWarning);
         assert!(!evidence.condition_finite);
         assert!(!evidence.well_conditioned);
@@ -292,7 +332,7 @@ mod tests {
         result.analysis.rank = 3;
         result.analysis.condition_estimate = 25.0;
         result.analysis.well_conditioned = true;
-        let evidence = classify(&result);
+        let evidence = classify(&input_from_legacy(&result));
         assert_eq!(evidence.status, SolverStatus::Converged);
         assert!(evidence.condition_finite);
         assert!(evidence.well_conditioned);
@@ -303,7 +343,7 @@ mod tests {
         let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         result.converged = false;
         result.reason = SolveReason::Singular;
-        let evidence = classify(&result);
+        let evidence = classify(&input_from_legacy(&result));
         assert_eq!(evidence.status, SolverStatus::Singular);
     }
 
@@ -313,7 +353,7 @@ mod tests {
         result.converged = false;
         result.reason = SolveReason::MaxIterations;
         result.final_scaled_residual_norm = result.initial_scaled_residual_norm;
-        let evidence = classify(&result);
+        let evidence = classify(&input_from_legacy(&result));
         assert_eq!(evidence.status, SolverStatus::Diverged);
     }
 
@@ -322,7 +362,7 @@ mod tests {
         let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         result.analysis.valid = false;
         result.final_scaled_residual_norm = f64::NAN;
-        let evidence = classify(&result);
+        let evidence = classify(&input_from_legacy(&result));
         assert_eq!(evidence.status, SolverStatus::Indeterminate);
         assert!(!evidence.final_residual_finite);
     }
@@ -331,7 +371,7 @@ mod tests {
     fn nonfinite_terminal_step_is_indeterminate() {
         let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         result.final_step_norm = f64::NAN;
-        let evidence = classify(&result);
+        let evidence = classify(&input_from_legacy(&result));
         assert_eq!(evidence.status, SolverStatus::Indeterminate);
         assert!(!evidence.final_step_finite);
     }
@@ -340,7 +380,7 @@ mod tests {
     fn negative_terminal_step_is_indeterminate() {
         let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         result.final_step_norm = -1.0;
-        let evidence = classify(&result);
+        let evidence = classify(&input_from_legacy(&result));
         assert_eq!(evidence.status, SolverStatus::Indeterminate);
         assert!(!evidence.final_step_finite);
     }
@@ -356,7 +396,7 @@ mod tests {
             result.iterations,
         );
         assert_eq!(terminal.status, TerminalConvergenceStatus::Converged);
-        let evidence = classify_with_terminal_convergence(&result, &terminal);
+        let evidence = classify_with_terminal_convergence(&input_from_legacy(&result), &terminal);
         assert_eq!(evidence.status, SolverStatus::Converged);
         assert_eq!(evidence.terminal_status, Some(TerminalConvergenceStatus::Converged));
     }
@@ -377,7 +417,7 @@ mod tests {
             result.iterations,
         );
         assert_eq!(terminal.status, TerminalConvergenceStatus::Stagnated);
-        let evidence = classify_with_terminal_convergence(&result, &terminal);
+        let evidence = classify_with_terminal_convergence(&input_from_legacy(&result), &terminal);
         assert_eq!(evidence.status, SolverStatus::Stagnated);
     }
 
@@ -393,7 +433,7 @@ mod tests {
         );
         terminal.final_step_norm = terminal.final_step_norm + 1.0;
         terminal.status = TerminalConvergenceStatus::NotConverged;
-        let evidence = classify_with_terminal_convergence(&result, &terminal);
+        let evidence = classify_with_terminal_convergence(&input_from_legacy(&result), &terminal);
         assert_eq!(evidence.status, SolverStatus::Indeterminate);
         assert_eq!(evidence.terminal_status, Some(TerminalConvergenceStatus::NotConverged));
     }
@@ -408,7 +448,7 @@ mod tests {
             0.0,
             result.iterations,
         );
-        let evidence = classify_with_terminal_convergence(&result, &terminal);
+        let evidence = classify_with_terminal_convergence(&input_from_legacy(&result), &terminal);
         assert_eq!(terminal.status, TerminalConvergenceStatus::NotConverged);
         assert_eq!(evidence.status, SolverStatus::Indeterminate);
     }
@@ -419,7 +459,7 @@ mod tests {
         result.converged = false;
         result.reason = SolveReason::MaxIterations;
         let consistency = inconsistent_evidence(&result);
-        let evidence = classify_with_linear_consistency(&result, &consistency);
+        let evidence = classify_with_linear_consistency(&input_from_legacy(&result), &consistency);
         assert_eq!(evidence.status, SolverStatus::Inconsistent);
     }
 
@@ -428,7 +468,7 @@ mod tests {
         let result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         assert!(result.converged);
         let consistency = inconsistent_evidence(&result);
-        let evidence = classify_with_linear_consistency(&result, &consistency);
+        let evidence = classify_with_linear_consistency(&input_from_legacy(&result), &consistency);
         assert_eq!(evidence.status, SolverStatus::Converged);
     }
 
@@ -440,7 +480,7 @@ mod tests {
         result.final_scaled_residual_norm = result.initial_scaled_residual_norm;
         let mut consistency = inconsistent_evidence(&result);
         consistency.equation_count += 1;
-        let evidence = classify_with_linear_consistency(&result, &consistency);
+        let evidence = classify_with_linear_consistency(&input_from_legacy(&result), &consistency);
         assert_eq!(evidence.status, SolverStatus::Diverged);
     }
 
@@ -466,7 +506,7 @@ mod tests {
         result.analysis.equation_count = 2;
         result.analysis.rank = 1;
         let evidence = classify_with_linear_system(
-            &result,
+            &input_from_legacy(&result),
             &[vec![1.0, 1.0], vec![2.0, 2.0]],
             &[2.0, 5.0],
             1.0e-10,
@@ -480,7 +520,7 @@ mod tests {
     fn explicit_linear_system_api_fails_closed_on_invalid_jacobian_dimensions() {
         let result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         let error = classify_with_linear_system(
-            &result,
+            &input_from_legacy(&result),
             &[vec![1.0], vec![2.0, 2.0]],
             &[2.0, 5.0],
             1.0e-10,

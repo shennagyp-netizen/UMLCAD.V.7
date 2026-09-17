@@ -10,12 +10,14 @@ use super::{
     solver_legacy,
     geometry::Geometry,
     snapshot::SemanticSnapshot,
+    solver_status::{classify_with_terminal_convergence, input_from_legacy},
 };
 
 pub use solver_legacy::{
     scaled_damped_qr, ConstraintAnalysis, ConstraintResidualReport, LinearSolveReport,
     SolveOptions, SolveReason,
 };
+pub use super::solver_status::{SolverStatus, SolverStatusEvidence};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConstraintSolveResult {
@@ -33,6 +35,10 @@ pub struct ConstraintSolveResult {
     /// exactly. It is diagnostic evidence made part of the production result,
     /// not a second iteration-control mechanism.
     pub terminal_convergence: TerminalConvergenceEvidence,
+    /// Authoritative semantic classification of the returned solve.
+    pub status: SolverStatus,
+    /// Evidence backing the status, including terminal/rank/conditioning facts.
+    pub status_evidence: SolverStatusEvidence,
     pub analysis: ConstraintAnalysis,
     pub geometry: Vec<(String, Geometry)>,
 }
@@ -64,6 +70,13 @@ fn certify(
         return Err("non-converged solver result has converged reason".into());
     }
 
+    let status_input = input_from_legacy(&result);
+    let status_evidence = classify_with_terminal_convergence(&status_input, &terminal);
+    if status_evidence.status == SolverStatus::Indeterminate {
+        return Err("solver status authority rejected terminal result evidence".into());
+    }
+    let status = status_evidence.status;
+
     Ok(ConstraintSolveResult {
         converged: result.converged,
         reason: result.reason,
@@ -74,6 +87,8 @@ fn certify(
         final_scaled_residual_norm: result.final_scaled_residual_norm,
         final_step_norm: result.final_step_norm,
         terminal_convergence: terminal,
+        status,
+        status_evidence,
         analysis: result.analysis,
         geometry: result.geometry,
     })
@@ -131,6 +146,11 @@ mod tests {
         assert_eq!(terminal.status, TerminalConvergenceStatus::Converged);
         assert!(result.converged);
         assert_eq!(result.reason, SolveReason::Converged);
+        assert_eq!(result.status, SolverStatus::Converged);
+        assert_eq!(
+            result.status_evidence.terminal_status,
+            Some(TerminalConvergenceStatus::Converged)
+        );
     }
 
     #[test]
@@ -163,5 +183,7 @@ mod tests {
             result.terminal_convergence.status,
             TerminalConvergenceStatus::Converged
         );
+        assert_eq!(result.status, SolverStatus::MaxIterations);
+        assert_eq!(result.status_evidence.iterations, result.iterations);
     }
 }

@@ -848,6 +848,137 @@ mod tests {
     }
 
     #[test]
+    fn convex_polygon_offset_preserves_winding_and_has_expected_rectangle_bounds() {
+        let p = rect(20.0, 10.0);
+        let outward = offset_convex_polygon(&p, 2.0, tol()).unwrap();
+        assert_eq!(
+            outward.vertices,
+            vec![
+                Vec2::new(-2.0, -2.0),
+                Vec2::new(22.0, -2.0),
+                Vec2::new(22.0, 12.0),
+                Vec2::new(-2.0, 12.0),
+            ]
+        );
+        assert!((outward.area(tol()).unwrap() - 336.0).abs() <= 1.0e-9);
+
+        let inward = offset_convex_polygon(&p, -2.0, tol()).unwrap();
+        assert!((inward.area(tol()).unwrap() - 96.0).abs() <= 1.0e-9);
+    }
+
+    #[test]
+    fn offset_rejects_concave_and_parallel_corner_singularities() {
+        let concave = PlanarPolygon::new(vec![
+            Vec2::new(0.0, 0.0),
+            Vec2::new(4.0, 0.0),
+            Vec2::new(4.0, 4.0),
+            Vec2::new(2.0, 2.0),
+            Vec2::new(0.0, 4.0),
+        ]);
+        assert_eq!(
+            offset_convex_polygon(&concave, 1.0, tol()),
+            Err(ConstructionError::Unsupported)
+        );
+        let mut bad = rect(10.0, 10.0);
+        bad.vertices[2] = Vec2::new(10.0, 0.0);
+        assert!(matches!(
+            offset_convex_polygon(&bad, 1.0, tol()),
+            Err(ConstructionError::Degenerate) | Err(ConstructionError::SelfIntersection)
+        ));
+        assert_eq!(
+            offset_convex_polygon(&rect(10.0, 10.0), f64::NAN, tol()),
+            Err(ConstructionError::NonFinite)
+        );
+    }
+
+    #[test]
+    fn circular_and_variable_radius_pipes_have_exact_volumes_and_endpoints() {
+        let pipe = CircularPipe {
+            path_start: Vec3::new(0.0, 0.0, 0.0),
+            path_end: Vec3::new(0.0, 0.0, 10.0),
+            radius: 2.0,
+            reference: Vec3::new(1.0, 0.0, 0.0),
+        };
+        assert!((pipe.length(tol()).unwrap() - 10.0).abs() <= 1.0e-12);
+        assert!((pipe.volume(tol()).unwrap() - 40.0 * PI).abs() <= 1.0e-9);
+        assert_eq!(
+            pipe.surface_point_at(0.0, 0.0, tol()).unwrap(),
+            Vec3::new(0.0, 2.0, 0.0)
+        );
+        assert_eq!(
+            pipe.surface_point_at(1.0, PI, tol()).unwrap(),
+            Vec3::new(0.0, -2.0, 10.0)
+        );
+
+        let variable = VariableRadiusPipe {
+            path_start: Vec3::new(0.0, 0.0, 0.0),
+            path_end: Vec3::new(0.0, 0.0, 10.0),
+            start_radius: 1.0,
+            end_radius: 2.0,
+            reference: Vec3::new(1.0, 0.0, 0.0),
+        };
+        assert_eq!(variable.radius_at(0.0, tol()).unwrap(), 1.0);
+        assert_eq!(variable.radius_at(1.0, tol()).unwrap(), 2.0);
+        let expected = PI * 10.0 * (1.0 + 2.0 + 4.0) / 3.0;
+        assert!((variable.volume(tol()).unwrap() - expected).abs() <= 1.0e-9);
+        assert!(variable.surface_point_at(0.5, 0.0, tol()).unwrap().is_finite());
+    }
+
+    #[test]
+    fn circular_arc_pipe_has_exact_path_and_volume_and_rejects_self_intersection() {
+        let pipe = CircularArcPipe {
+            center: Vec3::new(0.0, 0.0, 0.0),
+            path_radius: 10.0,
+            profile_radius: 2.0,
+            start_angle: 0.0,
+            end_angle: PI / 2.0,
+        };
+        assert!((pipe.path_length(tol()).unwrap() - 5.0 * PI).abs() <= 1.0e-12);
+        assert!((pipe.volume(tol()).unwrap() - 20.0 * PI * PI).abs() <= 1.0e-9);
+        assert_eq!(
+            pipe.surface_point_at(0.0, 0.0, tol()).unwrap(),
+            Vec3::new(12.0, 0.0, 0.0)
+        );
+        assert_eq!(
+            pipe.surface_point_at(1.0, 0.0, tol()).unwrap(),
+            Vec3::new(0.0, 12.0, 0.0)
+        );
+
+        let mut invalid = pipe;
+        invalid.profile_radius = invalid.path_radius;
+        assert_eq!(invalid.validate(tol()), Err(ConstructionError::Unsupported));
+        invalid.profile_radius = f64::NAN;
+        assert_eq!(invalid.validate(tol()), Err(ConstructionError::NonFinite));
+    }
+
+    #[test]
+    fn pipes_fail_closed_for_singular_reference_and_invalid_parameter() {
+        let pipe = CircularPipe {
+            path_start: Vec3::new(0.0, 0.0, 0.0),
+            path_end: Vec3::new(0.0, 0.0, 10.0),
+            radius: 1.0,
+            reference: Vec3::new(0.0, 0.0, 1.0),
+        };
+        assert_eq!(pipe.validate(tol()), Err(ConstructionError::SingularFrame));
+        let mut variable = VariableRadiusPipe {
+            path_start: Vec3::new(0.0, 0.0, 0.0),
+            path_end: Vec3::new(0.0, 0.0, 10.0),
+            start_radius: 1.0,
+            end_radius: 2.0,
+            reference: Vec3::new(1.0, 0.0, 0.0),
+        };
+        assert_eq!(
+            variable.radius_at(1.1, tol()),
+            Err(ConstructionError::OutOfDomain)
+        );
+        variable.start_radius = 0.0;
+        assert_eq!(
+            variable.validate(tol()),
+            Err(ConstructionError::InvalidDimensions)
+        );
+    }
+
+    #[test]
     fn extrusion_volume_is_exact() {
         let x = LinearExtrusion { profile: rect(20.0, 10.0), height: 30.0 };
         assert!((x.volume(tol()).unwrap() - 6000.0).abs() <= 1.0e-9);

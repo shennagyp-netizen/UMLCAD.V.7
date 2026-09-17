@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, analyzeConstraints, solveConstraints } from "../kernel/src/native-index.js";
+import { DesignProgram, analyzeConstraints, solveConstraints } from "../kernel/api/src/native-index.js";
 
 test("native solver analyzes a satisfied horizontal constraint",()=>{const p=new DesignProgram();p.addGeometry("edge",()=>({kind:"line",start:{x:0,y:0},end:{x:10,y:0}}));p.horizontal({kind:"geometry",entityId:"edge"});const result=analyzeConstraints(p.snapshot());assert.equal(result.satisfied,true);assert.equal(result.maxResidual,0);assert.equal(result.valid,true);assert.equal(result.degreesOfFreedom,3);assert.equal(result.rank,1)});
 test("native solver satisfies distance constraint",()=>{const p=new DesignProgram();p.addGeometry("edge",()=>({kind:"line",start:{x:0,y:0},end:{x:7,y:0}}));p.distance("edge",10);const solved=solveConstraints(p.snapshot(),{maxIterations:50});assert.equal(solved.converged,true);assert.equal(solved.analysis.valid,true);assert.ok(Number.isFinite(solved.analysis.conditionEstimate));assert.equal(solved.analysis.degreesOfFreedom,3);const line=solved.geometry.find(item=>item.id==="edge")!.geometry;assert.equal(line.kind,"line");assert.ok(Math.abs(Math.hypot(line.end.x-line.start.x,line.end.y-line.start.y)-10)<1e-7)});

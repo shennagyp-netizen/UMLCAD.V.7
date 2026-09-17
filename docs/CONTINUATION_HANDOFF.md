@@ -3,13 +3,13 @@
 ## Snapshot
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
-- Main head at handoff update: `ceea20ba2f032e9a07b3b97f0c843682900ecc45` before this documentation commit
-- Latest completed implementation station: M10/P0 mixed-unit nonlinear solver scale authority
-- Latest merged implementation PR: #25, `test: add mixed-unit nonlinear solver authority`
-- PR #25 merge commit: `ceea20ba2f032e9a07b3b97f0c843682900ecc45`
+- Main head at handoff update: `8fea60633c4f95f0175d18faa54878e7af9f44a6` before this documentation commit
+- Latest completed roadmap family: M10 — Constraints / Jacobian / solver
+- Latest merged M10 closure PR: #27, `math: complete solver result status authority`
+- PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
 
 ## Completed mathematical-authority state
-Main is post-merge green through the current M10 solver-authority stations. The V7 mathematical-authority program is not complete; the M0-M16 roadmap remains active.
+Main is post-merge green through the completed M10 family. M0-M16 remains active; M8 and M9 are still incomplete roadmap families and are the next construction/B-Rep work.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -83,6 +83,14 @@ For PR #25:
 - post-merge Rust kernel validation on `ceea20ba...`: PASS;
 - post-merge comprehensive E2E/red-team gate on `ceea20ba...`: PASS.
 
+For PR #27:
+- exact-head Rust kernel validation: PASS;
+- exact-head comprehensive E2E/red-team gate: PASS;
+- post-merge Rust kernel validation on `8fea6063...`: PASS;
+- post-merge comprehensive E2E/red-team gate on `8fea6063...`: PASS.
+
+M10 family status: **Implemented / Tested / CPU-validated by authoritative CI**.
+
 The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, black-box HTTP, Demo, raw HTTP red-team, release-path, and ignored-test checks.
 
 ## Immediate continuation
@@ -90,8 +98,12 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 2. Audit every remaining supported constraint/relation family for explicit analytic Jacobian coverage; unsupported equations must fail explicitly rather than re-enter finite differences.
 3. Review the solver's non-convergence classification so rejected-trial, stagnation, singular, invalid-domain, and max-iteration states remain explicit and mathematically distinguishable.
 4. Harden solver-result rank/conditioning/DOF evidence against contradictory terminal states and numerical boundary transitions.
-5. Finish the remaining M10 solver foundation, then advance to the M8/M9 construction and B-Rep mathematical-authority families according to `docs/MATH_AUTHORITY_ROADMAP.md`.
-6. Evaluate GPU acceleration only later as a conformance-tested implementation backend; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+5. Start M8 construction mathematics next: consolidate offsets, sweeps, loft/blend, fillet/chamfer, shell/thickening, frame/twist, singularity/self-intersection, and G0/G1/G2 continuity authority. Then complete M9 B-Rep/solid mathematics.
+6. Keep GPU work deferred until the CPU mathematical families are closed; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+
+## M10 completion boundary
+
+M10 is now treated as a closed roadmap family for the current supported equation/solver scope. Any future new constraint/relation or solver mode requires a new mathematical contract and its own authority tests; it is not silently added under the closed M10 status.
 
 ## Non-negotiable authority rules
 - CPU math is normative.

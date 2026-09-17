@@ -37,6 +37,7 @@ pub mod solid;
 pub mod spatial;
 pub mod spatial_accel;
 pub mod solver;
+pub mod solver_status;
 pub mod surfaces;
 pub mod surface_differential;
 pub mod sweeps;

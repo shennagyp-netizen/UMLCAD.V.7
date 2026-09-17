@@ -277,6 +277,7 @@ pub fn analytic_constraint_jacobian(
 mod tests {
     use super::*;
     use crate::math::{
+        constraints::geometry_difference,
         geometry::{Arc, Circle, Geometry, Line, Point},
         snapshot::{Constraint, GeometryItem, Relation, SemanticSnapshot},
     };
@@ -417,6 +418,272 @@ mod tests {
             vec![],
         );
         assert_eq!(analytic_constraint_jacobian(&snapshot), Err(JacobianError::Indeterminate));
+    }
+
+
+    fn line_item(
+        id: &str,
+        sx: f64,
+        sy: f64,
+        ex: f64,
+        ey: f64,
+    ) -> GeometryItem {
+        GeometryItem {
+            id: id.into(),
+            geometry: Geometry::Line(Line {
+                start: Point { x: sx, y: sy },
+                end: Point { x: ex, y: ey },
+            }),
+            parameter_dependencies: vec![],
+        }
+    }
+
+    fn circle_item(id: &str, x: f64, y: f64, radius: f64) -> GeometryItem {
+        GeometryItem {
+            id: id.into(),
+            geometry: Geometry::Circle(Circle {
+                center: Point { x, y },
+                radius,
+            }),
+            parameter_dependencies: vec![],
+        }
+    }
+
+    fn arc_item(
+        id: &str,
+        x: f64,
+        y: f64,
+        radius: f64,
+        start_angle: f64,
+        end_angle: f64,
+    ) -> GeometryItem {
+        GeometryItem {
+            id: id.into(),
+            geometry: Geometry::Arc(Arc {
+                center: Point { x, y },
+                radius,
+                start_angle,
+                end_angle,
+            }),
+            parameter_dependencies: vec![],
+        }
+    }
+
+    fn set_parameter(snapshot: &mut SemanticSnapshot, column: usize, delta: f64) {
+        let mut cursor = 0usize;
+        for item in &mut snapshot.geometry {
+            match &mut item.geometry {
+                Geometry::Line(line) => {
+                    if column < cursor + 4 {
+                        match column - cursor {
+                            0 => line.start.x += delta,
+                            1 => line.start.y += delta,
+                            2 => line.end.x += delta,
+                            3 => line.end.y += delta,
+                            _ => unreachable!(),
+                        }
+                        return;
+                    }
+                    cursor += 4;
+                }
+                Geometry::Circle(circle) => {
+                    if column < cursor + 3 {
+                        match column - cursor {
+                            0 => circle.center.x += delta,
+                            1 => circle.center.y += delta,
+                            2 => circle.radius += delta,
+                            _ => unreachable!(),
+                        }
+                        return;
+                    }
+                    cursor += 3;
+                }
+                Geometry::Arc(arc) => {
+                    if column < cursor + 5 {
+                        match column - cursor {
+                            0 => arc.center.x += delta,
+                            1 => arc.center.y += delta,
+                            2 => arc.radius += delta,
+                            3 => arc.start_angle += delta,
+                            4 => arc.end_angle += delta,
+                            _ => unreachable!(),
+                        }
+                        return;
+                    }
+                    cursor += 5;
+                }
+            }
+        }
+        panic!("parameter column {column} not found");
+    }
+
+    fn constraint_residual_rows(
+        current: &SemanticSnapshot,
+        reference: &SemanticSnapshot,
+    ) -> Vec<f64> {
+        current
+            .constraints
+            .iter()
+            .flat_map(|(_, constraint)| {
+                match constraint {
+                    Constraint::Fixed { entity_id } => {
+                        let actual = current.geometry(entity_id).unwrap();
+                        let original = reference.geometry(entity_id).unwrap();
+                        geometry_difference(actual, original).unwrap()
+                    }
+                    _ => super::super::constraints::residual(
+                        |id| current.geometry(id).cloned(),
+                        constraint,
+                    )
+                    .unwrap(),
+                }
+            })
+            .collect()
+    }
+
+    fn constraint_only_snapshot(
+        geometry: Vec<GeometryItem>,
+        constraints: Vec<Constraint>,
+    ) -> SemanticSnapshot {
+        SemanticSnapshot {
+            parameters: vec![],
+            geometry,
+            constraints: constraints
+                .into_iter()
+                .enumerate()
+                .map(|(i, constraint)| (format!("c{i}"), constraint))
+                .collect(),
+            relations: vec![],
+        }
+    }
+
+    fn assert_constraint_jacobian_matches_central_difference(snapshot: &SemanticSnapshot) {
+        let analytic = analytic_constraint_jacobian(snapshot).unwrap();
+        let base = constraint_residual_rows(snapshot, snapshot);
+        assert_eq!(analytic.len(), base.len());
+        let total_columns = snapshot
+            .geometry
+            .iter()
+            .map(|item| match item.geometry {
+                Geometry::Line(_) => 4,
+                Geometry::Circle(_) => 3,
+                Geometry::Arc(_) => 5,
+            })
+            .sum::<usize>();
+        let h = 1.0e-7;
+        for column in 0..total_columns {
+            let mut plus = snapshot.clone();
+            let mut minus = snapshot.clone();
+            set_parameter(&mut plus, column, h);
+            set_parameter(&mut minus, column, -h);
+            let plus_values = constraint_residual_rows(&plus, snapshot);
+            let minus_values = constraint_residual_rows(&minus, snapshot);
+            assert_eq!(plus_values.len(), base.len());
+            assert_eq!(minus_values.len(), base.len());
+            for row in 0..analytic.len() {
+                let numerical = (plus_values[row] - minus_values[row]) / (2.0 * h);
+                let expected = analytic[row][column];
+                let tolerance = 5.0e-6 * numerical.abs().max(expected.abs()).max(1.0);
+                assert!(
+                    (numerical - expected).abs() <= tolerance,
+                    "row {row}, col {column}: analytic={expected:.12e}, numerical={numerical:.12e}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn analytic_jacobian_covers_horizontal_vertical_fixed_and_arc_fixed_constraints() {
+        let snapshot = constraint_only_snapshot(
+            vec![
+                line_item("l", 0.0, 0.5, 3.0, 2.0),
+                circle_item("c", 4.0, -1.0, 1.5),
+                arc_item("a", -2.0, 3.0, 2.0, 0.25, 1.35),
+            ],
+            vec![
+                Constraint::Horizontal { entity_id: "l".into() },
+                Constraint::Vertical { entity_id: "l".into() },
+                Constraint::Fixed { entity_id: "l".into() },
+                Constraint::Fixed { entity_id: "c".into() },
+                Constraint::Fixed { entity_id: "a".into() },
+            ],
+        );
+        assert_constraint_jacobian_matches_central_difference(&snapshot);
+    }
+
+    #[test]
+    fn analytic_jacobian_covers_coincident_line_and_arc_endpoints() {
+        let snapshot = constraint_only_snapshot(
+            vec![
+                line_item("l", 0.0, 0.0, 3.0, 1.0),
+                arc_item("a", 4.0, -1.0, 2.0, 0.3, 1.4),
+            ],
+            vec![
+                Constraint::Coincident {
+                    first_geometry_id: "a".into(),
+                    first_point: Endpoint::Start,
+                    second_geometry_id: "l".into(),
+                    second_point: Endpoint::End,
+                },
+                Constraint::Coincident {
+                    first_geometry_id: "l".into(),
+                    first_point: Endpoint::Start,
+                    second_geometry_id: "a".into(),
+                    second_point: Endpoint::End,
+                },
+            ],
+        );
+        assert_constraint_jacobian_matches_central_difference(&snapshot);
+    }
+
+    #[test]
+    fn analytic_jacobian_covers_all_distance_constraint_parameterizations() {
+        let snapshot = constraint_only_snapshot(
+            vec![
+                line_item("l1", 0.0, 0.0, 3.0, 1.0),
+                line_item("l2", 5.0, -2.0, 7.0, 4.0),
+                circle_item("c", 11.0, 2.0, 2.5),
+                arc_item("a", -4.0, 3.0, 1.5, 0.3, 1.4),
+            ],
+            vec![
+                Constraint::Distance {
+                    first_geometry_id: "l1".into(),
+                    second_geometry_id: None,
+                    first_endpoint: None,
+                    second_endpoint: None,
+                    value: 3.1622776601683795,
+                },
+                Constraint::Distance {
+                    first_geometry_id: "c".into(),
+                    second_geometry_id: None,
+                    first_endpoint: None,
+                    second_endpoint: None,
+                    value: 2.5,
+                },
+                Constraint::Distance {
+                    first_geometry_id: "a".into(),
+                    second_geometry_id: None,
+                    first_endpoint: None,
+                    second_endpoint: None,
+                    value: 1.65,
+                },
+                Constraint::Distance {
+                    first_geometry_id: "l1".into(),
+                    second_geometry_id: Some("l2".into()),
+                    first_endpoint: Some(Endpoint::End),
+                    second_endpoint: Some(Endpoint::Start),
+                    value: 3.0,
+                },
+                Constraint::Distance {
+                    first_geometry_id: "a".into(),
+                    second_geometry_id: Some("l2".into()),
+                    first_endpoint: Some(Endpoint::Start),
+                    second_endpoint: Some(Endpoint::End),
+                    value: 2.0,
+                },
+            ],
+        );
+        assert_constraint_jacobian_matches_central_difference(&snapshot);
     }
 
     #[test]

@@ -4,7 +4,7 @@ The integration gate deliberately has three boundaries. No single test substitut
 
 | Boundary | Test layer | What is proven |
 | --- | --- | --- |
-| Kernel library API | `kernel_rust/tests/kernel_api_integration_e2e.rs` | Typed `KernelRequest` dispatch, numerical geometry behavior, linear solve, snapshot solve/analyze, dimensions, engineering evidence, DXF, adversarial solver inputs |
+| Kernel library API | `kernel/native/tests/kernel_api_integration_e2e.rs` | Typed `KernelRequest` dispatch, numerical geometry behavior, linear solve, snapshot solve/analyze, dimensions, engineering evidence, DXF, adversarial solver inputs |
 | Production .NET boundary | `dotnet/tests/UMLCAD.Kernel.Integration.Tests/KernelBlackBoxE2ETests.cs` | `RustKernelService` JSON/HTTP transport, compiled-model identity, graph nodes, diagnostics, concurrency, invalid geometry, stale references, malformed schema |
 | Process/wire boundary | `tests/e2e/run.py` | Real `kernel_host` lifecycle, readiness, cleanup, unknown endpoint, malformed JSON, unsupported schema/geometry, aggregate failure reporting |
 | Application path | `projects/demo/Demo.csproj -- --e2e` | Real Bench Vise semantic definition through package creation, Rust evaluation, compiled model validation, nested assembly assertions |

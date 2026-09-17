@@ -17,6 +17,7 @@ pub mod interval;
 pub mod intersections;
 pub mod jacobian;
 pub mod linalg;
+pub mod linear_consistency;
 pub mod mat;
 pub mod nurbs;
 pub mod nurbs3d;

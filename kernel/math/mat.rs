@@ -46,10 +46,6 @@ impl Mat2 {
         if scale == 0.0 {
             return Err(MatrixError::Singular);
         }
-
-        // Normalize before the determinant test. This prevents a uniform
-        // change of matrix units from changing the singularity decision and
-        // avoids overflow in the determinant of very large finite entries.
         let a = [
             [self.m[0][0] / scale, self.m[0][1] / scale],
             [self.m[1][0] / scale, self.m[1][1] / scale],
@@ -61,7 +57,6 @@ impl Mat2 {
         if det.abs() <= tolerance {
             return Err(MatrixError::Singular);
         }
-
         let inv_det = 1.0 / det;
         let result = Self::new([
             [a[1][1] * inv_det / scale, -a[0][1] * inv_det / scale],
@@ -114,9 +109,7 @@ impl Mat2 {
 
     pub fn condition_estimate(self, tolerance: f64) -> Result<f64, MatrixError> {
         let inverse = self.inverse(tolerance)?;
-        let norm = self.norm_inf();
-        let inverse_norm = inverse.norm_inf();
-        let condition = norm * inverse_norm;
+        let condition = self.norm_inf() * inverse.norm_inf();
         if condition.is_finite() {
             Ok(condition)
         } else {
@@ -167,9 +160,7 @@ impl Mat3 {
         if scale == 0.0 {
             return Err(MatrixError::Singular);
         }
-        let a = std::array::from_fn(|i| {
-            std::array::from_fn(|j| self.m[i][j] / scale)
-        });
+        let a = std::array::from_fn(|i| std::array::from_fn(|j| self.m[i][j] / scale));
         let det = a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
             - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
             + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
@@ -179,7 +170,6 @@ impl Mat3 {
         if det.abs() <= tolerance {
             return Err(MatrixError::Singular);
         }
-
         let c = [
             [
                 a[1][1] * a[2][2] - a[1][2] * a[2][1],
@@ -326,7 +316,6 @@ impl Mat4 {
         if scale == 0.0 {
             return Err(MatrixError::Singular);
         }
-
         let mut a = [[0.0; 8]; 4];
         for i in 0..4 {
             for j in 0..4 {
@@ -334,9 +323,6 @@ impl Mat4 {
             }
             a[i][4 + i] = 1.0;
         }
-
-        // Work on a unit-scaled matrix so the pivot criterion is dimensionless
-        // and uniform changes of matrix units cannot change the classification.
         for col in 0..4 {
             let mut pivot = col;
             for row in (col + 1)..4 {
@@ -364,7 +350,6 @@ impl Mat4 {
                 }
             }
         }
-
         let mut out = [[0.0; 4]; 4];
         for i in 0..4 {
             for j in 0..4 {
@@ -506,14 +491,22 @@ mod tests {
             let scaled_inv2 = scaled2.inverse(TOL).unwrap();
             for i in 0..2 {
                 for j in 0..2 {
-                    assert!((scaled_inv2.m[i][j] - inv2.m[i][j] / scale).abs() < 1.0e-10 / scale.max(1.0));
+                    let recovered = scaled_inv2.m[i][j] * scale;
+                    let reference = inv2.m[i][j];
+                    let error = (recovered - reference).abs();
+                    let scale = reference.abs().max(1.0);
+                    assert!(error <= 1.0e-10 * scale);
                 }
             }
 
-            let scaled3 = Mat3::new(std::array::from_fn(|i| std::array::from_fn(|j| a3.m[i][j] * scale)));
+            let scaled3 = Mat3::new(std::array::from_fn(|i| {
+                std::array::from_fn(|j| a3.m[i][j] * scale)
+            }));
             assert!(scaled3.inverse(TOL).is_ok());
 
-            let scaled4 = Mat4::new(std::array::from_fn(|i| std::array::from_fn(|j| a4.m[i][j] * scale)));
+            let scaled4 = Mat4::new(std::array::from_fn(|i| {
+                std::array::from_fn(|j| a4.m[i][j] * scale)
+            }));
             assert!(scaled4.inverse(TOL).is_ok());
         }
     }

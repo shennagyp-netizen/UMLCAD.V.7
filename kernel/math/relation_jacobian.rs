@@ -81,8 +81,7 @@ fn endpoint_data(
             vec![1.0, 0.0, arc.end_angle.cos(), 0.0, -arc.radius * arc.end_angle.sin()],
             vec![0.0, 1.0, arc.end_angle.sin(), 0.0, arc.radius * arc.end_angle.cos()],
         )),
-        (Geometry::Circle(_), _) => Err(RelationJacobianError::InvalidDomain),
-        (Geometry::Line(_), _) => Err(RelationJacobianError::InvalidDomain),
+        (Geometry::Circle(_), _) | (Geometry::Line(_), _) => Err(RelationJacobianError::InvalidDomain),
     }
 }
 
@@ -191,8 +190,7 @@ fn line_point_distance_gradient(
     let abs_cross = cross.abs();
     let inv_length = 1.0 / length;
     let inv_length_squared = inv_length * inv_length;
-    let q_gradient = [dy, -dx];
-    let point_gradient = vec![sign * q_gradient[0] * inv_length, sign * q_gradient[1] * inv_length];
+    let point_gradient = vec![sign * dy * inv_length, -sign * dx * inv_length];
     let dq = [qy - dy, dx - qx, -qy, qx];
     let dlength = [-dx * inv_length, -dy * inv_length, dx * inv_length, dy * inv_length];
     let mut line_gradient = vec![0.0; 4];
@@ -373,75 +371,54 @@ pub fn analytic_relation_jacobian(
                 let b = geometry(snapshot, second_geometry_id)?;
                 let mut row = vec![0.0; total];
                 match (a, b) {
+                    (Geometry::Line(_), Geometry::Line(_)) => return Err(RelationJacobianError::InvalidDomain),
                     (Geometry::Line(line), Geometry::Circle(circle)) => {
                         let (line_gradient, point_gradient) = line_point_distance_gradient(circle.center, line)?;
                         add(&mut row, offsets[first], &line_gradient);
-                        let mut circle_gradient = vec![0.0; 3];
-                        circle_gradient[0] = point_gradient[0];
-                        circle_gradient[1] = point_gradient[1];
-                        circle_gradient[2] = -1.0;
+                        let circle_gradient = vec![point_gradient[0], point_gradient[1], -1.0];
                         add(&mut row, offsets[second], &circle_gradient);
                     }
                     (Geometry::Line(line), Geometry::Arc(arc)) => {
                         let (line_gradient, point_gradient) = line_point_distance_gradient(arc.center, line)?;
                         add(&mut row, offsets[first], &line_gradient);
-                        let mut arc_gradient = vec![0.0; 5];
-                        arc_gradient[0] = point_gradient[0];
-                        arc_gradient[1] = point_gradient[1];
-                        arc_gradient[2] = -1.0;
+                        let arc_gradient = vec![point_gradient[0], point_gradient[1], -1.0, 0.0, 0.0];
                         add(&mut row, offsets[second], &arc_gradient);
                     }
                     (Geometry::Circle(circle), Geometry::Line(line)) => {
                         let (line_gradient, point_gradient) = line_point_distance_gradient(circle.center, line)?;
-                        let mut circle_gradient = vec![0.0; 3];
-                        circle_gradient[0] = point_gradient[0];
-                        circle_gradient[1] = point_gradient[1];
-                        circle_gradient[2] = -1.0;
+                        let circle_gradient = vec![point_gradient[0], point_gradient[1], -1.0];
                         add(&mut row, offsets[first], &circle_gradient);
                         add(&mut row, offsets[second], &line_gradient);
                     }
                     (Geometry::Arc(arc), Geometry::Line(line)) => {
                         let (line_gradient, point_gradient) = line_point_distance_gradient(arc.center, line)?;
-                        let mut arc_gradient = vec![0.0; 5];
-                        arc_gradient[0] = point_gradient[0];
-                        arc_gradient[1] = point_gradient[1];
-                        arc_gradient[2] = -1.0;
+                        let arc_gradient = vec![point_gradient[0], point_gradient[1], -1.0, 0.0, 0.0];
                         add(&mut row, offsets[first], &arc_gradient);
                         add(&mut row, offsets[second], &line_gradient);
                     }
                     (Geometry::Circle(a_circle), Geometry::Circle(b_circle)) => {
                         let (ga, gb) = circle_tangent_gradient(a_circle.center, a_circle.radius, b_circle.center, b_circle.radius, *mode)?;
-                        let mut va = vec![0.0; 3];
-                        let mut vb = vec![0.0; 3];
-                        va[0] = ga[0]; va[1] = ga[1]; va[2] = ga[2];
-                        vb[0] = gb[0]; vb[1] = gb[1]; vb[2] = gb[2];
-                        add(&mut row, offsets[first], &va);
-                        add(&mut row, offsets[second], &vb);
+                        add(&mut row, offsets[first], &ga);
+                        add(&mut row, offsets[second], &gb);
                     }
                     (Geometry::Circle(a_circle), Geometry::Arc(b_arc)) => {
                         let (ga, gb) = circle_tangent_gradient(a_circle.center, a_circle.radius, b_arc.center, b_arc.radius, *mode)?;
-                        let mut va = vec![0.0; 3];
-                        let mut vb = vec![0.0; 5];
-                        va[0] = ga[0]; va[1] = ga[1]; va[2] = ga[2];
-                        vb[0] = gb[0]; vb[1] = gb[1]; vb[2] = gb[2];
+                        let va = ga;
+                        let vb = vec![gb[0], gb[1], gb[2], 0.0, 0.0];
                         add(&mut row, offsets[first], &va);
                         add(&mut row, offsets[second], &vb);
                     }
                     (Geometry::Arc(a_arc), Geometry::Circle(b_circle)) => {
                         let (ga, gb) = circle_tangent_gradient(a_arc.center, a_arc.radius, b_circle.center, b_circle.radius, *mode)?;
-                        let mut va = vec![0.0; 5];
-                        let mut vb = vec![0.0; 3];
-                        va[0] = ga[0]; va[1] = ga[1]; va[2] = ga[2];
-                        vb[0] = gb[0]; vb[1] = gb[1]; vb[2] = gb[2];
+                        let va = vec![ga[0], ga[1], ga[2], 0.0, 0.0];
+                        let vb = gb;
                         add(&mut row, offsets[first], &va);
                         add(&mut row, offsets[second], &vb);
                     }
                     (Geometry::Arc(a_arc), Geometry::Arc(b_arc)) => {
                         let (ga, gb) = circle_tangent_gradient(a_arc.center, a_arc.radius, b_arc.center, b_arc.radius, *mode)?;
-                        let mut va = vec![0.0; 5];
-                        let mut vb = vec![0.0; 5];
-                        va[0] = ga[0]; va[1] = ga[1]; va[2] = ga[2];
-                        vb[0] = gb[0]; vb[1] = gb[1]; vb[2] = gb[2];
+                        let va = vec![ga[0], ga[1], ga[2], 0.0, 0.0];
+                        let vb = vec![gb[0], gb[1], gb[2], 0.0, 0.0];
                         add(&mut row, offsets[first], &va);
                         add(&mut row, offsets[second], &vb);
                     }
@@ -483,9 +460,9 @@ pub fn analytic_relation_jacobian(
                 let (point_index, point_value, px, py) = relation_point(snapshot, point)?;
                 let circle_index = index(&ids, circle_geometry_id)?;
                 let circle_geometry = geometry(snapshot, circle_geometry_id)?;
-                let (center, _) = match circle_geometry {
-                    Geometry::Circle(circle) => (circle.center, circle.radius),
-                    Geometry::Arc(arc) => (arc.center, arc.radius),
+                let center = match circle_geometry {
+                    Geometry::Circle(circle) => circle.center,
+                    Geometry::Arc(arc) => arc.center,
                     Geometry::Line(_) => return Err(RelationJacobianError::InvalidDomain),
                 };
                 let dx = point_value.x - center.x;
@@ -627,10 +604,7 @@ mod tests {
     fn nondifferentiable_point_on_line_fails_closed() {
         let snapshot = snapshot(
             vec![line("a", 0.0, 0.0, 1.0, 0.0), line("b", 0.0, 1.0, 1.0, 1.0)],
-            vec![Relation::PointOnLine {
-                point: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
-                line_geometry_id: "b".into(),
-            }],
+            vec![Relation::PointOnLine { point: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, line_geometry_id: "b".into() }],
         );
         assert_eq!(analytic_relation_jacobian(&snapshot), Err(RelationJacobianError::Indeterminate));
     }

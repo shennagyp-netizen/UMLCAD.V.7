@@ -10,7 +10,7 @@ use super::{
     solver_legacy,
     geometry::Geometry,
     snapshot::SemanticSnapshot,
-    solver_status::classify_with_terminal_convergence,
+    solver_status::{classify_with_terminal_convergence, input_from_legacy},
 };
 
 pub use solver_legacy::{
@@ -70,7 +70,8 @@ fn certify(
         return Err("non-converged solver result has converged reason".into());
     }
 
-    let status_evidence = classify_with_terminal_convergence(&result, &terminal);
+    let status_input = input_from_legacy(&result);
+    let status_evidence = classify_with_terminal_convergence(&status_input, &terminal);
     if status_evidence.status == SolverStatus::Indeterminate {
         return Err("solver status authority rejected terminal result evidence".into());
     }

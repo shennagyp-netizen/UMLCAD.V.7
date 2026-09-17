@@ -682,7 +682,8 @@ fn validate_face_region_edge_correspondence(
     face: &BRepFace,
     tolerance: Tolerance,
 ) -> Result<(), BRepError> {
-    let wire_ids = std::iter::once(face.outer_wire).chain(face.inner_wires.iter().map(|s| s.as_str()));
+    let mut wire_ids: Vec<&str> = vec![face.outer_wire.as_str()];
+    wire_ids.extend(face.inner_wires.iter().map(String::as_str));
     for wire_id in wire_ids {
         let wire = solid.wires.iter().find(|w| w.id == wire_id).ok_or(BRepError::MissingReference)?;
         let coedges = wire.coedges.iter()
@@ -692,10 +693,10 @@ fn validate_face_region_edge_correspondence(
         // The topological loop is authoritative; the planar region supplies
         // the corresponding surface mathematics. Explicit correspondence is
         // required at construction time through matching endpoint positions.
-        let region_points = if wire_id == face.outer_wire {
+        let region_points = if wire_id == face.outer_wire.as_str() {
             face.region.outer_points_3d(tolerance)?
         } else {
-            let index = face.inner_wires.iter().position(|id| id == wire_id).ok_or(BRepError::MissingReference)?;
+            let index = face.inner_wires.iter().position(|id| id.as_str() == wire_id).ok_or(BRepError::MissingReference)?;
             face.region.holes[index].iter()
                 .map(|uv| face.region.point_from_uv(*uv, tolerance))
                 .collect::<Result<Vec<_>, _>>()?
@@ -1100,7 +1101,7 @@ mod tests {
         assert!((intersection.volume(tol()).unwrap()-750.0).abs()<=1.0e-12);
 
         let difference=box_difference(a,b,tol()).unwrap();
-        let diff_volume:d64 = difference.iter().map(|x|x.volume(tol()).unwrap()).sum();
+        let diff_volume:f64 = difference.iter().map(|x|x.volume(tol()).unwrap()).sum();
         assert!((diff_volume + intersection.volume(tol()).unwrap()-a.volume(tol()).unwrap()).abs()<=1.0e-9);
 
         let union=box_union(a,b,tol()).unwrap();

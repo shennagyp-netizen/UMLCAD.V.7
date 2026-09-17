@@ -11,6 +11,7 @@ pub mod dxf;
 pub mod engineering;
 pub mod geometry;
 pub mod interval;
+pub mod intersections;
 pub mod linalg;
 pub mod mat;
 pub mod nurbs;

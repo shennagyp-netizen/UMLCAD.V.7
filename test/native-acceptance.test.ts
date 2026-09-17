@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, solveAndValidateEngineering } from "../kernel/src/native-index.js";
+import { DesignProgram, solveAndValidateEngineering } from "../kernel/api/src/native-index.js";
 
 test("solve-and-validate accepts a fully valid native design",()=>{
   const p=new DesignProgram();

@@ -20,6 +20,7 @@ pub mod solver;
 pub mod spatial;
 pub mod surfaces;
 pub mod sweeps;
+pub mod tolerance;
 pub mod topology;
 pub mod validation;
 pub mod vec;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, classifyConstraintSystem } from "../kernel/src/native-index.js";
+import { DesignProgram, classifyConstraintSystem } from "../kernel/api/src/native-index.js";
 
 test("diagnostics detect duplicate constraints and contradictions",()=>{
   const p=new DesignProgram();

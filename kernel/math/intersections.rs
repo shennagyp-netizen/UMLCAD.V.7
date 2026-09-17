@@ -6,7 +6,7 @@
 use super::{
     analytic::{Ellipse2, Plane3},
     conics3d::{Circle3, Sphere3},
-    geometry::{Circle, Line},
+    geometry::{Circle, Point},
     predicates::Tri,
     vec::{Vec2, Vec3},
 };
@@ -277,7 +277,8 @@ pub fn circle_circle_2d(a: Circle, b: Circle, tol: f64) -> Intersection2D {
     let h = h2_normalized.sqrt() * scale;
     let x = x_normalized * scale;
     let a_center = Vec2::new(a.center.x, a.center.y);
-    let base = a_center.add(delta.scale(x / distance));
+    let delta_vec = Vec2::new(delta.x, delta.y);
+    let base = a_center.add(delta_vec.scale(x / distance));
     let unit_perp = Vec2::new(-delta.y / distance, delta.x / distance);
     let point_a = base.add(unit_perp.scale(h));
     let point_b = base.sub(unit_perp.scale(h));
@@ -492,21 +493,21 @@ pub fn plane_plane_3d(a: Plane3, b: Plane3, tol: f64) -> Intersection3D {
             if det.abs() <= f64::MIN_POSITIVE {
                 return invalid_3d(IntersectionKind::Indeterminate);
             }
-            ((0.0), (c1 * n2.z - n1.z * c2) / det, (n1.y * c2 - c1 * n2.y) / det)
+            (0.0, (c1 * n2.z - n1.z * c2) / det, (n1.y * c2 - c1 * n2.y) / det)
         }
         1 => {
             let det = n1.x * n2.z - n1.z * n2.x;
             if det.abs() <= f64::MIN_POSITIVE {
                 return invalid_3d(IntersectionKind::Indeterminate);
             }
-            (((c1 * n2.z - n1.z * c2) / det), 0.0, ((n1.x * c2 - c1 * n2.x) / det))
+            ((c1 * n2.z - n1.z * c2) / det, 0.0, (n1.x * c2 - c1 * n2.x) / det)
         }
         _ => {
             let det = n1.x * n2.y - n1.y * n2.x;
             if det.abs() <= f64::MIN_POSITIVE {
                 return invalid_3d(IntersectionKind::Indeterminate);
             }
-            (((c1 * n2.y - n1.y * c2) / det), ((n1.x * c2 - c1 * n2.x) / det), 0.0)
+            ((c1 * n2.y - n1.y * c2) / det, (n1.x * c2 - c1 * n2.x) / det, 0.0)
         }
     };
     let point = Vec3::new(x, y, z);

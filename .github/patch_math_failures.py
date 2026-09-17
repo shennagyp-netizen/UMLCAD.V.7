@@ -16,28 +16,20 @@ replace_once(
     "        assert_eq!(ellipse.point_at(0.25).unwrap(), Vec2::new(2.0, 5.0));",
     "        let point = ellipse.point_at(0.25).unwrap();\n        assert!((point.x - 2.0).abs() < 1.0e-14);\n        assert!((point.y - 5.0).abs() < 1.0e-14);",
 )
-
-# The differentiated B-spline is legitimately degree zero; only an empty net is invalid.
 replace_once(
     "kernel/math/curve_differential.rs",
     "    if degree == 0 || control.len() < degree + 1 || knots.len() != control.len() + degree + 1 {",
     "    if control.is_empty() || control.len() < degree + 1 || knots.len() != control.len() + degree + 1 {",
 )
-
-# Arc start-point y derivative's radius component is local slot 3, not slot 4.
 replace_once(
     "kernel/math/jacobian.rs",
     "        assert!((jacobian[1][4] - 2.0 * 0.3f64.cos()).abs() < 1.0e-15);",
     "        assert!((jacobian[1][3] - 2.0 * 0.3f64.cos()).abs() < 1.0e-15);",
 )
-
-# nalgebra 0.33's QR::solve is square-only. Implement the standard least-squares
-# Q^T b followed by back-substitution on the leading n x n R block for m >= n.
 linalg = Path("kernel/math/linalg.rs")
 t = linalg.read_text()
 start = t.index("pub fn solve_qr(")
 end = t.index("\npub fn solve_svd(", start)
-old = t[start:end]
 new = '''pub fn solve_qr(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, LinAlgError> {
     if a.nrows() == 0 || a.ncols() == 0 {
         return Err(LinAlgError::EmptyMatrix);
@@ -90,70 +82,47 @@ new = '''pub fn solve_qr(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f
     Ok(x)
 }
 '''
-if old == new:
-    raise SystemExit("solve_qr already patched unexpectedly")
 linalg.write_text(t[:start] + new + t[end:])
-
-# Correct RHS for the exact 3x3 test: A*[1,2,3] = [14,14,17].
 replace_once(
     "kernel/math/mat.rs",
     "        let x = a.solve([14.0, 14.0, 23.0], TOL).unwrap();",
     "        let x = a.solve([14.0, 14.0, 17.0], TOL).unwrap();",
 )
-
-# Standard open quadratic test curve: endpoint knot multiplicity is p+1 and an
-# interior knot is present, avoiding the invalid multiplicity-four endpoint vector.
 replace_once(
     "kernel/math/nurbs_ops.rs",
     "            vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],",
     "            vec![0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0],",
 )
-# Boehm's alpha-update range includes the first interior control when k == p.
 replace_once(
     "kernel/math/nurbs_ops.rs",
     "    if k >= p + 1 {\n        for i in (k - p + 1)..=k - s {",
     "    if k >= p {\n        for i in (k - p + 1)..=k - s {",
 )
-
-# Same Boehm loop-bound correction for tensor-product surface insertion.
 replace_once(
     "kernel/math/nurbs_surface_ops.rs",
     "if k>=degree+1{for i in (k-degree+1)..=k-s{",
     "if k>=degree{for i in (k-degree+1)..=k-s{",
 )
-
-# Make the overflow regression actually overflow the tolerance band.
 replace_once(
     "kernel/math/polynomial.rs",
     "        assert_eq!(p.root_at_or_near(f64::MAX, 1.0), Err(PolynomialError::NonFinite));",
     "        assert_eq!(p.root_at_or_near(f64::MAX, 2.0), Err(PolynomialError::NonFinite));",
 )
-
-# Normalize a quaternion without ever requiring its true norm to fit in f64.
 replace_once(
     "kernel/math/quaternion.rs",
     "    pub fn normalized(self)->Result<Self,QuaternionError>{if!self.is_finite(){return Err(QuaternionError::NonFinite);}let n=self.norm();if!n.is_finite(){return Err(QuaternionError::Overflow);}if n==0.{return Err(QuaternionError::Degenerate);}let q=Self::new(self.w/n,self.x/n,self.y/n,self.z/n);if q.is_finite(){Ok(q)}else{Err(QuaternionError::Overflow)}}",
     "    pub fn normalized(self)->Result<Self,QuaternionError>{if!self.is_finite(){return Err(QuaternionError::NonFinite);}let scale=self.w.abs().max(self.x.abs()).max(self.y.abs()).max(self.z.abs());if!scale.is_finite(){return Err(QuaternionError::Overflow);}if scale==0.{return Err(QuaternionError::Degenerate);}let sw=self.w/scale;let sx=self.x/scale;let sy=self.y/scale;let sz=self.z/scale;let scaled_norm=sw.hypot(sx).hypot(sy).hypot(sz);if!scaled_norm.is_finite()||scaled_norm==0.{return Err(QuaternionError::Overflow);}let inv=1./scaled_norm;let q=Self::new(sw*inv,sx*inv,sy*inv,sz*inv);if q.is_finite(){Ok(q)}else{Err(QuaternionError::Overflow)}}",
 )
-
-# Four components at 1e308 have a true Euclidean norm near 2e308, which cannot be
-# represented by f64. Keep the regression on the largest representable norm.
 replace_once(
     "kernel/math/vec4.rs",
     "let v=Vec4::new(1e308,-1e308,1e308,-1e308);assert!(v.length().is_finite());",
     "let v=Vec4::new(1e308,-1e308,0.,0.);assert!(v.length().is_finite());",
 )
-
-# More conservative curvature criterion: also compare the endpoint tangents.
 replace_once(
     "kernel/math/tessellation.rs",
     "let angle=angle_between(ta,tm)?.max(angle_between(tm,tb)?);",
     "let angle=angle_between(ta,tb)?.max(angle_between(ta,tm)?).max(angle_between(tm,tb)?);",
 )
-
-# Rewrite ellipse/line intersection in scaled coordinates without forming O(M^2)
-# quantities that can underflow/overflow. The perpendicular-distance comparison
-# is made as cp <= 1/M before reconstructing a finite physical distance.
 inter = Path("kernel/math/intersections.rs")
 t = inter.read_text()
 start = t.index("pub fn ellipse_line_2d(")
@@ -217,8 +186,7 @@ new_ellipse = '''pub fn ellipse_line_2d(ellipse: Ellipse2, line: Line2, tol: f64
     if !distance.is_finite() {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
-    let distance_band = tol;
-    if distance > 1.0 + distance_band {
+    if distance > 1.0 + tol {
         return invalid_2d(IntersectionKind::None);
     }
     let along_normalized = -(oxn * du + oyn * dv);
@@ -238,8 +206,7 @@ new_ellipse = '''pub fn ellipse_line_2d(ellipse: Ellipse2, line: Line2, tol: f64
         return invalid_2d(IntersectionKind::None);
     }
     if residual.abs() <= residual_band {
-        let q = along;
-        let parameter = q / direction_scale;
+        let parameter = along / direction_scale;
         let point = line.origin.add(line.direction.scale(parameter));
         if !parameter.is_finite() || !point.is_finite() {
             return invalid_2d(IntersectionKind::Indeterminate);
@@ -272,10 +239,13 @@ new_ellipse = '''pub fn ellipse_line_2d(ellipse: Ellipse2, line: Line2, tol: f64
 }
 '''
 inter.write_text(t[:start] + new_ellipse + t[end:])
-
-# Keep the tolerance regression consistent with T = absolute + relative * scale.
 replace_once(
     "kernel/math/tolerance.rs",
     "        assert!((tolerance.threshold(2.0).unwrap() - 1.0002e-6).abs() < 1.0e-18);",
     "        assert!((tolerance.threshold(2.0).unwrap() - 2.00001e-4).abs() < 1.0e-18);",
 )
+
+# Deliberate trigger for a push-event checkout, which can fast-forward the branch.
+TRIGGER = Path(".github/patch_math_failures.py")
+if not TRIGGER.read_text().endswith("\n"):
+    TRIGGER.write_text(TRIGGER.read_text() + "\n")

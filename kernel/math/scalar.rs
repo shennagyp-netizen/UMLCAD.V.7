@@ -8,75 +8,59 @@ pub enum ScalarError {
     NonFinite,
     Overflow,
     DivisionByZero,
+    InvalidDomain,
     InvalidTolerance,
 }
 
 #[inline]
 pub fn finite(value: f64) -> Result<f64, ScalarError> {
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(ScalarError::NonFinite)
-    }
+    if value.is_finite() { Ok(value) } else { Err(ScalarError::NonFinite) }
 }
 
 #[inline]
 pub fn add(a: f64, b: f64) -> Result<f64, ScalarError> {
-    finite(a)?;
-    finite(b)?;
+    finite(a)?; finite(b)?;
     finite(a + b).map_err(|_| ScalarError::Overflow)
 }
 
 #[inline]
 pub fn sub(a: f64, b: f64) -> Result<f64, ScalarError> {
-    finite(a)?;
-    finite(b)?;
+    finite(a)?; finite(b)?;
     finite(a - b).map_err(|_| ScalarError::Overflow)
 }
 
 #[inline]
 pub fn mul(a: f64, b: f64) -> Result<f64, ScalarError> {
-    finite(a)?;
-    finite(b)?;
+    finite(a)?; finite(b)?;
     finite(a * b).map_err(|_| ScalarError::Overflow)
 }
 
 #[inline]
 pub fn div(a: f64, b: f64) -> Result<f64, ScalarError> {
-    finite(a)?;
-    finite(b)?;
-    if b == 0.0 {
-        return Err(ScalarError::DivisionByZero);
-    }
+    finite(a)?; finite(b)?;
+    if b == 0.0 { return Err(ScalarError::DivisionByZero); }
     finite(a / b).map_err(|_| ScalarError::Overflow)
 }
 
 #[inline]
-pub fn square(a: f64) -> Result<f64, ScalarError> {
-    mul(a, a)
-}
+pub fn square(a: f64) -> Result<f64, ScalarError> { mul(a, a) }
 
 #[inline]
 pub fn safe_sqrt(a: f64) -> Result<f64, ScalarError> {
     finite(a)?;
-    if a < 0.0 {
-        return Err(ScalarError::DivisionByZero);
-    }
+    if a < 0.0 { return Err(ScalarError::InvalidDomain); }
     finite(a.sqrt()).map_err(|_| ScalarError::Overflow)
 }
 
 #[inline]
 pub fn approximately_equal(a: f64, b: f64, absolute: f64, relative: f64) -> Result<bool, ScalarError> {
-    finite(a)?;
-    finite(b)?;
+    finite(a)?; finite(b)?;
     if !absolute.is_finite() || !relative.is_finite() || absolute < 0.0 || relative < 0.0 {
         return Err(ScalarError::InvalidTolerance);
     }
     let scale = a.abs().max(b.abs());
     let threshold = absolute + relative * scale;
-    if !threshold.is_finite() {
-        return Err(ScalarError::Overflow);
-    }
+    if !threshold.is_finite() { return Err(ScalarError::Overflow); }
     Ok((a - b).abs() <= threshold)
 }
 
@@ -95,6 +79,11 @@ mod tests {
     fn finite_overflow_is_rejected() {
         assert_eq!(add(f64::MAX, f64::MAX), Err(ScalarError::Overflow));
         assert_eq!(mul(f64::MAX, 2.0), Err(ScalarError::Overflow));
+    }
+
+    #[test]
+    fn square_root_classifies_negative_domain() {
+        assert_eq!(safe_sqrt(-1.0), Err(ScalarError::InvalidDomain));
     }
 
     #[test]

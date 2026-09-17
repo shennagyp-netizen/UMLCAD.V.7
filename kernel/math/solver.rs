@@ -734,7 +734,7 @@ pub fn solve_snapshot(
                 iteration,
             );
             if terminal.status == TerminalConvergenceStatus::Converged
-                && proposed_relation_satisfied
+                && proposed_relations_satisfied
             {
                 let final_analysis = analysis(
                     snapshot,
@@ -744,7 +744,7 @@ pub fn solve_snapshot(
                     scale,
                     options.residual_tolerance,
                     proposed_relation_equations,
-                    proposed_relation_satisfied,
+                    proposed_relations_satisfied,
                     rank,
                     condition,
                 )?;

@@ -10,7 +10,7 @@ use super::{
     solver_legacy,
     geometry::Geometry,
     snapshot::SemanticSnapshot,
-    solver_status::{classify_with_terminal_convergence, SolverStatus, SolverStatusEvidence},
+    solver_status::classify_with_terminal_convergence,
 };
 
 pub use solver_legacy::{

@@ -246,6 +246,10 @@ pub fn pseudo_inverse(
 }
 
 /// Return an orthonormal basis of the right null space as `n × (n-rank)`.
+///
+/// nalgebra exposes a thin `Vᵀ` with `min(m,n)` rows. For a wide matrix the
+/// missing null-space directions are reconstructed deterministically by
+/// completing the orthogonal complement of the identified row space.
 pub fn null_space(
     matrix: &DMatrix<f64>,
     rank_tol: f64,
@@ -255,15 +259,62 @@ pub fn null_space(
     let cols = matrix.ncols();
     let rank = decomposition.evidence.rank;
     let nullity = cols - rank;
-    if decomposition.v_t.nrows() < cols {
-        return Err(LinAlgError::DecompositionFailed);
+    if nullity == 0 {
+        return Ok(DMatrix::<f64>::zeros(cols, 0));
     }
-    let mut result = DMatrix::<f64>::zeros(cols, nullity);
-    for basis_index in 0..nullity {
-        let source_row = rank + basis_index;
+
+    let mut orthonormal: Vec<Vec<f64>> = Vec::with_capacity(cols);
+    for row in 0..rank {
+        let mut basis = vec![0.0; cols];
         for column in 0..cols {
-            result[(column, basis_index)] = decomposition.v_t[(source_row, column)];
+            basis[column] = decomposition.v_t[(row, column)];
         }
+        orthonormal.push(basis);
+    }
+
+    // This is only a round-off guard for the deterministic complement
+    // construction, not a semantic rank tolerance.
+    let completion_tol = 32.0 * f64::EPSILON * (cols.max(1) as f64).sqrt();
+    let mut result = DMatrix::<f64>::zeros(cols, nullity);
+    let mut count = 0usize;
+
+    for canonical_index in 0..cols {
+        if count == nullity {
+            break;
+        }
+        let mut candidate = vec![0.0; cols];
+        candidate[canonical_index] = 1.0;
+
+        for existing in &orthonormal {
+            let projection = candidate
+                .iter()
+                .zip(existing.iter())
+                .map(|(a, b)| a * b)
+                .sum::<f64>();
+            for index in 0..cols {
+                candidate[index] -= projection * existing[index];
+            }
+        }
+
+        let norm = candidate.iter().map(|value| value * value).sum::<f64>().sqrt();
+        if !norm.is_finite() {
+            return Err(LinAlgError::DecompositionFailed);
+        }
+        if norm <= completion_tol {
+            continue;
+        }
+        for value in &mut candidate {
+            *value /= norm;
+        }
+        for row in 0..cols {
+            result[(row, count)] = candidate[row];
+        }
+        orthonormal.push(candidate);
+        count += 1;
+    }
+
+    if count != nullity {
+        return Err(LinAlgError::DecompositionFailed);
     }
     Ok(result)
 }
@@ -408,7 +459,7 @@ mod tests {
     }
 
     #[test]
-    fn svd_classifies_full_rank_and_singular_systems() {
+    fn svd_classifies_full_rank_and_rank_deficiency() {
         let full = svd(&matrix(&[&[1.0, 0.0], &[0.0, 2.0]]), RTOL, ICT).unwrap();
         assert_eq!(full.evidence.rank, 2);
         assert_eq!(full.evidence.classification, RankClassification::FullRank);
@@ -438,8 +489,18 @@ mod tests {
     }
 
     #[test]
-    fn null_space_has_expected_dimension_and_orthogonality() {
+    fn null_space_has_expected_dimension_and_is_orthogonal_to_rows() {
         let a = matrix(&[&[1.0, 1.0, 1.0]]);
+        let ns = null_space(&a, RTOL, ICT).unwrap();
+        assert_eq!(ns.nrows(), 3);
+        assert_eq!(ns.ncols(), 2);
+        let residual = &a * &ns;
+        assert!(residual.iter().all(|value| value.abs() < 1.0e-10));
+    }
+
+    #[test]
+    fn null_space_handles_a_wide_rank_deficient_matrix() {
+        let a = matrix(&[&[1.0, 0.0, 0.0], &[0.0, 0.0, 0.0]]);
         let ns = null_space(&a, RTOL, ICT).unwrap();
         assert_eq!(ns.nrows(), 3);
         assert_eq!(ns.ncols(), 2);

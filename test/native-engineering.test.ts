@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, buildTopology, evaluateDimensions, spatialAnalysis, resolveReference, exportDxf, KERNEL_CAPABILITIES } from "../kernel/src/native-index.js";
+import { DesignProgram, buildTopology, evaluateDimensions, spatialAnalysis, resolveReference, exportDxf, KERNEL_CAPABILITIES } from "../kernel/api/src/native-index.js";
 
 function square(){const p=new DesignProgram();p.addGeometry("a",()=>({kind:"line",start:{x:0,y:0},end:{x:10,y:0}}));p.addGeometry("b",()=>({kind:"line",start:{x:10,y:0},end:{x:10,y:10}}));p.addGeometry("c",()=>({kind:"line",start:{x:10,y:10},end:{x:0,y:10}}));p.addGeometry("d",()=>({kind:"line",start:{x:0,y:10},end:{x:0,y:0}}));return p.snapshot()}
 test("native topology derives a closed wire",()=>{const t=buildTopology(square());assert.equal(t.wires.length,1);assert.equal(t.wires[0]!.closed,true);assert.equal(t.wires[0]!.directions.length,4)});

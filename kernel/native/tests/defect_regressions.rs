@@ -4,7 +4,7 @@ use umlcad_kernel_rust::functions::{
     nurbs_surface::{NurbsSurface2D, Point3 as SurfacePoint3},
     nurbs_surface_differential::NurbsSurfaceDifferential,
     snapshot::{Constraint, Endpoint, GeometryItem, SemanticSnapshot},
-    solver::{solve_snapshot, SolveOptions},
+    solver::{scaled_damped_qr, solve_snapshot, SolveOptions},
     spatial::point_distance,
     topology::build_topology,
 };
@@ -102,6 +102,18 @@ fn solver_rejects_a_nonfinite_finite_difference_probe() {
 
     let error = result.expect_err("non-finite finite-difference probe must be rejected");
     assert!(error.contains("finite-difference probe") || error.contains("solver parameter"));
+}
+
+#[test]
+fn normalized_solver_condition_estimate_is_invariant_to_column_units() {
+    let base = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
+    let rescaled = vec![vec![1.0e9, 2.0e-9], vec![3.0e9, 4.0e-9]];
+
+    let a = scaled_damped_qr(&base, &[1.0, -2.0], 1.0e-3, 1.0e-12).unwrap();
+    let b = scaled_damped_qr(&rescaled, &[1.0, -2.0], 1.0e-3, 1.0e-12).unwrap();
+
+    assert!((a.condition_number - b.condition_number).abs() < 1.0e-12);
+    assert_eq!(a.rank, b.rank);
 }
 
 #[test]

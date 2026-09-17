@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, validateEngineering, validateMigration, validateSemanticReferences } from "../kernel/src/native-index.js";
+import { DesignProgram, validateEngineering, validateMigration, validateSemanticReferences } from "../kernel/api/src/native-index.js";
 
 test("engineering evidence separates structural and acceptance facts",()=>{
   const p=new DesignProgram();

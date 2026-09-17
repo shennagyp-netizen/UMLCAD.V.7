@@ -243,7 +243,7 @@ fn quotient2(p: H, d: H, dd: H) -> Result<Point3, NurbsSurfaceError> {
     let q = Point3 {
         x: (dd.x * w2 - p.x * w * dd.w - 2.0 * d.x * w * d.w + 2.0 * p.x * d.w * d.w) / w3,
         y: (dd.y * w2 - p.y * w * dd.w - 2.0 * d.y * w * d.w + 2.0 * p.y * d.w * d.w) / w3,
-        z: (dd.z * w2 - p.z * w * dd.w - 2.0 * d.z * w * dd.w + 2.0 * p.z * d.w * d.w) / w3,
+        z: (dd.z * w2 - p.z * w * dd.w - 2.0 * d.z * w * d.w + 2.0 * p.z * d.w * d.w) / w3,
     };
     if q.x.is_finite() && q.y.is_finite() && q.z.is_finite() {
         Ok(q)
@@ -342,7 +342,7 @@ pub fn derivatives_at(
             / w3,
         z: (duv_h.z * w2
             - du_h.z * w * dv_h.w
-            - dv_h.z * w * du_h.w
+            - dv_h.x * w * du_h.w
             + 2.0 * base_h.z * du_h.w * dv_h.w
             - base_h.z * w * duv_h.w)
             / w3,

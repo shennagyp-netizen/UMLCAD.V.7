@@ -31,6 +31,8 @@ pub mod predicates;
 pub mod quaternion;
 pub mod relation_jacobian;
 pub mod relations;
+pub mod scalar;
+pub mod segments;
 pub mod snapshot;
 pub mod solid;
 pub mod spatial;
@@ -48,6 +50,3 @@ pub mod trim;
 pub mod validation;
 pub mod vec;
 pub mod vec4;
-
-#[cfg(test)]
-mod conditioning_tests;

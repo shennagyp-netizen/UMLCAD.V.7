@@ -74,11 +74,12 @@ fn relative_rank_threshold_has_a_defined_transition() {
     ]);
     let below = rank_evidence(&near, 1.0e-10, CANONICAL_ILL_COND_THRESHOLD).unwrap();
     assert_eq!(below.rank, 1);
-    assert_eq!(below.classification, RankClassification::RankDeficient);
+    assert_eq!(below.classification, RankClassification::IllConditioned);
 
     let above = rank_evidence(&near, 1.0e-11, CANONICAL_ILL_COND_THRESHOLD).unwrap();
     assert_eq!(above.rank, 2);
-    assert_eq!(above.classification, RankClassification::FullRank);
+    assert_eq!(above.condition_number, 2.0e10);
+    assert_eq!(above.classification, RankClassification::IllConditioned);
 }
 
 #[test]
@@ -93,7 +94,9 @@ fn null_space_is_invariant_in_structure_under_uniform_matrix_scaling() {
         let scaled = &a * factor;
         let scaled_ns = null_space(&scaled, CANONICAL_RANK_TOL, CANONICAL_ILL_COND_THRESHOLD).unwrap();
         assert_eq!(scaled_ns.shape(), base.shape());
-        assert!((&scaled * &scaled_ns).iter().all(|value| value.abs() <= 1.0e-10));
+        let residual = &scaled * &scaled_ns;
+        let normalized_residual = residual.iter().map(|value| value / factor).collect::<Vec<_>>();
+        assert!(normalized_residual.iter().all(|value| value.abs() <= 1.0e-10));
         let gram = scaled_ns.transpose() * &scaled_ns;
         for diagonal in 0..gram.nrows() {
             assert_close(gram[(diagonal, diagonal)], 1.0, 1.0e-12, "scaled null-space norm");

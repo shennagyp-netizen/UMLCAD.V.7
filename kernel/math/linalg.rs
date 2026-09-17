@@ -2,7 +2,8 @@
 //!
 //! `nalgebra` is an implementation dependency of this module; its types are
 //! not part of the semantic kernel contract. Callers provide tolerances
-//! explicitly. No hidden global rank or conditioning threshold is applied.
+//! explicitly. Rank and symmetry decisions fail closed when the requested
+//! numerical classification cannot be represented safely.
 
 use nalgebra::{DMatrix, DVector};
 
@@ -63,6 +64,24 @@ fn valid_tolerances(rank_tol: f64, ill_cond_threshold: f64) -> bool {
         && ill_cond_threshold >= 0.0
 }
 
+fn indeterminate_evidence(
+    rows: usize,
+    cols: usize,
+    largest: f64,
+    smallest_nonzero: f64,
+    rank: usize,
+) -> RankEvidence {
+    RankEvidence {
+        rank,
+        nullity: cols.saturating_sub(rank),
+        min_dim: rows.min(cols),
+        condition_number: f64::INFINITY,
+        largest_singular: largest,
+        smallest_nonzero_singular: smallest_nonzero,
+        classification: RankClassification::Indeterminate,
+    }
+}
+
 fn classify_rank(
     singular_values: &[f64],
     rows: usize,
@@ -85,15 +104,7 @@ fn classify_rank(
 
     let largest = singular_values[0];
     if !largest.is_finite() {
-        return RankEvidence {
-            rank: 0,
-            nullity: cols,
-            min_dim,
-            condition_number: f64::INFINITY,
-            largest_singular: largest,
-            smallest_nonzero_singular: 0.0,
-            classification: RankClassification::Indeterminate,
-        };
+        return indeterminate_evidence(rows, cols, largest, 0.0, 0);
     }
     if largest <= 0.0 {
         return RankEvidence {
@@ -107,26 +118,26 @@ fn classify_rank(
         };
     }
 
-    // Relative threshold only. A unit floor would make rank classification
-    // change merely because the matrix was uniformly rescaled.
     let threshold = rank_tol * largest;
+    if !threshold.is_finite() {
+        return indeterminate_evidence(rows, cols, largest, 0.0, 0);
+    }
+
     let mut rank = 0usize;
     let mut smallest_nonzero = f64::INFINITY;
     for &sigma in singular_values.iter().take(min_dim) {
         if !sigma.is_finite() {
-            return RankEvidence {
-                rank,
-                nullity: cols.saturating_sub(rank),
-                min_dim,
-                condition_number: f64::INFINITY,
-                largest_singular: largest,
-                smallest_nonzero_singular: if smallest_nonzero.is_finite() {
+            return indeterminate_evidence(
+                rows,
+                cols,
+                largest,
+                if smallest_nonzero.is_finite() {
                     smallest_nonzero
                 } else {
                     0.0
                 },
-                classification: RankClassification::Indeterminate,
-            };
+                rank,
+            );
         }
         if sigma > threshold {
             rank += 1;
@@ -232,6 +243,9 @@ pub fn pseudo_inverse(
             continue;
         }
         let inverse = 1.0 / sigma;
+        if !inverse.is_finite() {
+            return Err(LinAlgError::Unsolvable);
+        }
         for column in 0..cols {
             let v = v_t[(k, column)] * inverse;
             for row in 0..rows {
@@ -246,10 +260,6 @@ pub fn pseudo_inverse(
 }
 
 /// Return an orthonormal basis of the right null space as `n × (n-rank)`.
-///
-/// nalgebra exposes a thin `Vᵀ` with `min(m,n)` rows. For a wide matrix the
-/// missing null-space directions are reconstructed deterministically by
-/// completing the orthogonal complement of the identified row space.
 pub fn null_space(
     matrix: &DMatrix<f64>,
     rank_tol: f64,
@@ -265,16 +275,20 @@ pub fn null_space(
 
     let mut orthonormal: Vec<Vec<f64>> = Vec::with_capacity(cols);
     for row in 0..rank {
-        let mut basis = vec![0.0; cols];
-        for column in 0..cols {
-            basis[column] = decomposition.v_t[(row, column)];
+        let basis = (0..cols)
+            .map(|column| decomposition.v_t[(row, column)])
+            .collect::<Vec<_>>();
+        if basis.iter().any(|value| !value.is_finite()) {
+            return Err(LinAlgError::DecompositionFailed);
         }
         orthonormal.push(basis);
     }
 
-    // This is only a round-off guard for the deterministic complement
-    // construction, not a semantic rank tolerance.
     let completion_tol = 32.0 * f64::EPSILON * (cols.max(1) as f64).sqrt();
+    if !completion_tol.is_finite() {
+        return Err(LinAlgError::DecompositionFailed);
+    }
+
     let mut result = DMatrix::<f64>::zeros(cols, nullity);
     let mut count = 0usize;
 
@@ -291,12 +305,19 @@ pub fn null_space(
                 .zip(existing.iter())
                 .map(|(a, b)| a * b)
                 .sum::<f64>();
+            if !projection.is_finite() {
+                return Err(LinAlgError::DecompositionFailed);
+            }
             for index in 0..cols {
                 candidate[index] -= projection * existing[index];
             }
         }
 
-        let norm = candidate.iter().map(|value| value * value).sum::<f64>().sqrt();
+        let norm = candidate
+            .iter()
+            .map(|value| value * value)
+            .sum::<f64>()
+            .sqrt();
         if !norm.is_finite() {
             return Err(LinAlgError::DecompositionFailed);
         }
@@ -306,6 +327,9 @@ pub fn null_space(
         for value in &mut candidate {
             *value /= norm;
         }
+        if candidate.iter().any(|value| !value.is_finite()) {
+            return Err(LinAlgError::DecompositionFailed);
+        }
         for row in 0..cols {
             result[(row, count)] = candidate[row];
         }
@@ -313,7 +337,7 @@ pub fn null_space(
         count += 1;
     }
 
-    if count != nullity {
+    if count != nullity || result.iter().any(|value| !value.is_finite()) {
         return Err(LinAlgError::DecompositionFailed);
     }
     Ok(result)
@@ -332,7 +356,12 @@ pub fn solve_lu(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, LinA
     if a.iter().any(|value| !value.is_finite()) || b.iter().any(|value| !value.is_finite()) {
         return Err(LinAlgError::NonFinite);
     }
-    a.clone().lu().solve(b).ok_or(LinAlgError::Singular)
+    let solution = a.clone().lu().solve(b).ok_or(LinAlgError::Singular)?;
+    if solution.iter().all(|value| value.is_finite()) {
+        Ok(solution)
+    } else {
+        Err(LinAlgError::Unsolvable)
+    }
 }
 
 pub fn solve_qr(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, LinAlgError> {
@@ -348,7 +377,12 @@ pub fn solve_qr(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, LinA
     if a.iter().any(|value| !value.is_finite()) || b.iter().any(|value| !value.is_finite()) {
         return Err(LinAlgError::NonFinite);
     }
-    a.clone().qr().solve(b).ok_or(LinAlgError::Unsolvable)
+    let solution = a.clone().qr().solve(b).ok_or(LinAlgError::Unsolvable)?;
+    if solution.iter().all(|value| value.is_finite()) {
+        Ok(solution)
+    } else {
+        Err(LinAlgError::Unsolvable)
+    }
 }
 
 pub fn solve_svd(
@@ -370,10 +404,10 @@ pub fn solve_svd(
         return Err(LinAlgError::NonFinite);
     }
     let result = pseudo_inverse(a, rank_tol, ill_cond_threshold)? * b;
-    if result.iter().any(|value| !value.is_finite()) {
-        Err(LinAlgError::Unsolvable)
-    } else {
+    if result.iter().all(|value| value.is_finite()) {
         Ok(result)
+    } else {
+        Err(LinAlgError::Unsolvable)
     }
 }
 
@@ -387,15 +421,23 @@ pub fn is_positive_definite(a: &DMatrix<f64>, tol: f64) -> Tri {
         return Tri::Indeterminate;
     }
     let scale = a.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    if scale == 0.0 {
+        return Tri::False;
+    }
+    let symmetry_band = tol * scale;
+    if !symmetry_band.is_finite() {
+        return Tri::Indeterminate;
+    }
     for row in 0..a.nrows() {
         for column in 0..row {
-            if (a[(row, column)] - a[(column, row)]).abs() > tol * scale {
+            let difference = (a[(row, column)] - a[(column, row)]).abs();
+            if !difference.is_finite() {
+                return Tri::Indeterminate;
+            }
+            if difference > symmetry_band {
                 return Tri::Indeterminate;
             }
         }
-    }
-    if scale == 0.0 {
-        return Tri::False;
     }
     if a.clone().cholesky().is_some() {
         Tri::True
@@ -545,5 +587,18 @@ mod tests {
         assert_eq!(solve_lu(&bad, &vector(&[1.0, 2.0])), Err(LinAlgError::NonFinite));
         assert!(is_positive_definite(&bad, RTOL).is_indeterminate());
         assert_eq!(rank_evidence(&a, -1.0, ICT), Err(LinAlgError::InvalidTolerance));
+    }
+
+    #[test]
+    fn overflowed_rank_threshold_is_indeterminate() {
+        let a = matrix(&[&[1.0e308, 0.0], &[0.0, 1.0e308]]);
+        let evidence = rank_evidence(&a, 1.0e308, ICT).unwrap();
+        assert_eq!(evidence.classification, RankClassification::Indeterminate);
+    }
+
+    #[test]
+    fn overflowed_symmetry_band_is_indeterminate() {
+        let a = matrix(&[&[1.0e308, 1.0], &[0.0, 1.0e308]]);
+        assert_eq!(is_positive_definite(&a, 1.0e308), Tri::Indeterminate);
     }
 }

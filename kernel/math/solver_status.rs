@@ -25,6 +25,8 @@ pub struct SolverStatusEvidence {
     pub status: SolverStatus,
     pub residual_reduced: bool,
     pub final_residual_finite: bool,
+    pub final_step_finite: bool,
+    pub final_step_norm: f64,
     pub condition_finite: bool,
     pub well_conditioned: bool,
     pub rank: usize,
@@ -40,7 +42,7 @@ pub struct SolverStatusEvidence {
 /// - singular reason => `Singular`;
 /// - max iterations with a reduced finite residual => `MaxIterations`;
 /// - max iterations with no residual reduction => `Diverged`;
-/// - non-finite analysis => `Indeterminate`.
+/// - non-finite residual/step analysis => `Indeterminate`.
 ///
 /// A finite nonzero singular-spectrum spread is not sufficient to claim that a
 /// rank-deficient system is well-conditioned. Numerical rank must span the
@@ -53,12 +55,13 @@ pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
     let final_residual_finite = result.final_residual_norm.is_finite()
         && result.final_scaled_residual_norm.is_finite()
         && result.analysis.valid;
+    let final_step_finite = result.final_step_norm.is_finite() && result.final_step_norm >= 0.0;
     let residual_reduced = result.final_scaled_residual_norm < result.initial_scaled_residual_norm;
     let rank_complete = result.analysis.rank >= result.analysis.equation_count.min(result.analysis.variable_count);
     let condition_finite = result.analysis.condition_estimate.is_finite() && rank_complete;
     let well_conditioned = result.analysis.well_conditioned && rank_complete;
 
-    let status = if !final_residual_finite {
+    let status = if !final_residual_finite || !final_step_finite {
         SolverStatus::Indeterminate
     } else {
         match result.reason {
@@ -90,6 +93,8 @@ pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
         status,
         residual_reduced,
         final_residual_finite,
+        final_step_finite,
+        final_step_norm: result.final_step_norm,
         condition_finite,
         well_conditioned,
         rank: result.analysis.rank,
@@ -198,6 +203,8 @@ mod tests {
         let evidence = classify(&result);
         assert_eq!(evidence.status, SolverStatus::Converged);
         assert!(evidence.final_residual_finite);
+        assert!(evidence.final_step_finite);
+        assert!(evidence.final_step_norm >= 0.0);
     }
 
     #[test]
@@ -259,6 +266,24 @@ mod tests {
         let evidence = classify(&result);
         assert_eq!(evidence.status, SolverStatus::Indeterminate);
         assert!(!evidence.final_residual_finite);
+    }
+
+    #[test]
+    fn nonfinite_terminal_step_is_indeterminate() {
+        let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        result.final_step_norm = f64::NAN;
+        let evidence = classify(&result);
+        assert_eq!(evidence.status, SolverStatus::Indeterminate);
+        assert!(!evidence.final_step_finite);
+    }
+
+    #[test]
+    fn negative_terminal_step_is_indeterminate() {
+        let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        result.final_step_norm = -1.0;
+        let evidence = classify(&result);
+        assert_eq!(evidence.status, SolverStatus::Indeterminate);
+        assert!(!evidence.final_step_finite);
     }
 
     #[test]

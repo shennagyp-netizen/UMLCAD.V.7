@@ -1,7 +1,0 @@
-[workspace]
-resolver = "2"
-members = [
-    "crates/geometry-api",
-    "crates/geometry-contract-tests",
-    "crates/occt-backend",
-]

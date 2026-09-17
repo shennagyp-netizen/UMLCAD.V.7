@@ -1,2 +1,0 @@
-# UMLCAD.V.6
-# UMLCAD.V.7

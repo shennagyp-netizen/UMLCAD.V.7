@@ -5,6 +5,7 @@
 //! Classification is deliberately fail-closed: a status is only claimed when
 //! the available evidence is sufficient to justify it.
 
+use super::linear_consistency::{LinearConsistencyEvidence, LinearSystemStatus};
 use super::solver::{ConstraintSolveResult, SolveReason};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -91,6 +92,30 @@ pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
     }
 }
 
+/// Refine the diagnostic classification when an independent linear-consistency
+/// authority has proved the current linearized system inconsistent.
+///
+/// The extra evidence is accepted only when its matrix dimensions agree with
+/// the solver analysis and the solver has not reported convergence. This keeps
+/// the API fail-closed: mismatched or insufficient evidence leaves the original
+/// status untouched.
+pub fn classify_with_linear_consistency(
+    result: &ConstraintSolveResult,
+    consistency: &LinearConsistencyEvidence,
+) -> SolverStatusEvidence {
+    let mut evidence = classify(result);
+    let dimensions_match = consistency.variable_count == result.analysis.variable_count
+        && consistency.equation_count == result.analysis.equation_count;
+    if dimensions_match
+        && !result.converged
+        && evidence.final_residual_finite
+        && consistency.status == LinearSystemStatus::Inconsistent
+    {
+        evidence.status = SolverStatus::Inconsistent;
+    }
+    evidence
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,6 +124,7 @@ mod tests {
         snapshot::{Constraint, GeometryItem, SemanticSnapshot},
         solver::{solve_snapshot, SolveOptions},
     };
+    use nalgebra::{DMatrix, DVector};
 
     fn base_snapshot() -> SemanticSnapshot {
         SemanticSnapshot {
@@ -120,6 +146,18 @@ mod tests {
             relations: vec![],
         }
         .deterministic()
+    }
+
+    fn inconsistent_evidence(result: &ConstraintSolveResult) -> LinearConsistencyEvidence {
+        LinearConsistencyEvidence {
+            status: LinearSystemStatus::Inconsistent,
+            coefficient_rank: result.analysis.rank,
+            augmented_rank: result.analysis.rank + 1,
+            variable_count: result.analysis.variable_count,
+            equation_count: result.analysis.equation_count,
+            coefficient_condition_number: 1.0,
+            coefficient_classification: super::super::linalg::RankClassification::FullRank,
+        }
     }
 
     #[test]
@@ -158,5 +196,47 @@ mod tests {
         let evidence = classify(&result);
         assert_eq!(evidence.status, SolverStatus::Indeterminate);
         assert!(!evidence.final_residual_finite);
+    }
+
+    #[test]
+    fn explicit_inconsistency_evidence_refines_nonconverged_status() {
+        let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        result.converged = false;
+        result.reason = SolveReason::MaxIterations;
+        let consistency = inconsistent_evidence(&result);
+        let evidence = classify_with_linear_consistency(&result, &consistency);
+        assert_eq!(evidence.status, SolverStatus::Inconsistent);
+    }
+
+    #[test]
+    fn inconsistent_evidence_cannot_override_a_converged_result() {
+        let result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        assert!(result.converged);
+        let consistency = inconsistent_evidence(&result);
+        let evidence = classify_with_linear_consistency(&result, &consistency);
+        assert_eq!(evidence.status, SolverStatus::Converged);
+    }
+
+    #[test]
+    fn mismatched_inconsistency_evidence_is_ignored() {
+        let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        result.converged = false;
+        result.reason = SolveReason::MaxIterations;
+        let mut consistency = inconsistent_evidence(&result);
+        consistency.equation_count += 1;
+        let evidence = classify_with_linear_consistency(&result, &consistency);
+        assert_eq!(evidence.status, SolverStatus::Diverged);
+    }
+
+    #[test]
+    fn inconsistent_linear_rank_witness_is_explicitly_representable() {
+        let a = DMatrix::from_row_slice(2, 2, &[1.0, 1.0, 2.0, 2.0]);
+        let b = DVector::from_column_slice(&[2.0, 5.0]);
+        let evidence = super::super::linear_consistency::classify_linear_system(
+            &a, &b, 1.0e-10, 1.0e10,
+        )
+        .unwrap();
+        assert_eq!(evidence.status, LinearSystemStatus::Inconsistent);
+        assert!(evidence.augmented_rank > evidence.coefficient_rank);
     }
 }

@@ -42,6 +42,11 @@ pub struct SolverStatusEvidence {
 /// - max iterations with no residual reduction => `Diverged`;
 /// - non-finite analysis => `Indeterminate`.
 ///
+/// A finite nonzero singular-spectrum spread is not sufficient to claim that a
+/// rank-deficient system is well-conditioned. Numerical rank must span the
+/// smaller matrix dimension before the condition evidence is considered finite
+/// for status classification.
+///
 /// `Inconsistent`, `InvalidInput`, and `Cancelled` need richer upstream evidence
 /// than the current result type carries and are therefore not fabricated here.
 pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
@@ -49,8 +54,9 @@ pub fn classify(result: &ConstraintSolveResult) -> SolverStatusEvidence {
         && result.final_scaled_residual_norm.is_finite()
         && result.analysis.valid;
     let residual_reduced = result.final_scaled_residual_norm < result.initial_scaled_residual_norm;
-    let condition_finite = result.analysis.condition_estimate.is_finite();
-    let well_conditioned = result.analysis.well_conditioned;
+    let rank_complete = result.analysis.rank >= result.analysis.equation_count.min(result.analysis.variable_count);
+    let condition_finite = result.analysis.condition_estimate.is_finite() && rank_complete;
+    let well_conditioned = result.analysis.well_conditioned && rank_complete;
 
     let status = if !final_residual_finite {
         SolverStatus::Indeterminate
@@ -195,6 +201,38 @@ mod tests {
     }
 
     #[test]
+    fn converged_rank_deficient_result_is_warning_even_when_spread_is_finite() {
+        let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        result.converged = true;
+        result.reason = SolveReason::Converged;
+        result.analysis.variable_count = 4;
+        result.analysis.equation_count = 3;
+        result.analysis.rank = 2;
+        result.analysis.condition_estimate = 25.0;
+        result.analysis.well_conditioned = true;
+        let evidence = classify(&result);
+        assert_eq!(evidence.status, SolverStatus::ConvergedWithWarning);
+        assert!(!evidence.condition_finite);
+        assert!(!evidence.well_conditioned);
+    }
+
+    #[test]
+    fn converged_full_row_rank_wide_result_can_remain_conditioned() {
+        let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
+        result.converged = true;
+        result.reason = SolveReason::Converged;
+        result.analysis.variable_count = 4;
+        result.analysis.equation_count = 3;
+        result.analysis.rank = 3;
+        result.analysis.condition_estimate = 25.0;
+        result.analysis.well_conditioned = true;
+        let evidence = classify(&result);
+        assert_eq!(evidence.status, SolverStatus::Converged);
+        assert!(evidence.condition_finite);
+        assert!(evidence.well_conditioned);
+    }
+
+    #[test]
     fn finite_residual_with_singular_reason_is_not_reported_as_converged() {
         let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         result.converged = false;
@@ -239,7 +277,7 @@ mod tests {
         assert!(result.converged);
         let consistency = inconsistent_evidence(&result);
         let evidence = classify_with_linear_consistency(&result, &consistency);
-        assert_eq!(evidence.status, SolverStatus::Converged);
+        assert_eq!(evidence.status, SolverStatus::ConvergedWithWarning);
     }
 
     #[test]

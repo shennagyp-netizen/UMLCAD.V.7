@@ -103,8 +103,9 @@ impl Circle3D {
         self.validate()?;
         if !p.finite() { return Err(Curve3DError::NonFinite); }
         let displacement = self.center.vector_to(p);
-        let axial = displacement.dot(self.normal);
-        let radial = displacement.sub(self.normal.scale(axial)).norm();
+        let normal = self.normal.normalized()?;
+        let axial = displacement.dot(normal);
+        let radial = displacement.sub(normal.scale(axial)).norm();
         Ok((radial - self.radius).hypot(axial))
     }
 }

@@ -1,22 +1,6 @@
 #!/usr/bin/env python3
-"""Single-command UMLCAD V7 integration/red-team gate.
-
-The runner owns the real kernel-host lifecycle and executes:
-  1. Rust regression tests.
-  2. Rust typed public-API integration E2E tests.
-  3. Full .NET Framework test-project discovery.
-  4. Full .NET Framework test-project execution, including real kernel E2E tests.
-  5. Dedicated .NET black-box HTTP integration tests.
-  6. Demo end-to-end build/evaluate test.
-  7. Adversarial raw HTTP protocol probes.
-
-Repository paths are resolved from this script, not from the caller's working
- directory. Required project files are checked before any test process starts.
-No third-party Python packages are required.
-"""
-
+"""Single-command UMLCAD V7 integration/red-team gate."""
 from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -25,10 +9,9 @@ import signal
 import socket
 import subprocess
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Sequence
-
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_URL = "http://127.0.0.1:8080"
@@ -37,7 +20,6 @@ BLACKBOX_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Kernel.Integration.Tests/UML
 DEMO_PROJECT = ROOT / "projects/demo/Demo.csproj"
 RUST_MANIFEST = ROOT / "kernel/native/Cargo.toml"
 
-
 @dataclass
 class Result:
     name: str
@@ -45,7 +27,6 @@ class Result:
     returncode: int
     duration_seconds: float
     output_tail: str
-
 
 class Runner:
     def __init__(self, release: bool, verbose: bool) -> None:
@@ -62,16 +43,9 @@ class Runner:
         started = time.monotonic()
         self.log(f"RUN {name}: {' '.join(command)}")
         try:
-            completed = subprocess.run(
-                list(command),
-                cwd=ROOT,
-                env=os.environ.copy(),
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                timeout=timeout,
-                check=False,
-            )
+            completed = subprocess.run(list(command), cwd=ROOT, env=os.environ.copy(), text=True,
+                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                       timeout=timeout, check=False)
             returncode = completed.returncode
             output = completed.stdout or ""
         except subprocess.TimeoutExpired as exc:
@@ -82,12 +56,10 @@ class Runner:
             returncode = 127
             output = f"PROCESS ERROR: {exc}"
         duration = time.monotonic() - started
-        tail = output[-8000:]
-        self.results.append(Result(name, list(command), returncode, duration, tail))
+        self.results.append(Result(name, list(command), returncode, duration, output[-8000:]))
         if self.verbose or returncode != 0:
             print(output, end="" if output.endswith("\n") else "\n")
-        status = "PASS" if returncode == 0 else "FAIL"
-        self.log(f"{status} {name} ({duration:.1f}s)")
+        self.log(f"{'PASS' if returncode == 0 else 'FAIL'} {name} ({duration:.1f}s)")
         return returncode == 0
 
     def validate_paths(self) -> None:
@@ -106,20 +78,13 @@ class Runner:
 
     def discover_framework_tests(self) -> bool:
         name = "dotnet-framework-discovery"
-        started = time.monotonic()
         command = ["dotnet", "test", str(FRAMEWORK_TEST_PROJECT), "--list-tests"]
+        started = time.monotonic()
         self.log(f"RUN {name}: {' '.join(command)}")
         try:
-            completed = subprocess.run(
-                command,
-                cwd=ROOT,
-                env=os.environ.copy(),
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                timeout=900,
-                check=False,
-            )
+            completed = subprocess.run(command, cwd=ROOT, env=os.environ.copy(), text=True,
+                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                       timeout=900, check=False)
             output = completed.stdout or ""
             returncode = completed.returncode
         except subprocess.TimeoutExpired as exc:
@@ -129,22 +94,18 @@ class Runner:
         except OSError as exc:
             returncode = 127
             output = f"PROCESS ERROR: {exc}"
-
         duration = time.monotonic() - started
-        tail = output[-8000:]
-        self.results.append(Result(name, command, returncode, duration, tail))
-        if self.verbose or returncode != 0:
-            print(output, end="" if output.endswith("\n") else "\n")
 
-        listed_tests = re.findall(r"^\s{2,}([^\r\n]+?)\s*$", output, re.MULTILINE)
-        has_test_names = any("RustKernelEndToEndTests" in test for test in listed_tests)
-        has_total = re.search(r"Total tests:\s*(\d+)", output)
-        total = int(has_total.group(1)) if has_total else 0
-        ok = returncode == 0 and total > 0 and has_test_names
+        listed_tests = re.findall(r"^\s+UMLCAD\.Framework\.Tests\.[^\r\n]+$", output, re.MULTILINE)
+        total = len(listed_tests)
+        has_e2e = any("RustKernelEndToEndTests." in test for test in listed_tests)
+        ok = returncode == 0 and total > 0 and has_e2e
         if not ok and returncode == 0:
-            output += "\nDISCOVERY ERROR: Framework test project did not expose a non-zero test list containing RustKernelEndToEndTests."
-            self.results[-1].output_tail = output[-8000:]
-        self.log(("PASS" if ok else "FAIL") + f" {name}: discovered {total} tests")
+            output += "\nDISCOVERY ERROR: Framework test list did not expose expected UMLCAD.Framework.Tests entries including RustKernelEndToEndTests."
+        self.results.append(Result(name, command, returncode if ok else 1, duration, output[-8000:]))
+        if self.verbose or not ok:
+            print(output, end="" if output.endswith("\n") else "\n")
+        self.log(f"{'PASS' if ok else 'FAIL'} {name}: discovered {total} tests")
         return ok
 
     def start_kernel(self) -> None:
@@ -152,24 +113,10 @@ class Runner:
             return
         self.kernel_log.parent.mkdir(parents=True, exist_ok=True)
         log = self.kernel_log.open("w", encoding="utf-8")
-        command = [
-            "cargo",
-            "run",
-            "--release",
-            "--bin",
-            "kernel_host",
-            "--manifest-path",
-            "kernel/native/Cargo.toml",
-        ]
+        command = ["cargo", "run", "--release", "--bin", "kernel_host", "--manifest-path", "kernel/native/Cargo.toml"]
         self.log("START kernel_host: " + " ".join(command))
-        self.kernel = subprocess.Popen(
-            command,
-            cwd=ROOT,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            text=True,
-            start_new_session=True,
-        )
+        self.kernel = subprocess.Popen(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
+                                       text=True, start_new_session=True)
         deadline = time.monotonic() + 120
         while time.monotonic() < deadline:
             if self.kernel.poll() is not None:
@@ -204,19 +151,16 @@ class Runner:
 
     def write_report(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {
+        path.write_text(json.dumps({
             "schema": "uml-cad-e2e-report/1.0.0",
             "passed": all(x.returncode == 0 for x in self.results),
             "results": [asdict(x) for x in self.results],
             "kernel_log": str(self.kernel_log.relative_to(ROOT)),
-        }
-        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-
+        }, indent=2), encoding="utf-8")
 
 def http_request(payload: bytes, request: str) -> bytes:
-    raw = request.encode("ascii") + payload
     with socket.create_connection(("127.0.0.1", 8080), timeout=10) as sock:
-        sock.sendall(raw)
+        sock.sendall(request.encode("ascii") + payload)
         chunks: list[bytes] = []
         while True:
             chunk = sock.recv(8192)
@@ -225,165 +169,68 @@ def http_request(payload: bytes, request: str) -> bytes:
             chunks.append(chunk)
     return b"".join(chunks)
 
-
 def status_and_body(response: bytes) -> tuple[int, bytes]:
     head, _, body = response.partition(b"\r\n\r\n")
-    first = head.splitlines()[0].decode("ascii")
-    return int(first.split()[1]), body
-
+    return int(head.splitlines()[0].decode("ascii").split()[1]), body
 
 def raw_redteam_checks(runner: Runner) -> bool:
     checks = [
-        (
-            "unknown endpoint",
-            b"",
-            "GET /v1/does-not-exist HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-            404,
-            b"KERNEL_NOT_FOUND",
-        ),
-        (
-            "invalid JSON",
-            b"{not-json",
-            "POST /v1/build/evaluate HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 9\r\nConnection: close\r\n\r\n",
-            422,
-            b"KERNEL_INVALID_JSON",
-        ),
-        (
-            "wrong schema",
-            json.dumps({"schema": "attack/0", "semantic": {"parts": []}}).encode(),
-            None,
-            422,
-            b"KERNEL_BUILD_SCHEMA",
-        ),
-        (
-            "missing semantic",
-            json.dumps({"schema": "uml-cad-build-package/1.0.0"}).encode(),
-            None,
-            422,
-            b"KERNEL_BUILD_SCHEMA",
-        ),
-        (
-            "unsupported geometry",
-            json.dumps(
-                {
-                    "schema": "uml-cad-build-package/1.0.0",
-                    "applicationId": "attack",
-                    "applicationVersion": "1.0.0",
-                    "buildIdentity": "unused",
-                    "semantic": {
-                        "id": "attack",
-                        "version": "1.0.0",
-                        "buildIdentity": "unused",
-                        "parts": [
-                            {
-                                "id": "p",
-                                "geometry": [
-                                    {"id": "g", "kind": "ellipse", "properties": {"center": "0,0", "radius": "5"}}
-                                ],
-                            }
-                        ],
-                    },
-                }
-            ).encode(),
-            None,
-            422,
-            b"KERNEL_UNSUPPORTED_GEOMETRY",
-        ),
+        ("unknown endpoint", b"", "GET /v1/does-not-exist HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n", 404, b"KERNEL_NOT_FOUND"),
+        ("invalid JSON", b"{not-json", "POST /v1/build/evaluate HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 9\r\nConnection: close\r\n\r\n", 422, b"KERNEL_INVALID_JSON"),
+        ("wrong schema", json.dumps({"schema": "attack/0", "semantic": {"parts": []}}).encode(), None, 422, b"KERNEL_BUILD_SCHEMA"),
+        ("missing semantic", json.dumps({"schema": "uml-cad-build-package/1.0.0"}).encode(), None, 422, b"KERNEL_BUILD_SCHEMA"),
+        ("unsupported geometry", json.dumps({
+            "schema": "uml-cad-build-package/1.0.0", "applicationId": "attack", "applicationVersion": "1.0.0", "buildIdentity": "unused",
+            "semantic": {"id": "attack", "version": "1.0.0", "buildIdentity": "unused", "parts": [{"id": "p", "geometry": [{"id": "g", "kind": "ellipse", "properties": {"center": "0,0", "radius": "5"}}]}]}
+        }).encode(), None, 422, b"KERNEL_UNSUPPORTED_GEOMETRY"),
     ]
-
     passed = True
     for name, payload, request, expected_status, expected_token in checks:
         if request is None:
-            request = (
-                "POST /v1/build/evaluate HTTP/1.1\r\n"
-                "Host: localhost\r\n"
-                "Content-Type: application/json\r\n"
-                f"Content-Length: {len(payload)}\r\n"
-                "Connection: close\r\n\r\n"
-            )
+            request = "POST /v1/build/evaluate HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % len(payload)
         try:
-            response = http_request(payload, request)
-            status, body = status_and_body(response)
+            status, body = status_and_body(http_request(payload, request))
             ok = status == expected_status and expected_token in body
-        except Exception as exc:  # noqa: BLE001 - red-team harness must report probe failures.
+        except Exception as exc:
             ok = False
             body = str(exc).encode()
-        runner.results.append(
-            Result(
-                f"python-redteam/{name}",
-                ["raw-socket-http-probe", name],
-                0 if ok else 1,
-                0.0,
-                body.decode("utf-8", errors="replace")[-2000:],
-            )
-        )
+        runner.results.append(Result(f"python-redteam/{name}", ["raw-socket-http-probe", name], 0 if ok else 1, 0.0, body.decode("utf-8", errors="replace")[-2000:]))
         runner.log(("PASS" if ok else "FAIL") + f" python-redteam/{name}")
         passed &= ok
     return passed
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description="UMLCAD V7 one-command integration/red-team gate")
-    parser.add_argument("--release", action="store_true", help="also use release Rust integration tests")
-    parser.add_argument("--verbose", action="store_true", help="print full child process output")
-    parser.add_argument(
-        "--report",
-        type=Path,
-        default=ROOT / "tests" / "e2e" / "artifacts" / "e2e-report.json",
-        help="JSON report path",
-    )
+    parser.add_argument("--release", action="store_true")
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--report", type=Path, default=ROOT / "tests/e2e/artifacts/e2e-report.json")
     args = parser.parse_args()
-
     runner = Runner(args.release, args.verbose)
     passed = True
     try:
         runner.validate_paths()
-
         passed &= runner.run("rust-regression", ["cargo", "test", "--manifest-path", str(RUST_MANIFEST)], 900)
-        passed &= runner.run(
-            "rust-kernel-api-e2e",
-            ["cargo", "test", "--manifest-path", str(RUST_MANIFEST), "--test", "kernel_api_integration_e2e", "--", "--nocapture"],
-            900,
-        )
+        passed &= runner.run("rust-kernel-api-e2e", ["cargo", "test", "--manifest-path", str(RUST_MANIFEST), "--test", "kernel_api_integration_e2e", "--", "--nocapture"], 900)
         if args.release:
-            passed &= runner.run(
-                "rust-kernel-api-e2e-release",
-                ["cargo", "test", "--release", "--manifest-path", str(RUST_MANIFEST), "--test", "kernel_api_integration_e2e", "--", "--nocapture"],
-                900,
-            )
-
+            passed &= runner.run("rust-kernel-api-e2e-release", ["cargo", "test", "--release", "--manifest-path", str(RUST_MANIFEST), "--test", "kernel_api_integration_e2e", "--", "--nocapture"], 900)
         passed &= runner.discover_framework_tests()
-
         runner.start_kernel()
         os.environ["UMLCAD_KERNEL_URL"] = DEFAULT_URL + "/"
-
-        passed &= runner.run(
-            "dotnet-framework-full-suite",
-            ["dotnet", "test", str(FRAMEWORK_TEST_PROJECT)],
-            900,
-        )
-        passed &= runner.run(
-            "dotnet-kernel-blackbox-e2e",
-            ["dotnet", "test", str(BLACKBOX_TEST_PROJECT)],
-            900,
-        )
-        passed &= runner.run(
-            "demo-e2e",
-            ["dotnet", "run", "--project", str(DEMO_PROJECT), "--", "--e2e"],
-            900,
-        )
+        passed &= runner.run("dotnet-framework-full-suite", ["dotnet", "test", str(FRAMEWORK_TEST_PROJECT)], 900)
+        passed &= runner.run("dotnet-kernel-blackbox-e2e", ["dotnet", "test", str(BLACKBOX_TEST_PROJECT)], 900)
+        runner.stop_kernel()
+        passed &= runner.run("demo-e2e", ["dotnet", "run", "--project", str(DEMO_PROJECT), "--", "--e2e"], 900)
+        runner.start_kernel()
         passed &= raw_redteam_checks(runner)
-    except Exception as exc:  # noqa: BLE001 - top-level gate must always emit a report.
+    except Exception as exc:
         runner.log(f"HARNESS ERROR: {exc}")
         passed = False
     finally:
         runner.stop_kernel()
         runner.write_report(args.report)
-
     runner.log(f"REPORT {args.report}")
     runner.log("E2E GATE PASS" if passed else "E2E GATE FAIL")
     return 0 if passed else 1
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

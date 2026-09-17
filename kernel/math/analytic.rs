@@ -104,6 +104,33 @@ impl Ray2 {
             Err(AnalyticError::NonFinite)
         }
     }
+
+    /// Signed ray parameter of the orthogonal projection of `point` onto the
+    /// supporting line. It does not by itself establish that `point` is on the
+    /// ray. The calculation avoids forming `direction · direction`, which can
+    /// overflow for finite direction components near the floating-point limit.
+    pub fn supporting_parameter(&self, point: Vec2) -> Result<f64, AnalyticError> {
+        if !point.is_finite() {
+            return Err(AnalyticError::NonFinite);
+        }
+        self.validate()?;
+        let direction_length = self.direction.length();
+        let unit = self.unit_direction()?;
+        let displacement = point.sub(self.origin);
+        if !displacement.is_finite() {
+            return Err(AnalyticError::NonFinite);
+        }
+        let projection = displacement.dot(unit);
+        if !projection.is_finite() || direction_length == 0.0 {
+            return Err(AnalyticError::NonFinite);
+        }
+        let parameter = projection / direction_length;
+        if parameter.is_finite() {
+            Ok(parameter)
+        } else {
+            Err(AnalyticError::NonFinite)
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -147,14 +174,24 @@ impl Ray3 {
 
     /// Signed ray parameter of the orthogonal projection of `point` onto the
     /// supporting line. It does not by itself establish that `point` is on the
-    /// ray.
+    /// ray. The calculation avoids forming `direction · direction`, which can
+    /// overflow for finite direction components near the floating-point limit.
     pub fn supporting_parameter(&self, point: Vec3) -> Result<f64, AnalyticError> {
         if !point.is_finite() {
             return Err(AnalyticError::NonFinite);
         }
         self.validate()?;
-        let denominator = self.direction.dot(self.direction);
-        let parameter = point.sub(self.origin).dot(self.direction) / denominator;
+        let direction_length = self.direction.length();
+        let unit = self.unit_direction()?;
+        let displacement = point.sub(self.origin);
+        if !displacement.is_finite() {
+            return Err(AnalyticError::NonFinite);
+        }
+        let projection = displacement.dot(unit);
+        if !projection.is_finite() || direction_length == 0.0 {
+            return Err(AnalyticError::NonFinite);
+        }
+        let parameter = projection / direction_length;
         if parameter.is_finite() {
             Ok(parameter)
         } else {
@@ -194,7 +231,10 @@ impl Ellipse2 {
         let theta = parameter * TAU;
         let cos_r = self.rotation.cos();
         let sin_r = self.rotation.sin();
-        let local = Vec2::new(self.semi_axis_a * theta.cos(), self.semi_axis_b * theta.sin());
+        let local = Vec2::new(
+            self.semi_axis_a * theta.cos(),
+            self.semi_axis_b * theta.sin(),
+        );
         let point = self.center.add(Vec2::new(
             cos_r * local.x - sin_r * local.y,
             sin_r * local.x + cos_r * local.y,
@@ -347,7 +387,10 @@ impl Torus3 {
         if self.axis.length() == 0.0 {
             return Err(AnalyticError::InvalidAxis);
         }
-        if self.major_radius <= 0.0 || self.minor_radius <= 0.0 || self.minor_radius >= self.major_radius {
+        if self.major_radius <= 0.0
+            || self.minor_radius <= 0.0
+            || self.minor_radius >= self.major_radius
+        {
             return Err(AnalyticError::InvalidRadius);
         }
         Ok(())
@@ -396,12 +439,40 @@ mod tests {
 
     #[test]
     fn rays_reject_negative_parameters_and_zero_directions() {
-        let ray = Ray3 { origin: Vec3::new(0.0, 0.0, 0.0), direction: Vec3::new(1.0, 0.0, 0.0) };
+        let ray = Ray3 {
+            origin: Vec3::new(0.0, 0.0, 0.0),
+            direction: Vec3::new(1.0, 0.0, 0.0),
+        };
         assert_eq!(ray.point_at(-1.0), Err(AnalyticError::InvalidParameter));
         assert_eq!(
-            Ray3 { origin: Vec3::new(0.0, 0.0, 0.0), direction: Vec3::new(0.0, 0.0, 0.0) }.validate(),
+            Ray3 {
+                origin: Vec3::new(0.0, 0.0, 0.0),
+                direction: Vec3::new(0.0, 0.0, 0.0),
+            }
+            .validate(),
             Err(AnalyticError::Degenerate)
         );
+    }
+
+    #[test]
+    fn ray_supporting_parameter_avoids_direction_square_overflow() {
+        let ray = Ray3 {
+            origin: Vec3::new(0.0, 0.0, 0.0),
+            direction: Vec3::new(1.0e308, 0.0, 0.0),
+        };
+        let parameter = ray
+            .supporting_parameter(Vec3::new(1.0e308, 0.0, 0.0))
+            .unwrap();
+        assert!((parameter - 1.0).abs() < 1.0e-15);
+
+        let ray2 = Ray2 {
+            origin: Vec2::new(0.0, 0.0),
+            direction: Vec2::new(1.0e308, 0.0),
+        };
+        let parameter2 = ray2
+            .supporting_parameter(Vec2::new(1.0e308, 0.0))
+            .unwrap();
+        assert!((parameter2 - 1.0).abs() < 1.0e-15);
     }
 
     #[test]
@@ -424,14 +495,22 @@ mod tests {
             axis: Vec3::new(0.0, 0.0, 2.0),
             radius: 3.0,
         };
-        assert!(cylinder.implicit_value(Vec3::new(3.0, 0.0, 100.0)).unwrap().abs() < 1.0e-14);
+        assert!(
+            cylinder
+                .implicit_value(Vec3::new(3.0, 0.0, 100.0))
+                .unwrap()
+                .abs()
+                < 1.0e-14
+        );
 
         let cone = Cone3 {
             apex: Vec3::new(0.0, 0.0, 0.0),
             axis: Vec3::new(0.0, 0.0, 1.0),
             half_angle: std::f64::consts::FRAC_PI_4,
         };
-        assert!(cone.implicit_value(Vec3::new(1.0, 0.0, 1.0)).unwrap().abs() < 1.0e-14);
+        assert!(
+            cone.implicit_value(Vec3::new(1.0, 0.0, 1.0)).unwrap().abs() < 1.0e-14
+        );
 
         let torus = Torus3 {
             center: Vec3::new(0.0, 0.0, 0.0),
@@ -445,11 +524,21 @@ mod tests {
     #[test]
     fn analytic_primitives_reject_nonfinite_inputs() {
         assert_eq!(
-            Plane3 { origin: Vec3::new(0.0, 0.0, 0.0), normal: Vec3::new(f64::NAN, 0.0, 1.0) }.validate(),
+            Plane3 {
+                origin: Vec3::new(0.0, 0.0, 0.0),
+                normal: Vec3::new(f64::NAN, 0.0, 1.0),
+            }
+            .validate(),
             Err(AnalyticError::NonFinite)
         );
         assert_eq!(
-            Ellipse2 { center: Vec2::new(0.0, 0.0), semi_axis_a: 1.0, semi_axis_b: 1.0, rotation: f64::INFINITY }.validate(),
+            Ellipse2 {
+                center: Vec2::new(0.0, 0.0),
+                semi_axis_a: 1.0,
+                semi_axis_b: 1.0,
+                rotation: f64::INFINITY,
+            }
+            .validate(),
             Err(AnalyticError::NonFinite)
         );
     }

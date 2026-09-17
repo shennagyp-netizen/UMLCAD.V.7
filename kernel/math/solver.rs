@@ -935,3 +935,134 @@ mod dimensionless_step_metric_tests {
         assert!(normalized_step_norm(&snapshot, &delta[..11], 10.0).is_err());
     }
 }
+
+
+#[cfg(test)]
+mod mixed_unit_solver_tests {
+    use super::*;
+    use super::super::snapshot::{Endpoint, GeometryItem, Relation, RelationPoint};
+
+    fn mixed_unit_snapshot(scale: f64) -> SemanticSnapshot {
+        SemanticSnapshot {
+            parameters: Vec::new(),
+            geometry: vec![
+                GeometryItem {
+                    id: "base".into(),
+                    geometry: Geometry::Line(Line {
+                        start: Point { x: 0.0, y: 0.0 },
+                        end: Point { x: 4.0 * scale, y: 0.0 },
+                    }),
+                    parameter_dependencies: Vec::new(),
+                },
+                GeometryItem {
+                    id: "moving".into(),
+                    geometry: Geometry::Line(Line {
+                        start: Point { x: 4.2 * scale, y: 0.3 * scale },
+                        end: Point { x: 7.2 * scale, y: 4.3 * scale },
+                    }),
+                    parameter_dependencies: Vec::new(),
+                },
+            ],
+            constraints: vec![
+                (
+                    "base-fixed".into(),
+                    Constraint::Fixed {
+                        entity_id: "base".into(),
+                    },
+                ),
+                (
+                    "moving-start-coincident".into(),
+                    Constraint::Coincident {
+                        first_geometry_id: "base".into(),
+                        first_point: Endpoint::End,
+                        second_geometry_id: "moving".into(),
+                        second_point: Endpoint::Start,
+                    },
+                ),
+            ],
+            relations: vec![
+                (
+                    "moving-length".into(),
+                    Relation::DistancePoints {
+                        first: RelationPoint::Endpoint {
+                            geometry_id: "moving".into(),
+                            point: Endpoint::Start,
+                        },
+                        second: RelationPoint::Endpoint {
+                            geometry_id: "moving".into(),
+                            point: Endpoint::End,
+                        },
+                        value: 5.0 * scale,
+                    },
+                ),
+                (
+                    "moving-angle".into(),
+                    Relation::Angle {
+                        first_geometry_id: "base".into(),
+                        second_geometry_id: "moving".into(),
+                        radians: std::f64::consts::FRAC_PI_2,
+                    },
+                ),
+            ],
+        }
+        .deterministic()
+    }
+
+    fn line(result: &ConstraintSolveResult) -> Line {
+        result
+            .geometry
+            .iter()
+            .find_map(|(id, geometry)| {
+                if id == "moving" {
+                    match geometry {
+                        Geometry::Line(line) => Some(*line),
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            })
+            .expect("moving line")
+    }
+
+    #[test]
+    fn mixed_unit_nonlinear_fixture_is_scale_consistent() {
+        let small = solve_snapshot(&mixed_unit_snapshot(1.0), SolveOptions::default()).unwrap();
+        let large = solve_snapshot(&mixed_unit_snapshot(1.0e9), SolveOptions::default()).unwrap();
+
+        assert!(small.converged);
+        assert!(large.converged);
+        assert_eq!(small.reason, SolveReason::Converged);
+        assert_eq!(large.reason, SolveReason::Converged);
+        assert!(small.final_scaled_residual_norm <= 1.0e-8);
+        assert!(large.final_scaled_residual_norm <= 1.0e-8);
+        assert!(small.final_step_norm <= 1.0e-10);
+        assert!(large.final_step_norm <= 1.0e-10);
+
+        let a = line(&small);
+        let b = line(&large);
+        for (x_small, x_large) in [
+            (a.start.x, b.start.x / 1.0e9),
+            (a.start.y, b.start.y / 1.0e9),
+            (a.end.x, b.end.x / 1.0e9),
+            (a.end.y, b.end.y / 1.0e9),
+        ] {
+            assert!(
+                (x_small - x_large).abs() <= 1.0e-8,
+                "scale-inconsistent coordinate: small={x_small}, large={x_large}"
+            );
+        }
+    }
+
+    #[test]
+    fn mixed_unit_fixture_retains_dimensionless_terminal_evidence() {
+        for scale in [1.0, 1.0e6, 1.0e9] {
+            let result = solve_snapshot(&mixed_unit_snapshot(scale), SolveOptions::default()).unwrap();
+            assert!(result.converged, "scale {scale}");
+            assert!(result.final_scaled_residual_norm.is_finite());
+            assert!(result.final_step_norm.is_finite());
+            assert!(result.final_scaled_residual_norm <= 1.0e-8);
+            assert!(result.final_step_norm <= 1.0e-10);
+        }
+    }
+}

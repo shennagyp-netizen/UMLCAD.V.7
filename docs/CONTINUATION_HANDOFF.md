@@ -3,62 +3,45 @@
 ## Snapshot
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
-- Current completed baseline: hardened math + comprehensive Python E2E gate, merged on `main` before the analytic relation-Jacobian work.
 - Current development branch: `milestone/solver-analytic-relation-jacobian`
-- Current branch head: `f24d72825c3546d88884ff73fc8555c2c5704196`
+- Branch head after the handoff update: this commit is the latest branch head.
 
-## Mathematical authority state
-The current V7 work is a mathematical-authority hardening program, not a feature-expansion phase.
+## Current mathematical-authority state
+The previous hardened math station is already merged to `main` and verified by both Rust validation and the comprehensive Python/.NET/HTTP/Demo/red-team gate.
 
-Completed/tested foundations include:
-- M1 scalar/constants/tolerance hardening.
-- M2 vectors, matrices, quaternions, transforms, LU/QR/SVD/pseudoinverse/null-space and rank/conditioning diagnostics.
-- M3 analytic geometry and predicates.
-- M4 polynomial/root and interval foundations.
-- M5 curve evaluation and differential foundations.
-- M6 NURBS curve/surface evaluation, differential geometry, knot operations and conservative geometric contracts in the currently supported scope.
-- M7 analytic distance/projection/intersection foundations.
-- M11 spatial acceleration/tessellation foundations.
-- M12 CPU/GPU execution abstraction groundwork.
+The current V7 mathematical work has strong implemented/tested foundations across M1-M7, M11 spatial/tessellation, and M12 GPU abstraction groundwork. The full M0-M16 roadmap is not complete.
 
-M10 solver hardening is actively being completed. The analytic constraint Jacobian was already authoritative; the new relation Jacobian is now integrated into the same production Jacobian hook.
+## M10 station in progress
+`kernel/math/relation_jacobian.rs` is the analytic mathematical authority for the current relation residual equations. Its derivatives are independently checked with central finite differences, but finite differences are verification evidence only and are not used by the production implementation.
 
-## This milestone
-### Analytic relation Jacobian
-`kernel/math/relation_jacobian.rs` is the mathematical authority for the current relation residual equations. It uses explicit fail-closed `Indeterminate` handling at nondifferentiable configurations. Its rows are independently checked against central-difference verification tests; finite differences are test evidence only.
+`kernel/math/jacobian.rs` now composes the complete production Jacobian in the exact residual order:
+1. analytic constraint rows;
+2. analytic relation rows.
 
-### Solver integration
-`kernel/math/jacobian.rs` now emits:
-1. analytic constraint Jacobian rows;
-2. analytic relation Jacobian rows;
-3. one combined row set matching solver residual ordering.
+The existing solver Jacobian hook therefore consumes analytic relation derivatives directly. The former production finite-difference relation fallback is removed for the currently supported relation set without changing the solver control-flow algorithm.
 
-This means the production solver no longer needs finite-difference relation rows for the currently supported relation set. The existing solver Jacobian hook consumes the combined authority without changing solver control flow.
-
-### Regression coverage
-`kernel/native/tests/defect_regressions.rs` now verifies a relation-only radius solve while deliberately setting `finite_difference_step = f64::MAX`. The solve must still converge, proving that the production path is independent of finite-difference probing.
+`kernel/native/tests/defect_regressions.rs` now contains a relation-only radius solve that sets `finite_difference_step = f64::MAX`; convergence must still succeed. This is a regression proving the production solve is independent of finite-difference probing.
 
 ## Verification gate
-The authoritative CI gate is:
-- Rust kernel validation (`cargo test` through `.github/workflows/rust-kernel.yml`).
-- Comprehensive Python E2E (`python3 tests/e2e/run.py --release --verbose`) through `.github/workflows/e2e.yml`.
+The milestone must not be merged until both GitHub Actions gates are green on the PR merge context:
+- `.github/workflows/rust-kernel.yml`
+- `.github/workflows/e2e.yml`, running `python3 tests/e2e/run.py --release --verbose`
 
-The comprehensive E2E gate runs full Rust debug and release suites, typed Rust API E2E, .NET framework discovery/full suite, production black-box Rust HTTP E2E, Demo E2E, raw HTTP red-team checks, and rejects ignored Rust tests.
+The Python E2E gate runs full Rust debug/release suites, typed Rust API E2E, .NET framework discovery and full suite, production black-box Rust HTTP E2E, Demo E2E, and raw HTTP red-team checks. The runner rejects ignored Rust tests.
 
-Do not merge this milestone until both required GitHub Actions gates are green on the actual PR merge context.
+## Immediate continuation
+After this solver-integration milestone is green and merged:
+- continue M10 with explicit solver status semantics for singular/indeterminate cases;
+- strengthen rank, conditioning, convergence and step-acceptance verification;
+- expand analytic relation/constraint coverage and adversarial cases;
+- then continue remaining M8/M9 construction and B-Rep mathematical authority;
+- only afterward advance GPU conformance/performance/final-red-team M13-M16.
 
-## Immediate next step
-1. Validate PR for `milestone/solver-analytic-relation-jacobian` against `main`.
-2. If green, merge the milestone to `main`.
-3. Verify post-merge `main` Rust + comprehensive E2E.
-4. Continue M10 with explicit solver-status semantics, rank/conditioning verification, convergence correctness, and broader relation/constraint adversarial cases.
-5. Then address remaining M8/M9 mathematical construction/B-Rep coverage before GPU/conformance M13-M16.
-
-## Important constraints
-- CPU mathematical implementation remains normative.
+## Non-negotiable authority rules
+- CPU math remains normative.
 - OCCT is an optional conformance oracle/backend, never semantic authority.
-- GPU must not silently change precision/semantics.
-- Unsupported, ambiguous, singular, degenerate and indeterminate cases must fail closed.
-- Inputs and semantic snapshots remain immutable/stateless.
-- Never claim a hardware validation that has not actually run.
-- Do not treat green CI as completion of the full M0-M16 math roadmap.
+- GPU must not silently downgrade precision or semantics.
+- Unsupported, ambiguous, singular, degenerate and indeterminate cases fail closed.
+- Semantic state and inputs remain immutable/stateless.
+- Never claim hardware validation that did not run.
+- Do not equate a green milestone with completion of the whole M0-M16 roadmap.

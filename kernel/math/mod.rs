@@ -40,7 +40,12 @@ pub mod snapshot;
 pub mod solid;
 pub mod spatial;
 pub mod spatial_accel;
-pub mod solver;
+#[path = "solver.rs"]
+mod solver_legacy;
+pub mod terminal_authority;
+pub mod solver {
+    pub use super::terminal_authority::*;
+}
 pub mod solver_status;
 pub mod surfaces;
 pub mod surface_differential;

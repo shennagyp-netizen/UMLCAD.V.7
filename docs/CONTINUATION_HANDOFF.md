@@ -3,45 +3,61 @@
 ## Snapshot
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
-- Current milestone branch: `milestone/solver-status-authority`
-- Previous completed milestone: `milestone/solver-analytic-relation-jacobian`
+- Main head: `a9922e8ad64affe2a43781e98e84f2e0f6421132`
+- Current milestone branch: `milestone/solver-evidence-authority`
+- Previous completed station: `milestone/analytic-jacobian-complete`
 
 ## Completed mathematical-authority state
-The hardened math station and comprehensive cross-layer E2E gate are merged to `main` and post-merge green.
+Main is post-merge green through the current M10 mathematical-authority stations. The V7 program is not complete: the full M0-M16 roadmap remains active.
 
-The V7 math program has strong implemented/tested foundations across M1-M7, M11 spatial/tessellation, and M12 GPU abstraction groundwork. The full M0-M16 roadmap is not complete.
+Completed and validated M10 foundations now include:
+- analytic constraint Jacobian authority;
+- analytic relation Jacobian authority;
+- production solver use of the complete analytic Jacobian for the supported equation set;
+- rank/nullity and augmented-rank consistency authority;
+- conditioning authority with explicit conventional singular-system semantics;
+- convergence/stagnation authority for explicit residual and step evidence;
+- terminal convergence verification without manufacturing rejected-step history;
+- solver-status authority with fail-closed rank/conditioning semantics;
+- linear-solver conformance tests against the independent consistency authority;
+- zero-damping truncated pseudoinverse handling for numerically null singular directions.
 
-## Completed M10 relation-Jacobian station
-`kernel/math/relation_jacobian.rs` is the analytic authority for the current relation residual equations. Central differences are used only as an independent verification oracle. Nondifferentiable configurations fail closed as `Indeterminate`.
+## Analytic Jacobian policy
+`kernel/math/jacobian.rs` is the production Jacobian authority in exact residual order: analytic constraint rows followed by analytic relation rows. The production solver no longer falls back to generic finite differences for the supported equation set.
 
-`kernel/math/jacobian.rs` emits the production Jacobian in exact residual order: analytic constraint rows followed by analytic relation rows. The production solver therefore uses analytic relation derivatives for the currently supported relation set.
+`SolveOptions::finite_difference_step` is retained for API compatibility, but it is not used for production Jacobian generation. Central/finite differences remain independent verification techniques only.
 
-A regression in `kernel/native/tests/defect_regressions.rs` sets `finite_difference_step = f64::MAX` in a relation-only radius solve and still converges, proving the supported production relation solve is independent of finite-difference probing.
+## Linear and conditioning authority
+`kernel/math/linear_consistency.rs` distinguishes unique, underdetermined-consistent, inconsistent, and indeterminate systems using coefficient rank versus augmented rank under the declared numerical tolerance.
 
-## Current M10 status-authority station
-`kernel/math/solver_status.rs` adds a conservative typed `SolverStatus` authority around the existing immutable `ConstraintSolveResult` evidence. It distinguishes currently provable states such as `Converged`, `ConvergedWithWarning`, `Diverged`, `Singular`, `IllConditioned`, `MaxIterations`, and `Indeterminate` without fabricating unsupported `Inconsistent`, `InvalidInput`, or `Cancelled` states from insufficient evidence.
+`kernel/math/conditioning.rs` provides explicit conventional conditioning evidence. Rank-deficient systems are not treated as conventionally finite-conditioned merely because a reduced nonzero singular spectrum has finite spread.
 
-The classifier is diagnostic-only in this station: numerical solver control flow is unchanged. Four unit tests cover healthy convergence, singular result evidence, no-progress max-iteration behavior, and non-finite/indeterminate evidence.
+`kernel/math/solver_status.rs` consumes these proofs conservatively: `Inconsistent` is only claimed from explicit dimension-matched inconsistency evidence, and rank-deficient systems cannot be promoted to healthy conditioning.
+
+## Convergence authority
+`kernel/math/convergence.rs` contains two complementary contracts:
+- `evaluate` verifies accepted residual history, monotonicity, stagnation, progress, iteration cap, and joint residual/step convergence;
+- `verify_terminal` verifies final residual and final step evidence without inventing an iteration history when an implementation rejects trial steps.
+
+The production solver has not yet changed its iteration-control algorithm to store/replay full accepted-step history. That integration is the next controlled station.
 
 ## Verification gate
-Do not merge the status-authority milestone until both GitHub Actions gates are green on its exact final head:
-- `.github/workflows/rust-kernel.yml`
-- `.github/workflows/e2e.yml`, running `python3 tests/e2e/run.py --release --verbose`
+Every mathematical station must pass the exact-head Rust kernel gate and comprehensive E2E/red-team gate before merge. Post-merge Rust + E2E must also be green on the resulting `main` commit.
 
-The comprehensive E2E gate runs full Rust debug/release suites, typed Rust API E2E, .NET framework discovery/full suite, production black-box HTTP E2E, Demo E2E, raw HTTP red-team checks, and rejects ignored Rust tests.
+The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, black-box HTTP, Demo, raw HTTP red-team, release-path, and ignored-test checks.
 
-## Immediate continuation after this station
-1. Merge the fully validated status-authority station to `main` and verify post-merge Rust + E2E.
-2. Continue M10 with explicit inconsistent/rank-revealing analysis where the mathematics can prove it.
-3. Strengthen condition estimates, residual/step monotonicity, stagnation and convergence verification.
-4. Remove or strictly type the remaining generic finite-difference fallback once all intended Jacobian equation families have authoritative derivatives.
-5. Continue broader analytic relation/constraint adversarial coverage.
-6. Then continue M8/M9 construction and B-Rep mathematical authority, followed later by M13-M16 GPU/conformance/performance/final-red-team work.
+## Immediate continuation
+1. Integrate truthful solver-result step evidence with `ConstraintSolveResult` without redefining attempted-iteration counts or silently mixing physical units.
+2. Use that evidence to make terminal convergence certification authoritative in the production solver, while preserving solver-state immutability and fail-closed behavior.
+3. Extend analytic Jacobian coverage for every remaining supported relation/constraint family; any unsupported equation must fail explicitly rather than re-enter finite differences.
+4. Expand adversarial rank/conditioning/convergence tests around numerical boundaries and deterministic behavior.
+5. Complete the M10 solver foundation, then advance to M8/M9 construction and B-Rep mathematical authority.
+6. Later evaluate GPU acceleration only as a conformance-tested implementation backend; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may silently redefine authority.
 
 ## Non-negotiable authority rules
 - CPU math is normative.
-- OCCT is an optional conformance oracle/backend, never semantic authority.
-- GPU must not silently downgrade precision or semantics.
+- Existing `nalgebra` remains numerical implementation infrastructure; do not introduce a second library without a demonstrated architectural need and a compatible proof/verification plan.
+- GPU is acceleration only, never semantic authority.
 - Unsupported, ambiguous, singular, degenerate and indeterminate cases fail closed.
 - Semantic state and inputs remain immutable/stateless.
 - Never claim hardware validation unless it actually ran.

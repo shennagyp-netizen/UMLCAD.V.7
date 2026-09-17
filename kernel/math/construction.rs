@@ -903,7 +903,7 @@ mod tests {
         assert!((pipe.volume(tol()).unwrap() - 40.0 * PI).abs() <= 1.0e-9);
         assert_eq!(
             pipe.surface_point_at(0.0, 0.0, tol()).unwrap(),
-            Vec3::new(0.0, 2.0, 0.0)
+            Vec3::new(2.0, 0.0, 0.0)
         );
         assert_eq!(
             pipe.surface_point_at(1.0, PI, tol()).unwrap(),

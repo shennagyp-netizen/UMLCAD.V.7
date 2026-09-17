@@ -88,9 +88,10 @@ pub struct ConstraintSolveResult {
     pub final_residual_norm: f64,
     pub initial_scaled_residual_norm: f64,
     pub final_scaled_residual_norm: f64,
-    /// 2-norm of the last accepted solver step in the raw parameter vector.
-    /// Zero means that no step was accepted, as in a zero-iteration convergence
-    /// or a failure before the first accepted proposal.
+    /// Dimensionless 2-norm of the last accepted solver step. Geometric
+    /// translations and radii are normalized by the initial model extent; angular
+    /// parameters remain in radians. Zero means that no step was accepted, as in
+    /// a zero-iteration convergence or a failure before the first accepted proposal.
     pub final_step_norm: f64,
     pub analysis: ConstraintAnalysis,
     pub geometry: Vec<(String, Geometry)>,
@@ -164,6 +165,47 @@ fn model_scale(snapshot: &SemanticSnapshot) -> Result<f64, String> {
     } else {
         Err("degenerate model scale".into())
     }
+}
+
+fn normalized_step_norm(
+    snapshot: &SemanticSnapshot,
+    delta: &[f64],
+    scale: f64,
+) -> Result<f64, String> {
+    if !scale.is_finite() || scale <= 0.0 {
+        return Err("invalid model scale for step normalization".into());
+    }
+
+    let expected = snapshot
+        .geometry
+        .iter()
+        .map(|item| enc(&item.geometry).len())
+        .sum::<usize>();
+    if delta.len() != expected {
+        return Err("solver step/model variable mismatch".into());
+    }
+
+    let mut normalized = Vec::with_capacity(delta.len());
+    let mut offset = 0usize;
+    for item in &snapshot.geometry {
+        let width = enc(&item.geometry).len();
+        let values = &delta[offset..offset + width];
+        match &item.geometry {
+            Geometry::Line(_) | Geometry::Circle(_) => {
+                normalized.extend(values.iter().map(|value| *value / scale));
+            }
+            Geometry::Arc(_) => {
+                normalized.extend(values[..3].iter().map(|value| *value / scale));
+                normalized.extend(values[3..].iter().copied());
+            }
+        }
+        offset += width;
+    }
+
+    if normalized.iter().any(|value| !value.is_finite()) {
+        return Err("non-finite normalized solver step".into());
+    }
+    Ok(stable_norm(&normalized))
 }
 
 fn rank_condition(
@@ -680,11 +722,8 @@ pub fn solve_snapshot(
         };
         rank = linear.rank;
         condition = linear.condition_number;
-        let candidate_step_norm = stable_norm(&linear.delta);
-        if !candidate_step_norm.is_finite() {
-            damping = (damping * 10.0).min(1.0e12);
-            continue;
-        }
+        let candidate_step_norm =
+            normalized_step_norm(snapshot, &linear.delta, scale)?;
 
         let mut proposal = values.clone();
         for (value, delta) in proposal.iter_mut().zip(linear.delta.iter()) {
@@ -802,4 +841,93 @@ pub fn solve_snapshot(
         analysis: final_analysis,
         geometry: materialize(snapshot, &values, &ids, &offsets)?,
     })
+}
+
+#[cfg(test)]
+mod dimensionless_step_metric_tests {
+    use super::*;
+
+    fn snapshot_with_geometry(scale: f64) -> SemanticSnapshot {
+        SemanticSnapshot {
+            parameters: Vec::new(),
+            geometry: vec![
+                super::super::snapshot::GeometryItem {
+                    id: "line".into(),
+                    geometry: Geometry::Line(Line {
+                        start: Point { x: 0.0, y: 0.0 },
+                        end: Point { x: scale, y: 0.0 },
+                    }),
+                    parameter_dependencies: Vec::new(),
+                },
+                super::super::snapshot::GeometryItem {
+                    id: "circle".into(),
+                    geometry: Geometry::Circle(Circle {
+                        center: Point { x: 2.0 * scale, y: scale },
+                        radius: 0.5 * scale,
+                    }),
+                    parameter_dependencies: Vec::new(),
+                },
+                super::super::snapshot::GeometryItem {
+                    id: "arc".into(),
+                    geometry: Geometry::Arc(Arc {
+                        center: Point { x: 4.0 * scale, y: 0.0 },
+                        radius: 0.75 * scale,
+                        start_angle: 0.25,
+                        end_angle: 1.25,
+                    }),
+                    parameter_dependencies: Vec::new(),
+                },
+            ],
+            constraints: Vec::new(),
+            relations: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn normalized_step_norm_is_uniform_scale_invariant() {
+        let small = snapshot_with_geometry(10.0);
+        let large = snapshot_with_geometry(1000.0);
+        let small_scale = model_scale(&small).unwrap();
+        let large_scale = model_scale(&large).unwrap();
+        let base = vec![
+            0.4, -0.2, -0.3, 0.1,
+            0.5, -0.25, 0.125,
+            0.75, -0.5, 0.2, 0.04, -0.06,
+        ];
+        let scaled = vec![
+            40.0, -20.0, -30.0, 10.0,
+            50.0, -25.0, 12.5,
+            75.0, -50.0, 20.0, 0.04, -0.06,
+        ];
+
+        let small_norm = normalized_step_norm(&small, &base, small_scale).unwrap();
+        let large_norm = normalized_step_norm(&large, &scaled, large_scale).unwrap();
+        assert!((small_norm - large_norm).abs() <= 1.0e-14);
+    }
+
+    #[test]
+    fn normalized_step_norm_keeps_angles_scale_independent() {
+        let small = snapshot_with_geometry(10.0);
+        let large = snapshot_with_geometry(1000.0);
+        let small_scale = model_scale(&small).unwrap();
+        let large_scale = model_scale(&large).unwrap();
+        let angular = vec![
+            0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.3, -0.4,
+        ];
+
+        let small_norm = normalized_step_norm(&small, &angular, small_scale).unwrap();
+        let large_norm = normalized_step_norm(&large, &angular, large_scale).unwrap();
+        assert!((small_norm - 0.5).abs() <= 1.0e-15);
+        assert!((small_norm - large_norm).abs() <= 1.0e-15);
+    }
+
+    #[test]
+    fn normalized_step_norm_fails_closed_on_bad_scale_or_length() {
+        let snapshot = snapshot_with_geometry(10.0);
+        let delta = vec![0.0; 12];
+        assert!(normalized_step_norm(&snapshot, &delta, 0.0).is_err());
+        assert!(normalized_step_norm(&snapshot, &delta[..11], 10.0).is_err());
+    }
 }

@@ -905,10 +905,10 @@ mod tests {
             pipe.surface_point_at(0.0, 0.0, tol()).unwrap(),
             Vec3::new(2.0, 0.0, 0.0)
         );
-        assert_eq!(
-            pipe.surface_point_at(1.0, PI, tol()).unwrap(),
-            Vec3::new(-2.0, 0.0, 10.0)
-        );
+        let end = pipe.surface_point_at(1.0, PI, tol()).unwrap();
+        assert!((end.x + 2.0).abs() <= 1.0e-12);
+        assert!(end.y.abs() <= 1.0e-12);
+        assert!((end.z - 10.0).abs() <= 1.0e-12);
 
         let variable = VariableRadiusPipe {
             path_start: Vec3::new(0.0, 0.0, 0.0),

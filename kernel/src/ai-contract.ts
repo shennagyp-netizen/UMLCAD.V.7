@@ -1,0 +1,4 @@
+export interface KernelRequestContext{readonly projectId:string;readonly revision:string}
+export interface SemanticOperation{readonly operationId:string;readonly baseBuild:string;readonly kind:"set-parameter";readonly target:string;readonly value:number}
+export interface OperationEvidence{readonly accepted:boolean;readonly diagnostics:readonly {readonly code:string;readonly message:string}[];readonly resultingBuild?:string;readonly structuralValidity:boolean;readonly constraintValidity:boolean;readonly relationValidity:boolean;readonly numericalConditioning:boolean;readonly referenceValidity:boolean;readonly topologyValidity:boolean;readonly spatialValidity:boolean;readonly engineeringRuleValidity:boolean;readonly exportValidity:boolean}
+export const AI_PROTOCOL_VERSION="uml-cad-v5.kernel/2" as const;

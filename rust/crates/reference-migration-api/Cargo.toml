@@ -1,0 +1,11 @@
+[package]
+name = "umlcad-v6-reference-migration-api"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+umlcad-v6-reference-evolution-api = { path = "../reference-evolution-api" }
+
+[lib]
+path = "src/lib.rs"

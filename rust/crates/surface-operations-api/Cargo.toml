@@ -1,0 +1,10 @@
+[package]
+name = "umlcad-v6-surface-operations-api"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+umlcad-v6-geometry-api = { path = "../geometry-api" }
+umlcad-v6-freeform-api = { path = "../freeform-api" }
+umlcad-v6-nurbs-surface-api = { path = "../nurbs-surface-api" }

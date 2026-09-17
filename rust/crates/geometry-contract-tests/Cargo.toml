@@ -1,0 +1,14 @@
+[package]
+name = "umlcad-v6-geometry-contract-tests"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+umlcad-v6-geometry-api = { path = "../geometry-api" }
+
+[dev-dependencies]
+umlcad-v6-occt-backend = { path = "../occt-backend" }
+umlcad-v6-fillet-api = { path = "../fillet-api" }
+umlcad-v6-shell-api = { path = "../shell-api" }
+umlcad-v6-draft-api = { path = "../draft-api" }

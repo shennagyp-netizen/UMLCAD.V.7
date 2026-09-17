@@ -1,0 +1,9 @@
+[package]
+name = "umlcad-v6-geometry-api"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "umlcad_v6_geometry_api"
+path = "src/lib.rs"

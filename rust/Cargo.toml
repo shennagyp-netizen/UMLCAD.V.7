@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/geometry-api",
+    "crates/geometry-contract-tests",
+    "crates/freeform-api",
+    "crates/nurbs-surface-api",
+    "crates/surface-operations-api",
+    "crates/offset-api",
+    "crates/sweep-api",
+    "crates/fillet-api",
+    "crates/shell-api",
+    "crates/draft-api",
+    "crates/topology-api",
+    "crates/kernel-integration-api",
+    "crates/mesh-api",
+    "crates/exchange-api",
+    "crates/occt-backend",
+    "crates/reference-evolution-api",
+    "crates/reference-migration-api",
+]

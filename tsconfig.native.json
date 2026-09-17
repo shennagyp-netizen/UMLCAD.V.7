@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["kernel/src/core.ts", "kernel/src/kernel.ts", "kernel/src/solver.ts", "kernel/src/relation-solver.ts", "kernel/src/topology.ts", "kernel/src/dimensions.ts", "kernel/src/spatial.ts", "kernel/src/references.ts", "kernel/src/reference-validation.ts", "kernel/src/relations.ts", "kernel/src/diagnostics.ts", "kernel/src/engineering.ts", "kernel/src/dxf.ts", "kernel/src/capabilities.ts", "kernel/src/ai-contract.ts", "kernel/src/manifest.ts", "kernel/src/native-index.ts", "test/native-kernel.test.ts", "test/native-solver.test.ts", "test/native-engineering.test.ts", "test/native-kernel-surfaces.test.ts", "test/native-relations.test.ts", "test/native-relation-solver.test.ts", "test/native-validation.test.ts", "test/native-diagnostics.test.ts", "test/native-acceptance.test.ts", "test/native-scientific-regression.test.ts", "test/native-relation-tangency.test.ts"]
+}

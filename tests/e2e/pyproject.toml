@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "umlcad-v6-e2e"
+version = "0.1.0"
+description = "UMLCAD V6 integration and red-team test harness"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+line-length = 120

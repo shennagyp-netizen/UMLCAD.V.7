@@ -1,0 +1,7 @@
+[package]
+name = "umlcad-v6-sweep-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+umlcad-v6-geometry-api = { path = "../geometry-api" }

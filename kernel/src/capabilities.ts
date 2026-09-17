@@ -1,0 +1,4 @@
+export interface KernelCapability{readonly id:string;readonly version:string;readonly mutates:boolean}
+export const KERNEL_CAPABILITIES:readonly KernelCapability[]=Object.freeze([
+{id:"geometry.2d",version:"1",mutates:false},{id:"constraints.analysis",version:"1",mutates:false},{id:"constraints.solve",version:"1",mutates:false},{id:"constraints.diagnostics",version:"1",mutates:false},{id:"relations.analysis",version:"1",mutates:false},{id:"relations.solve",version:"1",mutates:false},{id:"engineering.validation",version:"1",mutates:false},{id:"build.part",version:"1",mutates:false},{id:"build.assembly",version:"1",mutates:false},{id:"topology.2d",version:"1",mutates:false},{id:"dimensions.2d",version:"1",mutates:false},{id:"spatial.2d",version:"1",mutates:false},{id:"references",version:"1",mutates:false},{id:"export.dxf",version:"1",mutates:false}
+]);

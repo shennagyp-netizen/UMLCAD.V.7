@@ -1,0 +1,11 @@
+[package]
+name = "umlcad-v6-topology-api"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+sha2 = "0.10"
+
+[lib]
+path = "src/kernel.rs"

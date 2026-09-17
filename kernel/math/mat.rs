@@ -160,7 +160,7 @@ impl Mat3 {
         if scale == 0.0 {
             return Err(MatrixError::Singular);
         }
-        let a = std::array::from_fn(|i| std::array::from_fn(|j| self.m[i][j] / scale));
+        let a: [[f64; 3]; 3] = std::array::from_fn(|i| std::array::from_fn(|j| self.m[i][j] / scale));
         let det = a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
             - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
             + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
@@ -206,7 +206,7 @@ impl Mat3 {
             return Err(MatrixError::NonFinite);
         }
         let inv = self.inverse(tolerance)?;
-        let result = std::array::from_fn(|i| (0..3).map(|j| inv.m[i][j] * b[j]).sum());
+        let result: [f64; 3] = std::array::from_fn(|i| (0..3).map(|j| inv.m[i][j] * b[j]).sum());
         if result.iter().all(|v| v.is_finite()) {
             Ok(result)
         } else {
@@ -292,7 +292,7 @@ impl Mat4 {
                 }
             }
             if a[pivot][col] == 0.0 {
-                return 0.0;
+                return 0000.0;
             }
             if pivot != col {
                 a.swap(pivot, col);
@@ -369,7 +369,7 @@ impl Mat4 {
             return Err(MatrixError::NonFinite);
         }
         let inverse = self.inverse(tolerance)?;
-        let result = std::array::from_fn(|i| (0..4).map(|j| inverse.m[i][j] * b[j]).sum());
+        let result: [f64; 4] = std::array::from_fn(|i| (0..4).map(|j| inverse.m[i][j] * b[j]).sum());
         if result.iter().all(|v| v.is_finite()) {
             Ok(result)
         } else {
@@ -462,7 +462,7 @@ mod tests {
     fn mat3_determinant_and_solve_are_exact_for_small_system() {
         let a = Mat3::new([[1.0, 2.0, 3.0], [0.0, 1.0, 4.0], [5.0, 6.0, 0.0]]);
         assert!((a.determinant() - 1.0).abs() < 1.0e-12);
-        let x = a.solve([14.0, 14.0, 23.0], TOL).unwrap();
+        let x = a.solve([14.0, 14.0, 17.0], TOL).unwrap();
         assert!((x[0] - 1.0).abs() < 1.0e-12);
         assert!((x[1] - 2.0).abs() < 1.0e-12);
         assert!((x[2] - 3.0).abs() < 1.0e-12);

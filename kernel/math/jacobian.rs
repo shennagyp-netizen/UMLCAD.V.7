@@ -340,7 +340,7 @@ mod tests {
         let jacobian = analytic_constraint_jacobian(&snapshot).unwrap();
         assert_eq!(jacobian.len(), 2);
         assert!((jacobian[0][2] - 0.3f64.cos()).abs() < 1.0e-15);
-        assert!((jacobian[1][4] - 2.0 * 0.3f64.cos()).abs() < 1.0e-15);
+        assert!((jacobian[1][3] - 2.0 * 0.3f64.cos()).abs() < 1.0e-15);
     }
 
     #[test]

@@ -230,7 +230,7 @@ impl Bvh3 {
         let mut out = Vec::new();
         let mut stack = vec![root];
         while let Some(index) = stack.pop() {
-            match self.nodes[index] {
+            match &self.nodes[index] {
                 BvhNode::Leaf { item } => {
                     if item.bounds.intersects(query, tolerance) {
                         out.push(item.index);
@@ -238,8 +238,8 @@ impl Bvh3 {
                 }
                 BvhNode::Branch { bounds, left, right } => {
                     if bounds.intersects(query, tolerance) {
-                        stack.push(right);
-                        stack.push(left);
+                        stack.push(*right);
+                        stack.push(*left);
                     }
                 }
             }
@@ -254,9 +254,9 @@ impl Bvh3 {
         }
         let mut out = Vec::new();
         for i in 0..self.nodes.len() {
-            if let BvhNode::Leaf { item: a } = self.nodes[i] {
+            if let BvhNode::Leaf { item: a } = &self.nodes[i] {
                 for j in i + 1..self.nodes.len() {
-                    if let BvhNode::Leaf { item: b } = self.nodes[j] {
+                    if let BvhNode::Leaf { item: b } = &self.nodes[j] {
                         if a.bounds.intersects(b.bounds, tolerance) {
                             let pair = if a.index < b.index {
                                 (a.index, b.index)

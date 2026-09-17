@@ -116,7 +116,7 @@ pub fn insert_knot(curve: &NurbsCurve2D, u: f64) -> Result<NurbsCurve2D, NurbsEr
     for i in k - s..=n {
         qw[i + 1] = pw[i];
     }
-    if k >= p + 1 {
+    if k >= p {
         for i in (k - p + 1)..=k - s {
             let den = curve.knots[i + p] - curve.knots[i];
             if den == 0.0 {
@@ -329,7 +329,7 @@ mod tests {
                 Point2 { x: 3.0, y: 1.0 },
             ],
             vec![1.0, 1.0, 1.0, 1.0],
-            vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0],
+            vec![0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0],
         )
     }
 

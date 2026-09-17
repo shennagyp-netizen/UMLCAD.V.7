@@ -1,0 +1,29 @@
+name: Rust kernel validation
+
+on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+  pull_request:
+
+jobs:
+  rust-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run Rust kernel test suite
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --manifest-path kernel/native/Cargo.toml 2>&1 | tee cargo-test.log
+      - name: Upload Rust test log
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-kernel-test-log
+          path: cargo-test.log
+          if-no-files-found: error

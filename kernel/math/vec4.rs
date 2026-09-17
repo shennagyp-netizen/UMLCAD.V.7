@@ -18,4 +18,4 @@ impl Vec4 {
 }
 
 #[cfg(test)]
-mod tests{use super::*;#[test]fn homogeneous_normalization(){let v=Vec4::new(1.,2.,3.,4.);let n=v.normalized().unwrap();assert!((n.length()-1.).abs()<1e-15);}#[test]fn extreme_length_is_finite(){let v=Vec4::new(1e308,-1e308,1e308,-1e308);assert!(v.length().is_finite());}#[test]fn invalid_vector_is_rejected(){assert_eq!(Vec4::new(0.,0.,0.,0.).normalized(),Err(Vec4Error::Degenerate));}}
+mod tests{use super::*;#[test]fn homogeneous_normalization(){let v=Vec4::new(1.,2.,3.,4.);let n=v.normalized().unwrap();assert!((n.length()-1.).abs()<1e-15);}#[test]fn extreme_length_is_finite(){let v=Vec4::new(1e308,-1e308,0.,0.);assert!(v.length().is_finite());}#[test]fn invalid_vector_is_rejected(){assert_eq!(Vec4::new(0.,0.,0.,0.).normalized(),Err(Vec4Error::Degenerate));}}

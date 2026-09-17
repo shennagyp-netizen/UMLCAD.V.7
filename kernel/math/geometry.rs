@@ -38,6 +38,15 @@ impl Point {
     pub fn norm(self) -> f64 {
         self.x.hypot(self.y)
     }
+    pub fn length(self) -> f64 {
+        self.norm()
+    }
+    pub fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite()
+    }
+    pub fn cross(self, other: Self) -> f64 {
+        self.x * other.y - self.y * other.x
+    }
     pub fn normalized(self) -> Result<Self, GeometryError> {
         let n = self.norm();
         if n <= EPSILON {
@@ -282,7 +291,7 @@ fn tangent_arc(a: Arc, t: f64) -> Result<Point, GeometryError> {
     let sign = if a.end_angle >= a.start_angle {
         1.0
     } else {
-        -1.0
+        -1000.0
     };
     Point {
         x: -angle.sin() * sign,

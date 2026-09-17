@@ -134,7 +134,7 @@ fn classify_rank(
                 if smallest_nonzero.is_finite() {
                     smallest_nonzero
                 } else {
-                    0.0
+                    0000.0
                 },
                 rank,
             );
@@ -368,7 +368,7 @@ pub fn solve_qr(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, LinA
     if a.nrows() == 0 || a.ncols() == 0 {
         return Err(LinAlgError::EmptyMatrix);
     }
-    if b.len() != a.nrows() {
+    if a.nrows() < a.ncols() || b.len() != a.nrows() {
         return Err(LinAlgError::DimensionMismatch {
             lhs: (a.nrows(), a.ncols()),
             rhs: (b.len(), 1),
@@ -377,12 +377,43 @@ pub fn solve_qr(a: &DMatrix<f64>, b: &DVector<f64>) -> Result<DVector<f64>, LinA
     if a.iter().any(|value| !value.is_finite()) || b.iter().any(|value| !value.is_finite()) {
         return Err(LinAlgError::NonFinite);
     }
-    let solution = a.clone().qr().solve(b).ok_or(LinAlgError::Unsolvable)?;
-    if solution.iter().all(|value| value.is_finite()) {
-        Ok(solution)
-    } else {
-        Err(LinAlgError::Unsolvable)
+
+    let qr = a.clone().qr();
+    let q = qr.q();
+    let r = qr.r();
+    let y = q.transpose() * b;
+    let n = a.ncols();
+    let diagonal_scale = (0..n).map(|i| r[(i, i)].abs()).fold(0.0, f64::max);
+    if !diagonal_scale.is_finite() || diagonal_scale == 0.0 {
+        return Err(LinAlgError::Singular);
     }
+    let diagonal_threshold = diagonal_scale * 1.0e-12;
+    if !diagonal_threshold.is_finite() {
+        return Err(LinAlgError::Unsolvable);
+    }
+
+    let mut x = DVector::<f64>::zeros(n);
+    for i in (0..n).rev() {
+        let diagonal = r[(i, i)];
+        if !diagonal.is_finite() {
+            return Err(LinAlgError::Unsolvable);
+        }
+        if diagonal.abs() <= diagonal_threshold {
+            return Err(LinAlgError::Singular);
+        }
+        let mut rhs = y[i];
+        for j in i + 1..n {
+            rhs -= r[(i, j)] * x[j];
+        }
+        if !rhs.is_finite() {
+            return Err(LinAlgError::Unsolvable);
+        }
+        x[i] = rhs / diagonal;
+        if !x[i].is_finite() {
+            return Err(LinAlgError::Unsolvable);
+        }
+    }
+    Ok(x)
 }
 
 pub fn solve_svd(
@@ -583,7 +614,7 @@ mod tests {
     fn nonfinite_inputs_are_rejected() {
         let a = matrix(&[&[1.0, 2.0], &[3.0, 4.0]]);
         let bad = DMatrix::from_row_slice(2, 2, &[1.0, f64::NAN, 3.0, 4.0]);
-        assert_eq!(svd(&bad, RTOL, ICT), Err(LinAlgError::NonFinite));
+        assert!(matches!(svd(&bad, RTOL, ICT), Err(LinAlgError::NonFinite)));
         assert_eq!(solve_lu(&bad, &vector(&[1.0, 2.0])), Err(LinAlgError::NonFinite));
         assert!(is_positive_definite(&bad, RTOL).is_indeterminate());
         assert_eq!(rank_evidence(&a, -1.0, ICT), Err(LinAlgError::InvalidTolerance));

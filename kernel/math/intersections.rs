@@ -6,7 +6,7 @@
 use super::{
     analytic::{Ellipse2, Plane3},
     conics3d::{Circle3, Sphere3},
-    geometry::{Circle, Line},
+    geometry::{Circle, Point},
     predicates::Tri,
     vec::{Vec2, Vec3},
 };
@@ -149,7 +149,8 @@ pub fn line_circle_2d(line: Line2, circle: Circle, tol: f64) -> Intersection2D {
         Ok(value) => value,
         Err(_) => return invalid_2d(IntersectionKind::Degenerate),
     };
-    let offset = line.origin.sub(circle.center);
+    let circle_center = Vec2::new(circle.center.x, circle.center.y);
+    let offset = line.origin.sub(circle_center);
     if !offset.is_finite() || !direction_length.is_finite() {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
@@ -258,7 +259,9 @@ pub fn circle_circle_2d(a: Circle, b: Circle, tol: f64) -> Intersection2D {
     }
     if h2_normalized <= tol {
         let x = x_normalized * scale;
-        let base = a.center.add(delta.scale(x / distance));
+        let center = Vec2::new(a.center.x, a.center.y);
+        let delta_vec = Vec2::new(delta.x, delta.y);
+        let base = center.add(delta_vec.scale(x / distance));
         if base.is_finite() {
             return Intersection2D {
                 kind: IntersectionKind::Tangent,
@@ -273,7 +276,9 @@ pub fn circle_circle_2d(a: Circle, b: Circle, tol: f64) -> Intersection2D {
     }
     let h = h2_normalized.sqrt() * scale;
     let x = x_normalized * scale;
-    let base = a.center.add(delta.scale(x / distance));
+    let a_center = Vec2::new(a.center.x, a.center.y);
+    let delta_vec = Vec2::new(delta.x, delta.y);
+    let base = a_center.add(delta_vec.scale(x / distance));
     let unit_perp = Vec2::new(-delta.y / distance, delta.x / distance);
     let point_a = base.add(unit_perp.scale(h));
     let point_b = base.sub(unit_perp.scale(h));
@@ -310,77 +315,93 @@ pub fn ellipse_line_2d(ellipse: Ellipse2, line: Line2, tol: f64) -> Intersection
         rotation_c * unit_direction.x + rotation_s * unit_direction.y,
         -rotation_s * unit_direction.x + rotation_c * unit_direction.y,
     );
-    let ux = direction.x / ellipse.semi_axis_a;
-    let uy = direction.y / ellipse.semi_axis_b;
+    let dx = direction.x / ellipse.semi_axis_a;
+    let dy = direction.y / ellipse.semi_axis_b;
     let ox = origin.x / ellipse.semi_axis_a;
     let oy = origin.y / ellipse.semi_axis_b;
-    if [ux, uy, ox, oy].iter().any(|value| !value.is_finite()) {
+    if [dx, dy, ox, oy].iter().any(|value| !value.is_finite()) {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
-    let coefficient_scale = 1.0_f64.max(ux.abs()).max(uy.abs()).max(ox.abs()).max(oy.abs());
-    let ux = ux / coefficient_scale;
-    let uy = uy / coefficient_scale;
-    let ox = ox / coefficient_scale;
-    let oy = oy / coefficient_scale;
-    let inv_scale_sq = 1.0 / (coefficient_scale * coefficient_scale);
-    if !inv_scale_sq.is_finite() {
-        return invalid_2d(IntersectionKind::Indeterminate);
-    }
-    let quadratic_a = ux * ux + uy * uy;
-    let quadratic_b = 2.0 * (ox * ux + oy * uy);
-    let quadratic_c = ox * ox + oy * oy - inv_scale_sq;
-    let discriminant = quadratic_b * quadratic_b - 4.0 * quadratic_a * quadratic_c;
-    if ![quadratic_a, quadratic_b, quadratic_c, discriminant]
-        .iter()
-        .all(|value| value.is_finite())
-    {
-        return invalid_2d(IntersectionKind::Indeterminate);
-    }
-    if quadratic_a == 0.0 {
+    let direction_scale = dx.hypot(dy);
+    if !direction_scale.is_finite() || direction_scale == 0.0 {
         return invalid_2d(IntersectionKind::Degenerate);
     }
-    let band = tol * (quadratic_b * quadratic_b).abs().max((4.0 * quadratic_a * quadratic_c).abs());
-    if !band.is_finite() {
+    let du = dx / direction_scale;
+    let dv = dy / direction_scale;
+    let origin_scale = 1.0_f64.max(ox.abs()).max(oy.abs());
+    if !origin_scale.is_finite() || origin_scale == 0.0 {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
-    if discriminant < -band {
+    let oxn = ox / origin_scale;
+    let oyn = oy / origin_scale;
+    let perpendicular_normalized = (oxn * dv - oyn * du).abs();
+    let inv_origin_scale = 1.0 / origin_scale;
+    if !perpendicular_normalized.is_finite() || !inv_origin_scale.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    let perpendicular_band = tol * inv_origin_scale;
+    if !perpendicular_band.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    if perpendicular_normalized > inv_origin_scale + perpendicular_band {
         return invalid_2d(IntersectionKind::None);
     }
-    let t_distance = if discriminant.abs() <= band {
-        -quadratic_b / (2.0 * quadratic_a)
-    } else {
-        if discriminant < 0.0 {
-            return invalid_2d(IntersectionKind::Indeterminate);
-        }
-        let root = discriminant.sqrt();
-        let t1 = (-quadratic_b - root) / (2.0 * quadratic_a);
-        let t2 = (-quadratic_b + root) / (2.0 * quadratic_a);
-        let parameter_1 = t1 * coefficient_scale / direction_length;
-        let parameter_2 = t2 * coefficient_scale / direction_length;
-        let point_1 = line.origin.add(line.direction.scale(parameter_1));
-        let point_2 = line.origin.add(line.direction.scale(parameter_2));
-        if !parameter_1.is_finite()
-            || !parameter_2.is_finite()
-            || !point_1.is_finite()
-            || !point_2.is_finite()
-        {
+
+    let distance = perpendicular_normalized * origin_scale;
+    if !distance.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    let distance_band = tol;
+    if distance > 1.0 + distance_band {
+        return invalid_2d(IntersectionKind::None);
+    }
+    let along_normalized = -(oxn * du + oyn * dv);
+    if !along_normalized.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    let along = along_normalized * origin_scale;
+    if !along.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    let residual = 1.0 - distance * distance;
+    let residual_band = tol * (1.0 + distance.abs()).max(1.0);
+    if !residual.is_finite() || !residual_band.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    if residual < -residual_band {
+        return invalid_2d(IntersectionKind::None);
+    }
+    if residual.abs() <= residual_band {
+        let q = along;
+        let parameter = q / direction_scale;
+        let point = line.origin.add(line.direction.scale(parameter));
+        if !parameter.is_finite() || !point.is_finite() {
             return invalid_2d(IntersectionKind::Indeterminate);
         }
         return Intersection2D {
-            kind: IntersectionKind::MultiplePoints,
-            points: vec![point_1, point_2],
-            parameters: vec![parameter_1, parameter_2],
+            kind: IntersectionKind::Tangent,
+            points: vec![point],
+            parameters: vec![parameter],
         };
-    };
-    let parameter = t_distance * coefficient_scale / direction_length;
-    let point = line.origin.add(line.direction.scale(parameter));
-    if !parameter.is_finite() || !point.is_finite() {
+    }
+    let half = residual.sqrt();
+    let q1 = along - half;
+    let q2 = along + half;
+    let parameter_1 = q1 / direction_scale;
+    let parameter_2 = q2 / direction_scale;
+    let point_1 = line.origin.add(line.direction.scale(parameter_1));
+    let point_2 = line.origin.add(line.direction.scale(parameter_2));
+    if !parameter_1.is_finite()
+        || !parameter_2.is_finite()
+        || !point_1.is_finite()
+        || !point_2.is_finite()
+    {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
     Intersection2D {
-        kind: IntersectionKind::Tangent,
-        points: vec![point],
-        parameters: vec![parameter],
+        kind: IntersectionKind::MultiplePoints,
+        points: vec![point_1, point_2],
+        parameters: vec![parameter_1, parameter_2],
     }
 }
 
@@ -488,21 +509,21 @@ pub fn plane_plane_3d(a: Plane3, b: Plane3, tol: f64) -> Intersection3D {
             if det.abs() <= f64::MIN_POSITIVE {
                 return invalid_3d(IntersectionKind::Indeterminate);
             }
-            ((0.0), (c1 * n2.z - n1.z * c2) / det, (n1.y * c2 - c1 * n2.y) / det)
+            (0.0, (c1 * n2.z - n1.z * c2) / det, (n1.y * c2 - c1 * n2.y) / det)
         }
         1 => {
             let det = n1.x * n2.z - n1.z * n2.x;
             if det.abs() <= f64::MIN_POSITIVE {
                 return invalid_3d(IntersectionKind::Indeterminate);
             }
-            (((c1 * n2.z - n1.z * c2) / det), 0.0, ((n1.x * c2 - c1 * n2.x) / det))
+            ((c1 * n2.z - n1.z * c2) / det, 0.0, (n1.x * c2 - c1 * n2.x) / det)
         }
         _ => {
             let det = n1.x * n2.y - n1.y * n2.x;
             if det.abs() <= f64::MIN_POSITIVE {
                 return invalid_3d(IntersectionKind::Indeterminate);
             }
-            (((c1 * n2.y - n1.y * c2) / det), ((n1.x * c2 - c1 * n2.x) / det), 0.0)
+            ((c1 * n2.y - n1.y * c2) / det, (n1.x * c2 - c1 * n2.x) / det, 0.0)
         }
     };
     let point = Vec3::new(x, y, z);
@@ -803,7 +824,7 @@ mod tests {
             direction: Vec2::new(1.0, 0.0),
         };
         let circle = Circle {
-            center: Vec2::new(0.0, 0.0),
+            center: Point { x: 0.0, y: 0.0 },
             radius: 1.0,
         };
         assert_eq!(

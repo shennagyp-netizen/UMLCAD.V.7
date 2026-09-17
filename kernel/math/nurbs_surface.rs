@@ -114,7 +114,7 @@ impl NurbsSurface2D {
         ))
     }
 
-    fn normalized_weight_scale(&self) -> Result<f64, NurbsSurfaceError> {
+    pub(crate) fn normalized_weight_scale(&self) -> Result<f64, NurbsSurfaceError> {
         let scale = self.weights.iter().copied().fold(0.0, f64::max);
         if !scale.is_finite() || scale <= 0.0 {
             return Err(NurbsSurfaceError::InvalidWeight);

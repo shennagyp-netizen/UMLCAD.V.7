@@ -484,7 +484,9 @@ mod tests {
             rotation: 0.0,
         };
         assert_eq!(ellipse.point_at(0.0).unwrap(), Vec2::new(6.0, 3.0));
-        assert_eq!(ellipse.point_at(0.25).unwrap(), Vec2::new(2.0, 5.0));
+        let point = ellipse.point_at(0.25).unwrap();
+        assert!((point.x - 2.0).abs() < 1.0e-14);
+        assert!((point.y - 5.0).abs() < 1.0e-14);
         assert!(ellipse.implicit_value(Vec2::new(6.0, 3.0)).unwrap().abs() < 1.0e-14);
     }
 

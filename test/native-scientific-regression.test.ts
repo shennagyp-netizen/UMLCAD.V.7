@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, buildTopology, evaluateDimensions, geometryEndpoint, spatialAnalysis, solveConstraints, type GeometricRelation } from "../kernel/src/native-index.js";
+import { DesignProgram, buildTopology, evaluateDimensions, geometryEndpoint, spatialAnalysis, solveConstraints, type GeometricRelation } from "../kernel/api/src/native-index.js";
 
 test("circle semantics never fabricate topological endpoints",()=>{
   const p=new DesignProgram();

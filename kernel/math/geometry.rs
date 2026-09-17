@@ -38,6 +38,15 @@ impl Point {
     pub fn norm(self) -> f64 {
         self.x.hypot(self.y)
     }
+    pub fn length(self) -> f64 {
+        self.norm()
+    }
+    pub fn is_finite(self) -> bool {
+        self.x.is_finite() && self.y.is_finite()
+    }
+    pub fn cross(self, other: Self) -> f64 {
+        self.x * other.y - self.y * other.x
+    }
     pub fn normalized(self) -> Result<Self, GeometryError> {
         let n = self.norm();
         if n <= EPSILON {

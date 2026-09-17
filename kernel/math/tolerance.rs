@@ -68,7 +68,7 @@ mod tests {
     #[test]
     fn absolute_and_relative_components_are_combined_explicitly() {
         let tolerance = Tolerance::new(1.0e-6, 1.0e-4).unwrap();
-        assert!((tolerance.threshold(2.0) - 1.0002e-6).abs() < 1.0e-18);
+        assert!((tolerance.threshold(2.0).unwrap() - 1.0002e-6).abs() < 1.0e-18);
     }
 
     #[test]

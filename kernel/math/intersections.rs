@@ -258,7 +258,9 @@ pub fn circle_circle_2d(a: Circle, b: Circle, tol: f64) -> Intersection2D {
     }
     if h2_normalized <= tol {
         let x = x_normalized * scale;
-        let base = a.center.add(delta.scale(x / distance));
+        let center = Vec2::new(a.center.x, a.center.y);
+        let delta_vec = Vec2::new(delta.x, delta.y);
+        let base = center.add(delta_vec.scale(x / distance));
         if base.is_finite() {
             return Intersection2D {
                 kind: IntersectionKind::Tangent,

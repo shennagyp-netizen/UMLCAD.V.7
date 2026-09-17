@@ -583,7 +583,7 @@ mod tests {
     fn nonfinite_inputs_are_rejected() {
         let a = matrix(&[&[1.0, 2.0], &[3.0, 4.0]]);
         let bad = DMatrix::from_row_slice(2, 2, &[1.0, f64::NAN, 3.0, 4.0]);
-        assert_eq!(svd(&bad, RTOL, ICT), Err(LinAlgError::NonFinite));
+        assert!(matches!(svd(&bad, RTOL, ICT), Err(LinAlgError::NonFinite)));
         assert_eq!(solve_lu(&bad, &vector(&[1.0, 2.0])), Err(LinAlgError::NonFinite));
         assert!(is_positive_definite(&bad, RTOL).is_indeterminate());
         assert_eq!(rank_evidence(&a, -1.0, ICT), Err(LinAlgError::InvalidTolerance));

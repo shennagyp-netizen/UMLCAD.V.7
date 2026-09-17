@@ -160,7 +160,7 @@ impl Mat3 {
         if scale == 0.0 {
             return Err(MatrixError::Singular);
         }
-        let a = std::array::from_fn(|i| std::array::from_fn(|j| self.m[i][j] / scale));
+        let a: [[f64; 3]; 3] = std::array::from_fn(|i| std::array::from_fn(|j| self.m[i][j] / scale));
         let det = a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1])
             - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0])
             + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0]);
@@ -206,7 +206,7 @@ impl Mat3 {
             return Err(MatrixError::NonFinite);
         }
         let inv = self.inverse(tolerance)?;
-        let result = std::array::from_fn(|i| (0..3).map(|j| inv.m[i][j] * b[j]).sum());
+        let result: [f64; 3] = std::array::from_fn(|i| (0..3).map(|j| inv.m[i][j] * b[j]).sum());
         if result.iter().all(|v| v.is_finite()) {
             Ok(result)
         } else {
@@ -369,7 +369,7 @@ impl Mat4 {
             return Err(MatrixError::NonFinite);
         }
         let inverse = self.inverse(tolerance)?;
-        let result = std::array::from_fn(|i| (0..4).map(|j| inverse.m[i][j] * b[j]).sum());
+        let result: [f64; 4] = std::array::from_fn(|i| (0..4).map(|j| inverse.m[i][j] * b[j]).sum());
         if result.iter().all(|v| v.is_finite()) {
             Ok(result)
         } else {

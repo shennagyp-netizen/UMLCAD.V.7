@@ -476,6 +476,6 @@ mod tests {
     #[test]
     fn overflowed_root_tolerance_does_not_become_a_root() {
         let p = Polynomial::new(vec![1.0, 1.0]).unwrap();
-        assert_eq!(p.root_at_or_near(f64::MAX, 1.0), Err(PolynomialError::NonFinite));
+        assert_eq!(p.root_at_or_near(f64::MAX, 2.0), Err(PolynomialError::NonFinite));
     }
 }

@@ -462,7 +462,7 @@ mod tests {
     fn mat3_determinant_and_solve_are_exact_for_small_system() {
         let a = Mat3::new([[1.0, 2.0, 3.0], [0.0, 1.0, 4.0], [5.0, 6.0, 0.0]]);
         assert!((a.determinant() - 1.0).abs() < 1.0e-12);
-        let x = a.solve([14.0, 14.0, 23.0], TOL).unwrap();
+        let x = a.solve([14.0, 14.0, 17.0], TOL).unwrap();
         assert!((x[0] - 1.0).abs() < 1.0e-12);
         assert!((x[1] - 2.0).abs() < 1.0e-12);
         assert!((x[2] - 3.0).abs() < 1.0e-12);

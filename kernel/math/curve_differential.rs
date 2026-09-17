@@ -22,7 +22,7 @@ fn bspline_eval(
     knots: &[f64],
     u: f64,
 ) -> Result<(f64, f64), DifferentialError> {
-    if degree == 0 || control.len() < degree + 1 || knots.len() != control.len() + degree + 1 {
+    if control.is_empty() || control.len() < degree + 1 || knots.len() != control.len() + degree + 1 {
         return Err(DifferentialError::InvalidDomain);
     }
     let n = control.len() - 1;

@@ -315,77 +315,93 @@ pub fn ellipse_line_2d(ellipse: Ellipse2, line: Line2, tol: f64) -> Intersection
         rotation_c * unit_direction.x + rotation_s * unit_direction.y,
         -rotation_s * unit_direction.x + rotation_c * unit_direction.y,
     );
-    let ux = direction.x / ellipse.semi_axis_a;
-    let uy = direction.y / ellipse.semi_axis_b;
+    let dx = direction.x / ellipse.semi_axis_a;
+    let dy = direction.y / ellipse.semi_axis_b;
     let ox = origin.x / ellipse.semi_axis_a;
     let oy = origin.y / ellipse.semi_axis_b;
-    if [ux, uy, ox, oy].iter().any(|value| !value.is_finite()) {
+    if [dx, dy, ox, oy].iter().any(|value| !value.is_finite()) {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
-    let coefficient_scale = 1.0_f64.max(ux.abs()).max(uy.abs()).max(ox.abs()).max(oy.abs());
-    let ux = ux / coefficient_scale;
-    let uy = uy / coefficient_scale;
-    let ox = ox / coefficient_scale;
-    let oy = oy / coefficient_scale;
-    let inv_scale_sq = 1.0 / (coefficient_scale * coefficient_scale);
-    if !inv_scale_sq.is_finite() {
-        return invalid_2d(IntersectionKind::Indeterminate);
-    }
-    let quadratic_a = ux * ux + uy * uy;
-    let quadratic_b = 2.0 * (ox * ux + oy * uy);
-    let quadratic_c = ox * ox + oy * oy - inv_scale_sq;
-    let discriminant = quadratic_b * quadratic_b - 4.0 * quadratic_a * quadratic_c;
-    if ![quadratic_a, quadratic_b, quadratic_c, discriminant]
-        .iter()
-        .all(|value| value.is_finite())
-    {
-        return invalid_2d(IntersectionKind::Indeterminate);
-    }
-    if quadratic_a == 0.0 {
+    let direction_scale = dx.hypot(dy);
+    if !direction_scale.is_finite() || direction_scale == 0.0 {
         return invalid_2d(IntersectionKind::Degenerate);
     }
-    let band = tol * (quadratic_b * quadratic_b).abs().max((4.0 * quadratic_a * quadratic_c).abs());
-    if !band.is_finite() {
+    let du = dx / direction_scale;
+    let dv = dy / direction_scale;
+    let origin_scale = 1.0_f64.max(ox.abs()).max(oy.abs());
+    if !origin_scale.is_finite() || origin_scale == 0.0 {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
-    if discriminant < -band {
+    let oxn = ox / origin_scale;
+    let oyn = oy / origin_scale;
+    let perpendicular_normalized = (oxn * dv - oyn * du).abs();
+    let inv_origin_scale = 1.0 / origin_scale;
+    if !perpendicular_normalized.is_finite() || !inv_origin_scale.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    let perpendicular_band = tol * inv_origin_scale;
+    if !perpendicular_band.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    if perpendicular_normalized > inv_origin_scale + perpendicular_band {
         return invalid_2d(IntersectionKind::None);
     }
-    let t_distance = if discriminant.abs() <= band {
-        -quadratic_b / (2.0 * quadratic_a)
-    } else {
-        if discriminant < 0.0 {
-            return invalid_2d(IntersectionKind::Indeterminate);
-        }
-        let root = discriminant.sqrt();
-        let t1 = (-quadratic_b - root) / (2.0 * quadratic_a);
-        let t2 = (-quadratic_b + root) / (2.0 * quadratic_a);
-        let parameter_1 = t1 * coefficient_scale / direction_length;
-        let parameter_2 = t2 * coefficient_scale / direction_length;
-        let point_1 = line.origin.add(line.direction.scale(parameter_1));
-        let point_2 = line.origin.add(line.direction.scale(parameter_2));
-        if !parameter_1.is_finite()
-            || !parameter_2.is_finite()
-            || !point_1.is_finite()
-            || !point_2.is_finite()
-        {
+
+    let distance = perpendicular_normalized * origin_scale;
+    if !distance.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    let distance_band = tol;
+    if distance > 1.0 + distance_band {
+        return invalid_2d(IntersectionKind::None);
+    }
+    let along_normalized = -(oxn * du + oyn * dv);
+    if !along_normalized.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    let along = along_normalized * origin_scale;
+    if !along.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    let residual = 1.0 - distance * distance;
+    let residual_band = tol * (1.0 + distance.abs()).max(1.0);
+    if !residual.is_finite() || !residual_band.is_finite() {
+        return invalid_2d(IntersectionKind::Indeterminate);
+    }
+    if residual < -residual_band {
+        return invalid_2d(IntersectionKind::None);
+    }
+    if residual.abs() <= residual_band {
+        let q = along;
+        let parameter = q / direction_scale;
+        let point = line.origin.add(line.direction.scale(parameter));
+        if !parameter.is_finite() || !point.is_finite() {
             return invalid_2d(IntersectionKind::Indeterminate);
         }
         return Intersection2D {
-            kind: IntersectionKind::MultiplePoints,
-            points: vec![point_1, point_2],
-            parameters: vec![parameter_1, parameter_2],
+            kind: IntersectionKind::Tangent,
+            points: vec![point],
+            parameters: vec![parameter],
         };
-    };
-    let parameter = t_distance * coefficient_scale / direction_length;
-    let point = line.origin.add(line.direction.scale(parameter));
-    if !parameter.is_finite() || !point.is_finite() {
+    }
+    let half = residual.sqrt();
+    let q1 = along - half;
+    let q2 = along + half;
+    let parameter_1 = q1 / direction_scale;
+    let parameter_2 = q2 / direction_scale;
+    let point_1 = line.origin.add(line.direction.scale(parameter_1));
+    let point_2 = line.origin.add(line.direction.scale(parameter_2));
+    if !parameter_1.is_finite()
+        || !parameter_2.is_finite()
+        || !point_1.is_finite()
+        || !point_2.is_finite()
+    {
         return invalid_2d(IntersectionKind::Indeterminate);
     }
     Intersection2D {
-        kind: IntersectionKind::Tangent,
-        points: vec![point],
-        parameters: vec![parameter],
+        kind: IntersectionKind::MultiplePoints,
+        points: vec![point_1, point_2],
+        parameters: vec![parameter_1, parameter_2],
     }
 }
 

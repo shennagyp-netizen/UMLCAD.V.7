@@ -4,6 +4,7 @@ pub mod bspline;
 pub mod constraints;
 pub mod conics3d;
 pub mod constants;
+pub mod curve_differential;
 pub mod curves3d;
 pub mod diagnostics;
 pub mod dimensions;

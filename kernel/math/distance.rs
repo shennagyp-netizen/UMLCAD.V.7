@@ -76,15 +76,23 @@ pub fn point_line(
         return Err(DistanceError::NonFinite);
     }
     let unit = direction.normalized().map_err(|_| DistanceError::Degenerate)?;
+    let direction_length = direction.length();
+    if !direction_length.is_finite() || direction_length == 0.0 {
+        return Err(DistanceError::Degenerate);
+    }
     let displacement = point.sub(origin);
     if !displacement.is_finite() {
         return Err(DistanceError::Overflow);
     }
-    let t = displacement.dot(unit);
+    let projection = displacement.dot(unit);
+    if !projection.is_finite() {
+        return Err(DistanceError::Overflow);
+    }
+    let t = projection / direction_length;
     if !t.is_finite() {
         return Err(DistanceError::Overflow);
     }
-    let q = checked_point(origin, unit, t)?;
+    let q = checked_point(origin, direction, t)?;
     let d = point.sub(q).length();
     if !d.is_finite() {
         return Err(DistanceError::Overflow);
@@ -106,6 +114,11 @@ pub fn point_ray(point: Vec3, ray: &Ray3) -> Result<Distance3, DistanceError> {
         return Err(DistanceError::NonFinite);
     }
     ray.validate().map_err(|_| DistanceError::Degenerate)?;
+    let direction = ray.direction;
+    let direction_length = direction.length();
+    if !direction_length.is_finite() || direction_length == 0.0 {
+        return Err(DistanceError::Degenerate);
+    }
     let unit = ray
         .unit_direction()
         .map_err(|_| DistanceError::Degenerate)?;
@@ -113,12 +126,16 @@ pub fn point_ray(point: Vec3, ray: &Ray3) -> Result<Distance3, DistanceError> {
     if !displacement.is_finite() {
         return Err(DistanceError::Overflow);
     }
-    let supporting_t = displacement.dot(unit);
-    if !supporting_t.is_finite() {
+    let supporting_distance = displacement.dot(unit);
+    if !supporting_distance.is_finite() {
         return Err(DistanceError::Overflow);
     }
-    let t = if supporting_t < 0.0 { 0.0 } else { supporting_t };
-    let q = checked_point(ray.origin, unit, t)?;
+    let ray_distance = supporting_distance.max(0.0);
+    let parameter = ray_distance / direction_length;
+    if !parameter.is_finite() {
+        return Err(DistanceError::Overflow);
+    }
+    let q = checked_point(ray.origin, direction, parameter)?;
     let d = point.sub(q).length();
     if !d.is_finite() {
         return Err(DistanceError::Overflow);
@@ -126,7 +143,10 @@ pub fn point_ray(point: Vec3, ray: &Ray3) -> Result<Distance3, DistanceError> {
     Ok(Distance3 {
         distance: d,
         first: ClosestPoint3 { point, parameter: 0.0 },
-        second: Some(ClosestPoint3 { point: q, parameter: t }),
+        second: Some(ClosestPoint3 {
+            point: q,
+            parameter,
+        }),
         status: if d == 0.0 {
             DistanceStatus::Intersecting
         } else {
@@ -491,12 +511,14 @@ mod tests {
     }
 
     #[test]
-    fn extreme_ray_direction_remains_well_defined() {
+    fn extreme_ray_direction_remains_well_defined_and_keeps_native_parameter() {
         let ray = Ray3 {
             origin: Vec3::new(0.0, 0.0, 0.0),
             direction: Vec3::new(1.0e308, 0.0, 0.0),
         };
         let result = point_ray(Vec3::new(2.0, 1.0, 0.0), &ray).unwrap();
         assert!((result.distance - 1.0).abs() < 1.0e-14);
+        assert!(result.second.unwrap().parameter.is_finite());
+        assert!(result.second.unwrap().parameter < 1.0e-307);
     }
 }

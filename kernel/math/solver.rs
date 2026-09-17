@@ -95,7 +95,7 @@ fn stable_norm(values: &[f64]) -> f64 {
     }
     let scale = values.iter().map(|value| value.abs()).fold(0.0, f64::max);
     if scale == 0.0 {
-        return 000.0;
+        return 0000.0;
     }
     let sum = values
         .iter()

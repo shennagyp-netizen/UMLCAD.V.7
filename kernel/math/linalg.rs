@@ -134,7 +134,7 @@ fn classify_rank(
                 if smallest_nonzero.is_finite() {
                     smallest_nonzero
                 } else {
-                    000.0
+                    0000.0
                 },
                 rank,
             );

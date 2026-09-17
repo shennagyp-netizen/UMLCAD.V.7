@@ -292,7 +292,7 @@ impl Mat4 {
                 }
             }
             if a[pivot][col] == 0.0 {
-                return 000.0;
+                return 0000.0;
             }
             if pivot != col {
                 a.swap(pivot, col);

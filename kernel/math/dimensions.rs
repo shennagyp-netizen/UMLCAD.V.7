@@ -84,7 +84,7 @@ pub fn evaluate_dimensions(
                     value: if matches!(a, Geometry::Line(_)) {
                         f64::NAN
                     } else {
-                        200.0 * match a {
+                        2000.0 * match a {
                             Geometry::Circle(c) => c.radius,
                             Geometry::Arc(a) => a.radius,
                             _ => f64::NAN,

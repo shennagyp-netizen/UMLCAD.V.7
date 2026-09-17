@@ -516,19 +516,22 @@ mod tests {
         panic!("parameter column {column} not found");
     }
 
-    fn constraint_residual_rows(snapshot: &SemanticSnapshot) -> Vec<f64> {
-        snapshot
+    fn constraint_residual_rows(
+        current: &SemanticSnapshot,
+        reference: &SemanticSnapshot,
+    ) -> Vec<f64> {
+        current
             .constraints
             .iter()
             .flat_map(|(_, constraint)| {
                 match constraint {
                     Constraint::Fixed { entity_id } => {
-                        let current = snapshot.geometry(entity_id).unwrap();
-                        let reference = snapshot.geometry(entity_id).unwrap();
-                        geometry_difference(current, reference).unwrap()
+                        let actual = current.geometry(entity_id).unwrap();
+                        let original = reference.geometry(entity_id).unwrap();
+                        geometry_difference(actual, original).unwrap()
                     }
                     _ => super::super::constraints::residual(
-                        |id| snapshot.geometry(id).cloned(),
+                        |id| current.geometry(id).cloned(),
                         constraint,
                     )
                     .unwrap(),
@@ -555,7 +558,7 @@ mod tests {
 
     fn assert_constraint_jacobian_matches_central_difference(snapshot: &SemanticSnapshot) {
         let analytic = analytic_constraint_jacobian(snapshot).unwrap();
-        let base = constraint_residual_rows(snapshot);
+        let base = constraint_residual_rows(snapshot, snapshot);
         assert_eq!(analytic.len(), base.len());
         let total_columns = snapshot
             .geometry
@@ -572,8 +575,8 @@ mod tests {
             let mut minus = snapshot.clone();
             set_parameter(&mut plus, column, h);
             set_parameter(&mut minus, column, -h);
-            let plus_values = constraint_residual_rows(&plus);
-            let minus_values = constraint_residual_rows(&minus);
+            let plus_values = constraint_residual_rows(&plus, snapshot);
+            let minus_values = constraint_residual_rows(&minus, snapshot);
             assert_eq!(plus_values.len(), base.len());
             assert_eq!(minus_values.len(), base.len());
             for row in 0..analytic.len() {

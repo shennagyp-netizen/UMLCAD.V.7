@@ -46,19 +46,19 @@ pub(crate) fn input_from_legacy(
     result: &super::solver_legacy::ConstraintSolveResult,
 ) -> SolverClassificationInput {
     SolverClassificationInput {
-        converged: input.converged,
-        reason: input.reason.clone(),
+        converged: result.converged,
+        reason: result.reason.clone(),
         final_residual_norm: result.final_residual_norm,
-        final_scaled_residual_norm: input.final_scaled_residual_norm,
+        final_scaled_residual_norm: result.final_scaled_residual_norm,
         initial_scaled_residual_norm: result.initial_scaled_residual_norm,
-        final_step_norm: input.final_step_norm,
+        final_step_norm: result.final_step_norm,
         analysis_valid: result.analysis.valid,
         well_conditioned: result.analysis.well_conditioned,
         rank: result.analysis.rank,
-        equation_count: input.equation_count,
-        variable_count: input.variable_count,
+        equation_count: result.analysis.equation_count,
+        variable_count: result.analysis.variable_count,
         condition_estimate: result.analysis.condition_estimate,
-        iterations: input.iterations,
+        iterations: result.iterations,
     }
 }
 
@@ -287,8 +287,8 @@ mod tests {
             status: LinearSystemStatus::Inconsistent,
             coefficient_rank: result.analysis.rank,
             augmented_rank: result.analysis.rank + 1,
-            variable_count: result.variable_count,
-            equation_count: result.equation_count,
+            variable_count: result.analysis.variable_count,
+            equation_count: result.analysis.equation_count,
             coefficient_condition_number: 1.0,
             coefficient_classification: super::super::linalg::RankClassification::FullRank,
         }
@@ -311,8 +311,8 @@ mod tests {
         let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         result.converged = true;
         result.reason = SolveReason::Converged;
-        result.variable_count = 4;
-        result.equation_count = 3;
+        result.analysis.variable_count = 4;
+        result.analysis.equation_count = 3;
         result.analysis.rank = 2;
         result.analysis.condition_estimate = 25.0;
         result.analysis.well_conditioned = true;
@@ -327,8 +327,8 @@ mod tests {
         let mut result = solve_snapshot(&base_snapshot(), SolveOptions::default()).unwrap();
         result.converged = true;
         result.reason = SolveReason::Converged;
-        result.variable_count = 4;
-        result.equation_count = 3;
+        result.analysis.variable_count = 4;
+        result.analysis.equation_count = 3;
         result.analysis.rank = 3;
         result.analysis.condition_estimate = 25.0;
         result.analysis.well_conditioned = true;
@@ -502,8 +502,8 @@ mod tests {
         result.converged = false;
         result.reason = SolveReason::MaxIterations;
         result.final_scaled_residual_norm = result.initial_scaled_residual_norm;
-        result.variable_count = 2;
-        result.equation_count = 2;
+        result.analysis.variable_count = 2;
+        result.analysis.equation_count = 2;
         result.analysis.rank = 1;
         let evidence = classify_with_linear_system(
             &input_from_legacy(&result),

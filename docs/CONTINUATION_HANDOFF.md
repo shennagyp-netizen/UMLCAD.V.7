@@ -3,10 +3,10 @@
 ## Snapshot
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
-- Main head at handoff update: `201637b7b6225291d7fbaab4f1a226747511764d` before this documentation commit
-- Latest completed implementation station: M10/P0 production row-scaled linearization
-- Latest merged implementation PR: #23, `math: apply dimensionless row scaling in production solver`
-- PR #23 merge commit: `201637b7b6225291d7fbaab4f1a226747511764d`
+- Main head at handoff update: `f014d8fdc7263bc0bb1fe704efeba857086e40fa` before this documentation commit
+- Latest completed implementation station: M10/P0 authoritative accepted-step convergence history
+- Latest merged implementation PR: #24, `math: make accepted-step history authoritative`
+- PR #24 merge commit: `f014d8fdc7263bc0bb1fe704efeba857086e40fa`
 
 ## Completed mathematical-authority state
 Main is post-merge green through the current M10 solver-authority stations. The V7 mathematical-authority program is not complete; the M0-M16 roadmap remains active.
@@ -25,6 +25,7 @@ Completed and validated stations now include:
 - zero-damping truncated pseudoinverse handling for numerically null singular directions;
 - backend-neutral row-scaling contract for linearized systems;
 - production row scaling of each analytic Jacobian row and matching residual row by the same explicit semantic scale before the existing nalgebra-backed damped SVD solve.
+- truthful accepted-step convergence history authority that excludes rejected trials while preserving the authoritative attempted-iteration count;
 
 PR #23 specifically closed the previous mathematical mismatch in which convergence/acceptance used dimensionless scaled residuals while the nonlinear linearization step consumed raw mixed-unit residual rows. The production solve now applies the same semantic row normalization to both the Jacobian and residual before the existing solver backend.
 
@@ -40,14 +41,14 @@ PR #23 specifically closed the previous mathematical mismatch in which convergen
 
 `kernel/math/solver_status.rs` consumes these proofs conservatively: `Inconsistent` is only claimed from explicit dimension-matched inconsistency evidence, and rank-deficient systems cannot be promoted to healthy conditioning.
 
-## Convergence and terminal authority
+## Accepted-step convergence, convergence and terminal authority
 `kernel/math/convergence.rs` contains two complementary contracts:
 - `evaluate` verifies accepted residual history, monotonicity, stagnation, progress, iteration cap, and joint residual/step convergence;
 - `verify_terminal` verifies final residual and final step evidence without manufacturing an iteration history when an implementation rejects trial steps.
 
 `kernel/math/terminal_authority.rs` is the public terminal-convergence authority used by the solver-facing module. It validates the terminal evidence returned by the wrapped solver and rejects contradictory convergence state.
 
-The production iteration-control algorithm still does not replay/store the full accepted-step history for every attempted iteration. That remains a controlled mathematical-hardening station rather than something to infer or fabricate from final-state data.
+The production iteration-control algorithm now stores the initial scaled residual and only residuals at actually accepted iterates. Rejected trial steps are not inserted into the history. The accepted-history authority therefore evaluates monotonicity and convergence truthfully while the solver's attempted-iteration count remains the authoritative count for iteration caps and result reporting.
 
 ## Production linearization scaling
 `kernel/math/linearization.rs` defines the backend-neutral `RowScaledLinearSystem` contract and `scale_linearization` operation. A positive finite semantic row scale is applied identically to each Jacobian row and its corresponding residual component.
@@ -69,13 +70,19 @@ For PR #23:
 - post-merge Rust kernel validation on `201637b7...`: PASS;
 - post-merge comprehensive E2E/red-team gate on `201637b7...`: PASS.
 
+For PR #24:
+- exact-head Rust kernel validation: PASS;
+- exact-head comprehensive E2E/red-team gate: PASS;
+- post-merge Rust kernel validation on `f014d8fd...`: PASS;
+- post-merge comprehensive E2E/red-team gate on `f014d8fd...`: PASS.
+
 The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, black-box HTTP, Demo, raw HTTP red-team, release-path, and ignored-test checks.
 
 ## Immediate continuation
-1. Make accepted-step/history evidence authoritative in the production iteration-control path without redefining attempted-iteration counts or mixing physical units.
-2. Add adversarial mixed-unit nonlinear fixtures that exercise row scaling together with coupled distance/angle/relation equations across the declared geometry-scale range.
-3. Expand numerical-boundary tests for rank transitions, conditioning, damping, stagnation, and deterministic repeated solves.
-4. Audit every remaining supported constraint/relation family for explicit analytic Jacobian coverage; unsupported equations must fail explicitly rather than re-enter finite differences.
+1. Add adversarial mixed-unit nonlinear fixtures that exercise row scaling together with coupled distance/angle/relation equations across the declared geometry-scale range.
+2. Expand numerical-boundary tests for rank transitions, conditioning, damping, stagnation, accepted-history behavior, and deterministic repeated solves.
+3. Audit every remaining supported constraint/relation family for explicit analytic Jacobian coverage; unsupported equations must fail explicitly rather than re-enter finite differences.
+4. Review the solver's non-convergence classification so rejected-trial, stagnation, singular, invalid-domain, and max-iteration states remain explicit and mathematically distinguishable.
 5. Finish the remaining M10 solver foundation, then advance to the M8/M9 construction and B-Rep mathematical-authority families according to `docs/MATH_AUTHORITY_ROADMAP.md`.
 6. Evaluate GPU acceleration only later as a conformance-tested implementation backend; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 

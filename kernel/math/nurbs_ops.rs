@@ -56,17 +56,39 @@ fn multiplicity(knots: &[f64], u: f64) -> usize {
     knots.iter().filter(|k| **k == u).count()
 }
 
-fn to_h(curve: &NurbsCurve2D) -> Vec<H> {
-    curve
+fn to_h(curve: &NurbsCurve2D) -> Result<Vec<H>, NurbsError> {
+    // Rational geometry is invariant under uniform positive weight scaling.
+    // Normalize before forming homogeneous coordinates so finite coordinates
+    // cannot overflow merely because an otherwise equivalent representation
+    // uses very large projective weights.
+    let scale = curve
+        .weights
+        .iter()
+        .copied()
+        .fold(0.0, f64::max);
+    if !scale.is_finite() || scale <= 0.0 {
+        return Err(NurbsError::InvalidWeight);
+    }
+    let result = curve
         .control_points
         .iter()
         .zip(curve.weights.iter())
-        .map(|(p, w)| H {
-            x: p.x * w,
-            y: p.y * w,
-            w: *w,
+        .map(|(p, weight)| {
+            let w = *weight / scale;
+            H {
+                x: p.x * w,
+                y: p.y * w,
+                w,
+            }
         })
-        .collect()
+        .collect::<Vec<_>>();
+    if result
+        .iter()
+        .any(|q| !q.x.is_finite() || !q.y.is_finite() || !q.w.is_finite() || q.w <= 0.0)
+    {
+        return Err(NurbsError::Overflow);
+    }
+    Ok(result)
 }
 
 pub fn insert_knot(curve: &NurbsCurve2D, u: f64) -> Result<NurbsCurve2D, NurbsError> {
@@ -84,7 +106,7 @@ pub fn insert_knot(curve: &NurbsCurve2D, u: f64) -> Result<NurbsCurve2D, NurbsEr
         return Err(NurbsError::InvalidKnotCount);
     }
     let k = find_span(curve, u);
-    let pw = to_h(curve);
+    let pw = to_h(curve)?;
     let n = pw.len() - 1;
     let mut qw = vec![H { x: 0.0, y: 0.0, w: 0.0 }; pw.len() + 1];
 
@@ -108,6 +130,13 @@ pub fn insert_knot(curve: &NurbsCurve2D, u: f64) -> Result<NurbsCurve2D, NurbsEr
         }
     }
 
+    if qw
+        .iter()
+        .any(|q| !q.x.is_finite() || !q.y.is_finite() || !q.w.is_finite() || q.w <= 0.0)
+    {
+        return Err(NurbsError::Overflow);
+    }
+
     let mut uq = Vec::with_capacity(curve.knots.len() + 1);
     for i in 0..=k {
         uq.push(curve.knots[i]);
@@ -120,9 +149,6 @@ pub fn insert_knot(curve: &NurbsCurve2D, u: f64) -> Result<NurbsCurve2D, NurbsEr
     let mut cp = Vec::with_capacity(qw.len());
     let mut wt = Vec::with_capacity(qw.len());
     for q in qw {
-        if !q.w.is_finite() || q.w <= 0.0 {
-            return Err(NurbsError::InvalidWeight);
-        }
         let point = Point2 {
             x: q.x / q.w,
             y: q.y / q.w,
@@ -231,7 +257,11 @@ pub fn interior_knot_multiplicities(
         let u = curve.knots[i];
         if u > a && u < b {
             let m = multiplicity(&curve.knots, u);
-            if result.last().map(|r: &KnotMultiplicity| r.knot == u).unwrap_or(false) {
+            if result
+                .last()
+                .map(|r: &KnotMultiplicity| r.knot == u)
+                .unwrap_or(false)
+            {
                 i += 1;
                 continue;
             }
@@ -311,6 +341,28 @@ mod tests {
             let a = c.point_at(u).unwrap();
             let b = q.point_at(u).unwrap();
             assert!((a.x - b.x).abs() < 1.0e-12 && (a.y - b.y).abs() < 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn huge_uniform_weights_do_not_overflow_knot_insertion() {
+        let c = NurbsCurve2D::new(
+            2,
+            vec![
+                Point2 { x: 0.0, y: 0.0 },
+                Point2 { x: 1.0e200, y: 2.0e200 },
+                Point2 { x: 3.0e200, y: 0.0 },
+            ],
+            vec![1.0e200, 2.0e200, 1.0e200],
+            vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+        );
+        let q = insert_knot(&c, 0.5).unwrap();
+        for u in [0.0, 0.25, 0.5, 0.75, 1.0] {
+            let a = c.point_at(u).unwrap();
+            let b = q.point_at(u).unwrap();
+            let scale = a.x.abs().max(a.y.abs()).max(1.0);
+            assert!((a.x - b.x).abs() <= 1.0e-12 * scale);
+            assert!((a.y - b.y).abs() <= 1.0e-12 * scale);
         }
     }
 

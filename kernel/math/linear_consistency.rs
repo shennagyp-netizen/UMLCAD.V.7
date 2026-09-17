@@ -256,4 +256,67 @@ mod tests {
         assert_eq!(base.coefficient_rank, scaled.coefficient_rank);
         assert_eq!(base.augmented_rank, scaled.augmented_rank);
     }
+
+    #[test]
+    fn zero_rhs_cannot_make_an_underdetermined_system_inconsistent() {
+        let evidence = classify(&[&[1.0, 0.0, 0.0], &[2.0, 0.0, 0.0]], &[0.0, 0.0]);
+        assert_eq!(evidence.status, LinearSystemStatus::UnderdeterminedConsistent);
+        assert_eq!(evidence.coefficient_rank, 1);
+        assert_eq!(evidence.augmented_rank, 1);
+    }
+
+    #[test]
+    fn wide_rank_deficient_consistent_system_is_classified_correctly() {
+        let evidence = classify(&[&[1.0, 0.0, 0.0], &[0.0, 1.0, 0.0]], &[2.0, 3.0]);
+        assert_eq!(evidence.status, LinearSystemStatus::UnderdeterminedConsistent);
+        assert_eq!(evidence.coefficient_rank, 2);
+        assert_eq!(evidence.augmented_rank, 2);
+        assert_eq!(evidence.variable_count, 3);
+        assert_eq!(evidence.equation_count, 2);
+    }
+
+    #[test]
+    fn tall_full_column_rank_system_is_unique() {
+        let evidence = classify(
+            &[&[1.0, 0.0], &[0.0, 1.0], &[1.0, 1.0]],
+            &[2.0, 3.0, 5.0],
+        );
+        assert_eq!(evidence.status, LinearSystemStatus::Unique);
+        assert_eq!(evidence.coefficient_rank, 2);
+        assert_eq!(evidence.augmented_rank, 2);
+        assert_eq!(evidence.variable_count, 2);
+        assert_eq!(evidence.equation_count, 3);
+    }
+
+    #[test]
+    fn singular_value_ratio_below_declared_rank_tolerance_is_rank_deficient() {
+        let tol = 1.0e-6;
+        let a = DMatrix::from_diagonal(&DVector::from_row_slice(&[1.0, 0.5 * tol]));
+        let b = DVector::from_column_slice(&[1.0, 0.5 * tol]);
+        let evidence = classify_linear_system(&a, &b, tol, 1.0e10).unwrap();
+        assert_eq!(evidence.coefficient_rank, 1);
+        assert_eq!(evidence.augmented_rank, 1);
+        assert_eq!(evidence.status, LinearSystemStatus::UnderdeterminedConsistent);
+    }
+
+    #[test]
+    fn singular_value_ratio_above_declared_rank_tolerance_is_full_rank() {
+        let tol = 1.0e-6;
+        let a = DMatrix::from_diagonal(&DVector::from_row_slice(&[1.0, 2.0 * tol]));
+        let b = DVector::from_column_slice(&[1.0, 2.0 * tol]);
+        let evidence = classify_linear_system(&a, &b, tol, 1.0e10).unwrap();
+        assert_eq!(evidence.coefficient_rank, 2);
+        assert_eq!(evidence.augmented_rank, 2);
+        assert_eq!(evidence.status, LinearSystemStatus::Unique);
+    }
+
+    #[test]
+    fn zero_rhs_is_always_consistent_even_when_coefficients_have_thresholded_rank_loss() {
+        let tol = 1.0e-6;
+        let a = DMatrix::from_diagonal(&DVector::from_row_slice(&[1.0, 0.5 * tol]));
+        let b = DVector::zeros(2);
+        let evidence = classify_linear_system(&a, &b, tol, 1.0e10).unwrap();
+        assert_eq!(evidence.augmented_rank, evidence.coefficient_rank);
+        assert_ne!(evidence.status, LinearSystemStatus::Inconsistent);
+    }
 }

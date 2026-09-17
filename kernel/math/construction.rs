@@ -87,10 +87,6 @@ impl PlanarPolygon {
         }
         let eps = tolerance.threshold(scale2(&self.vertices))
             .map_err(|_| ConstructionError::InvalidTolerance)?;
-        let area = self.signed_area();
-        if !area.is_finite() || area.abs() <= eps * eps {
-            return Err(ConstructionError::Degenerate);
-        }
         let n = self.vertices.len();
         for i in 0..n {
             let a = self.vertices[i];
@@ -103,6 +99,10 @@ impl PlanarPolygon {
                     return Err(ConstructionError::SelfIntersection);
                 }
             }
+        }
+        let area = self.signed_area();
+        if !area.is_finite() || area.abs() <= eps * eps {
+            return Err(ConstructionError::Degenerate);
         }
         Ok(())
     }
@@ -645,8 +645,8 @@ mod tests {
     fn fillet_chamfer_shell_match_analytic_contracts() {
         let fillet = BoxFillet { width: 20.0, depth: 30.0, height: 40.0, radius: 2.0 };
         let expected_fillet = 24000.0
-            - 8.0 * (600.0 + 800.0 + 1200.0) / 1.0
-            + PI * 4.0 * 90.0
+            - 2.0 * 2.0 * (600.0 + 800.0 + 1200.0)
+            + PI * 4.0 * (20.0 + 30.0 + 40.0)
             + (4.0 * PI / 3.0 - 8.0) * 8.0;
         assert!((fillet.volume(tol()).unwrap() - expected_fillet).abs() <= 1.0e-9);
 

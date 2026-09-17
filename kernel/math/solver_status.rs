@@ -24,7 +24,7 @@ pub enum SolverStatus {
     Indeterminate,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SolverClassificationInput {
     pub converged: bool,
     pub reason: SolveReason,

@@ -131,7 +131,7 @@ impl NurbsSurface2D {
         if u < u0 || u > u1 || v < v0 || v > v1 {
             return Err(NurbsSurfaceError::OutOfDomain);
         }
-        dehomogenize(self.evaluate_homogeneous(u, v))
+        dehomogenize(self.evaluate_homogeneous(u, v)?)
     }
 
     pub fn control_hull_bounds(&self) -> Result<BoundingBox3, NurbsSurfaceError> {
@@ -213,10 +213,10 @@ impl NurbsSurface2D {
         )
     }
 
-    fn evaluate_homogeneous(&self, u: f64, v: f64) -> HomogeneousPoint {
+    fn evaluate_homogeneous(&self, u: f64, v: f64) -> Result<HomogeneousPoint, NurbsSurfaceError> {
         let count_u = self.control_count_u_unchecked();
         let count_v = self.control_count_v_unchecked();
-        let weight_scale = self.normalized_weight_scale().unwrap_or(1.0);
+        let weight_scale = self.normalized_weight_scale()?;
         let span_u = find_span(u, self.degree_u, &self.knots_u, count_u);
         let mut rows = Vec::with_capacity(count_v);
         for v_index in 0..count_v {
@@ -233,6 +233,11 @@ impl NurbsSurface2D {
                     w: weight,
                 });
             }
+            if work.iter().any(|point| {
+                !point.xw.is_finite() || !point.yw.is_finite() || !point.zw.is_finite() || !point.w.is_finite()
+            }) {
+                return Err(NurbsSurfaceError::Overflow);
+            }
             rows.push(de_boor(u, span_u, self.degree_u, &self.knots_u, &mut work));
         }
 
@@ -241,7 +246,11 @@ impl NurbsSurface2D {
         for local in 0..=self.degree_v {
             work.push(rows[span_v - self.degree_v + local]);
         }
-        de_boor(v, span_v, self.degree_v, &self.knots_v, &mut work)
+        let result = de_boor(v, span_v, self.degree_v, &self.knots_v, &mut work);
+        if !result.xw.is_finite() || !result.yw.is_finite() || !result.zw.is_finite() || !result.w.is_finite() {
+            return Err(NurbsSurfaceError::Overflow);
+        }
+        Ok(result)
     }
 }
 

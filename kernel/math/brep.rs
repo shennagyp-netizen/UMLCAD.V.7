@@ -256,9 +256,19 @@ impl PlanarRegion3 {
                 return Ok(RegionClass::InsideHole);
             }
         }
+        let point_on_segment = |a: Vec2, b: Vec2| {
+            let edge = b.sub(a);
+            let rel = uv.sub(a);
+            let cross = edge.cross(rel);
+            cross.is_finite()
+                && cross.abs() <= band * (edge.length() + rel.length() + 1.0)
+                && uv.x >= a.x.min(b.x) - band
+                && uv.x <= a.x.max(b.x) + band
+                && uv.y >= a.y.min(b.y) - band
+                && uv.y <= a.y.max(b.y) + band
+        };
         let on_outer = self.outer.iter().enumerate().any(|(i, a)| {
-            let b = self.outer[(i + 1) % self.outer.len()];
-            segment_intersects_2d(*a, b, uv, uv, band)
+            point_on_segment(*a, self.outer[(i + 1) % self.outer.len()])
         });
         if on_outer {
             return Ok(RegionClass::OnBoundary);
@@ -1004,36 +1014,64 @@ mod tests {
             BRepEdge{id:"e13".into(),start_vertex:"v1".into(),end_vertex:"v3".into()},
             BRepEdge{id:"e23".into(),start_vertex:"v2".into(),end_vertex:"v3".into()},
         ];
-        let facespec = [
-            ("f0", "w0", vec!["e01","e13","e03"], true,
-             vec![Vec2::new(0.0,0.0),Vec2::new(1.0,0.0),Vec2::new(1.0,1.0)]),
-            ("f1", "w1", vec!["e01","e12","e20"], false,
-             vec![Vec2::new(0.0,0.0),Vec2::new(1.0,0.0),Vec2::new(0.0,1.0)]),
-            ("f2", "w2", vec!["e20","e23","e03"], true,
-             vec![Vec2::new(0.0,0.0),Vec2::new(1.0,0.0),Vec2::new(1.0,1.0)]),
-            ("f3", "w3", vec!["e12","e23","e13"], false,
-             vec![Vec2::new(0.0,0.0),Vec2::new(1.0,0.0),Vec2::new(0.0,1.0)]),
+
+        // Each face is explicitly parameterized in an orthonormal planar basis.
+        // The loop order is outward-facing for the tetrahedron.
+        let rt2 = 2.0_f64.sqrt();
+        let rt6 = 6.0_f64.sqrt();
+        let u3 = Vec3::new(-1.0,1.0,0.0).scale(1.0/rt2);
+        let v3 = Vec3::new(-1.0,-1.0,2.0).scale(1.0/rt6);
+        let faces = vec![
+            BRepFace{
+                id:"f0".into(), outer_wire:"w0".into(), inner_wires:vec![],
+                region:PlanarRegion3{origin:vertices[0].point,u_dir:Vec3::new(1.0,0.0,0.0),v_dir:Vec3::new(0.0,0.0,1.0),
+                    outer:vec![Vec2::new(0.0,0.0),Vec2::new(1.0,0.0),Vec2::new(0.0,1.0)],holes:vec![]},
+                orientation:true,
+            },
+            BRepFace{
+                id:"f1".into(), outer_wire:"w1".into(), inner_wires:vec![],
+                region:PlanarRegion3{origin:vertices[0].point,u_dir:Vec3::new(1.0,0.0,0.0),v_dir:Vec3::new(0.0,1.0,0.0),
+                    outer:vec![Vec2::new(0.0,0.0),Vec2::new(0.0,1.0),Vec2::new(1.0,0.0)],holes:vec![]},
+                orientation:true,
+            },
+            BRepFace{
+                id:"f2".into(), outer_wire:"w2".into(), inner_wires:vec![],
+                region:PlanarRegion3{origin:vertices[0].point,u_dir:Vec3::new(0.0,1.0,0.0),v_dir:Vec3::new(0.0,0.0,1.0),
+                    outer:vec![Vec2::new(0.0,0.0),Vec2::new(0.0,1.0),Vec2::new(1.0,0.0)],holes:vec![]},
+                orientation:true,
+            },
+            BRepFace{
+                id:"f3".into(), outer_wire:"w3".into(), inner_wires:vec![],
+                region:PlanarRegion3{origin:vertices[1].point,u_dir:u3,v_dir:v3,
+                    outer:vec![
+                        Vec2::new(0.0,0.0),
+                        Vec2::new(rt2,0.0),
+                        Vec2::new(1.0/rt2,3.0/rt6),
+                    ],holes:vec![]},
+                orientation:true,
+            },
         ];
-        let regions = [
-            PlanarRegion3{origin:vertices[0].point,u_dir:Vec3::new(1.0,0.0,0.0),v_dir:Vec3::new(0.0,0.0,1.0),outer:facespec[0].4.clone(),holes:vec![]},
-            PlanarRegion3{origin:vertices[0].point,u_dir:Vec3::new(1.0,0.0,0.0),v_dir:Vec3::new(0.0,1.0,0.0),outer:facespec[1].4.clone(),holes:vec![]},
-            PlanarRegion3{origin:vertices[0].point,u_dir:Vec3::new(0.0,1.0,0.0),v_dir:Vec3::new(0.0,0.0,1.0),outer:facespec[2].4.clone(),holes:vec![]},
-            PlanarRegion3{origin:vertices[1].point,u_dir:Vec3::new(-1.0,1.0,0.0).normalized().unwrap(),v_dir:Vec3::new(-1.0,0.0,1.0).normalized().unwrap(),outer:facespec[3].4.clone(),holes:vec![]},
+
+        let wire_specs: [(&str,[&str;3],[bool;3]);4] = [
+            ("w0",["e01","e13","e03"],[true,true,false]),
+            ("w1",["e20","e12","e01"],[false,false,false]),
+            ("w2",["e03","e23","e20"],[true,false,false]),
+            ("w3",["e12","e23","e13"],[true,true,false]),
         ];
         let mut coedges=Vec::new();
         let mut wires=Vec::new();
-        let mut faces=Vec::new();
-        for (fi,(fid,wid,eids,orientation,_)) in facespec.iter().enumerate() {
-            let mut cids=Vec::new();
-            for (i,eid) in eids.iter().enumerate() {
+        for (fi,(wid,eids,directions)) in wire_specs.iter().enumerate() {
+            let fid=format!("f{}",fi);
+            let mut ids=Vec::new();
+            for i in 0..3 {
                 let cid=format!("c{}_{}",fi,i);
-                coedges.push(BRepCoedge{id:cid.clone(),edge:(*eid).into(),wire:(*wid).into(),face:(*fid).into(),forward: true});
-                cids.push(cid);
+                coedges.push(BRepCoedge{id:cid.clone(),edge:eids[i].into(),wire:(*wid).into(),face:fid.clone(),forward:directions[i]});
+                ids.push(cid);
             }
-            wires.push(BRepWire{id:(*wid).into(),coedges:cids,closed:true});
-            faces.push(BRepFace{id:(*fid).into(),outer_wire:(*wid).into(),inner_wires:vec![],region:regions[fi].clone(),orientation:*orientation});
+            wires.push(BRepWire{id:(*wid).into(),coedges:ids,closed:true});
         }
-        BRepSolid{vertices,edges,coedges,wires,faces,shells:vec![BRepShell{id:"s0".into(),faces:facespec.iter().map(|x|x.0.into()).collect()}]}
+        let shell_faces=faces.iter().map(|f|f.id.clone()).collect();
+        BRepSolid{vertices,edges,coedges,wires,faces,shells:vec![BRepShell{id:"s0".into(),faces:shell_faces}]}
     }
 
     #[test]

@@ -29,9 +29,9 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | B-Rep supporting math | Existing topology plus bounded V6 mathematics | Existing topology tests | Unified edge/face/wire/shell incidence and geometric consistency validators | Predicates / intersections | Medium | P0 | Partial |
 | Solid mathematics | Existing bounded volume/engineering evidence | Existing tests | General point-in-solid, centroid/inertia, orientation/closure mathematics | B-Rep | Low/Medium | P0 | Partial |
 | Boolean support | Existing bounded/native pathways | Existing tests | General topology-aware region construction from intersections | B-Rep + intersections | Low/Medium | P0 | Partial |
-| Constraint equations | `constraints.rs`, `relations.rs` | Existing solver tests | Complete analytic constraint family | Differential geometry | Medium | P0 | Partial |
-| Analytic Jacobians | Existing finite-difference solver | Existing solver tests | Analytic Jacobian authority for every supported constraint/relation | Constraints + derivatives | High | P0 | Missing |
-| Nonlinear solver | Existing damped QR solver | Extensive existing tests | Newton/Gauss-Newton/LM/trust-region classification and analytic Jacobians | Linalg + Jacobians | Medium | P0 | Partial |
+| Constraint equations | `constraints.rs`, `relations.rs` | Exhaustive constraint + relation authority tests | Supported semantic constraint/relation enums are complete; new families require new contracts | Differential geometry | Medium | P0 | Implemented / Tested |
+| Analytic Jacobians | `jacobian.rs`, `relation_jacobian.rs` | Exhaustive independent finite-difference verification for every supported family | Finite differences remain verification-only; future new equations require analytic rows | Constraints + derivatives | High | P0 | Implemented / Tested |
+| Nonlinear solver | Damped SVD/least-squares solve with adaptive damping, accepted-history convergence, terminal/status authority | Extensive solver, scale, mixed-unit, rank/conditioning, convergence and red-team tests | No separate named Newton/TR backend is required while the current damped least-squares acceptance model remains the supported equivalent | Linalg + Jacobians | Medium | P0 | Implemented / Tested |
 | Tessellation math | Existing mesh-related capabilities | Existing project tests | Unified adaptive/trim-aware tessellator with explicit error metadata | Curves / surfaces / trims | High | P1 | Partial |
 | Spatial acceleration | Existing AABB/spatial module | Existing spatial tests | Unified BVH/OBB/parameter-space pruning contracts | Bounds / predicates | High | P1 | Partial |
 | GPU abstraction | None authoritative yet | None | Backend-neutral batch/execution contract | CPU math stable | N/A | P0 | Missing |
@@ -39,6 +39,19 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | CUDA | None authoritative yet | None | Real CUDA backend + conformance on NVIDIA hardware | GPU abstraction | High | P0 | Missing |
 | Cross-backend conformance | None authoritative yet | None | CPU/Metal/CUDA comparison harness | All GPU backends | High | P0 | Missing |
 | Final scale/red-team matrix | Existing scattered tests | Good but incomplete | Standardized 1e-12 … 1e12 and pathological fixture families across all P0 operations | All P0 math | Medium | P0 | Partial |
+
+## M10 closure record
+
+As of main commit `8fea60633c4f95f0175d18faa54878e7af9f44a6`, the current supported M10 family is closed as an implemented/tested mathematical authority:
+- all currently supported semantic constraint and relation families have analytic residual/Jacobian coverage;
+- the production solver uses the complete analytic Jacobian, explicit dimensionless row scaling, nalgebra-backed damped SVD least-squares steps, and adaptive damping/acceptance;
+- rank, nullity/DOF, conditioning, linear consistency, and dependent-equation evidence are explicit and fail-closed;
+- accepted-step convergence history and terminal convergence certification are authoritative;
+- solve results carry explicit `SolverStatus` and supporting evidence;
+- mixed-unit and large-scale nonlinear regression coverage exercises the production path;
+- exact-head and post-merge Rust + comprehensive E2E/red-team gates are green for the M10 closure PR.
+
+M10 status is therefore `Implemented / Tested`. This does not imply completion of M8, M9, or M0-M16 as a whole.
 
 ## Execution order
 

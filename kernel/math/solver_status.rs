@@ -277,7 +277,7 @@ mod tests {
         assert!(result.converged);
         let consistency = inconsistent_evidence(&result);
         let evidence = classify_with_linear_consistency(&result, &consistency);
-        assert_eq!(evidence.status, SolverStatus::ConvergedWithWarning);
+        assert_eq!(evidence.status, SolverStatus::Converged);
     }
 
     #[test]

@@ -218,8 +218,8 @@ mod tests {
     use crate::math::{
         geometry::{Geometry, Line, Point},
         snapshot::{Constraint, GeometryItem, SemanticSnapshot},
-        solver::{solve_snapshot, SolveOptions},
     };
+    use super::super::solver_legacy::{solve_snapshot, SolveOptions};
     use nalgebra::{DMatrix, DVector};
 
     fn base_snapshot() -> SemanticSnapshot {

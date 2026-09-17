@@ -1,13 +1,15 @@
 //! Conservative semantic classification for solver results.
 //!
 //! This module does not alter the numerical solver. It converts the existing
-//! immutable `ConstraintSolveResult` evidence into an explicit authority status.
+//! immutable solver evidence into an explicit authority status. The classifier
+//! consumes the private implementation result so the public terminal-authority
+//! wrapper can embed the verified status without a module dependency cycle.
 //! Classification is deliberately fail-closed: a status is only claimed when
 //! the available evidence is sufficient to justify it.
 
 use super::convergence::{TerminalConvergenceEvidence, TerminalConvergenceStatus};
 use super::linear_consistency::{LinearConsistencyEvidence, LinearSystemStatus};
-use super::solver::{ConstraintSolveResult, SolveReason};
+use super::solver_legacy::{ConstraintSolveResult, SolveReason};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SolverStatus {

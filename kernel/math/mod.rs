@@ -20,7 +20,8 @@ pub mod intersections;
 pub mod jacobian;
 pub mod jacobian_authority_exhaustive;
 pub mod linalg;
-pub mod linalg_authority_exhaustive;
+#[cfg(test)]
+mod linalg_authority_exhaustive;
 pub mod linear_consistency;
 pub mod mat;
 pub mod nurbs;

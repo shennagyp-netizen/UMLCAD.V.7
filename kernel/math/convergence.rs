@@ -30,6 +30,24 @@ pub struct ConvergenceEvidence {
     pub progress_ratio: f64,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TerminalConvergenceStatus {
+    Converged,
+    Stagnated,
+    NotConverged,
+    Indeterminate,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TerminalConvergenceEvidence {
+    pub status: TerminalConvergenceStatus,
+    pub final_residual: f64,
+    pub final_step_norm: f64,
+    pub iterations: usize,
+    pub residual_satisfied: bool,
+    pub step_satisfied: bool,
+}
+
 fn finite_tolerances(residual_tolerance: f64, step_tolerance: f64) -> bool {
     residual_tolerance.is_finite()
         && residual_tolerance >= 0.0
@@ -53,6 +71,54 @@ fn invalid_evidence(
         residual_decreased: false,
         monotone_nonincreasing: false,
         progress_ratio: f64::NAN,
+    }
+}
+
+/// Verify the terminal state of a solve without requiring a residual history.
+///
+/// This is intentionally separate from [`evaluate`]: iterative implementations
+/// may reject trial steps, so a terminal certificate must not manufacture an
+/// iteration history or redefine the solver's attempted-iteration count.
+pub fn verify_terminal(
+    final_residual: f64,
+    final_step_norm: f64,
+    residual_tolerance: f64,
+    step_tolerance: f64,
+    iterations: usize,
+) -> TerminalConvergenceEvidence {
+    let valid = final_residual.is_finite()
+        && final_residual >= 0.0
+        && final_step_norm.is_finite()
+        && final_step_norm >= 0.0
+        && finite_tolerances(residual_tolerance, step_tolerance);
+    if !valid {
+        return TerminalConvergenceEvidence {
+            status: TerminalConvergenceStatus::Indeterminate,
+            final_residual,
+            final_step_norm,
+            iterations,
+            residual_satisfied: false,
+            step_satisfied: false,
+        };
+    }
+
+    let residual_satisfied = final_residual <= residual_tolerance;
+    let step_satisfied = final_step_norm <= step_tolerance;
+    let status = if residual_satisfied && step_satisfied {
+        TerminalConvergenceStatus::Converged
+    } else if step_satisfied {
+        TerminalConvergenceStatus::Stagnated
+    } else {
+        TerminalConvergenceStatus::NotConverged
+    };
+
+    TerminalConvergenceEvidence {
+        status,
+        final_residual,
+        final_step_norm,
+        iterations,
+        residual_satisfied,
+        step_satisfied,
     }
 }
 
@@ -130,6 +196,47 @@ pub fn evaluate(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn terminal_convergence_requires_both_criteria() {
+        let residual_only = verify_terminal(1.0e-12, 1.0, 1.0e-8, 1.0e-10, 5);
+        assert_eq!(residual_only.status, TerminalConvergenceStatus::NotConverged);
+        assert!(residual_only.residual_satisfied);
+        assert!(!residual_only.step_satisfied);
+
+        let both = verify_terminal(1.0e-12, 1.0e-12, 1.0e-8, 1.0e-10, 5);
+        assert_eq!(both.status, TerminalConvergenceStatus::Converged);
+        assert!(both.residual_satisfied);
+        assert!(both.step_satisfied);
+    }
+
+    #[test]
+    fn terminal_small_step_with_unsatisfied_residual_is_stagnation() {
+        let evidence = verify_terminal(1.0, 1.0e-12, 1.0e-8, 1.0e-10, 5);
+        assert_eq!(evidence.status, TerminalConvergenceStatus::Stagnated);
+    }
+
+    #[test]
+    fn terminal_invalid_evidence_fails_closed() {
+        for (residual, step, residual_tol, step_tol) in [
+            (f64::NAN, 0.0, 1.0e-8, 1.0e-10),
+            (1.0, f64::INFINITY, 1.0e-8, 1.0e-10),
+            (1.0, -1.0, 1.0e-8, 1.0e-10),
+            (1.0, 0.0, f64::NAN, 1.0e-10),
+            (1.0, 0.0, 1.0e-8, -1.0),
+        ] {
+            assert_eq!(
+                verify_terminal(residual, step, residual_tol, step_tol, 5).status,
+                TerminalConvergenceStatus::Indeterminate
+            );
+        }
+    }
+
+    #[test]
+    fn terminal_iteration_count_is_reported_without_redefining_solver_iterations() {
+        let evidence = verify_terminal(1.0e-12, 1.0e-12, 1.0e-8, 1.0e-10, 17);
+        assert_eq!(evidence.iterations, 17);
+    }
 
     #[test]
     fn already_satisfied_zero_iteration_system_converges() {

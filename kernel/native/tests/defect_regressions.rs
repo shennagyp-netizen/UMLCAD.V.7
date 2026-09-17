@@ -118,18 +118,24 @@ fn normalized_solver_condition_estimate_is_invariant_to_column_units() {
 
 #[test]
 fn repeated_knot_surface_u_derivative_remains_finite_at_c0_join() {
+    // degree_u = 2 with an interior knot of multiplicity 2 gives a C0 join.
+    // For 5 control points in u and 2 in v, the surface needs 10 points.
     let surface = NurbsSurface2D::new(
         2,
         1,
         vec![
             SurfacePoint3 { x: 0.0, y: 0.0, z: 0.0 },
             SurfacePoint3 { x: 0.0, y: 1.0, z: 0.0 },
+            SurfacePoint3 { x: 0.25, y: 0.0, z: 0.0 },
+            SurfacePoint3 { x: 0.25, y: 1.0, z: 0.0 },
             SurfacePoint3 { x: 0.5, y: 0.0, z: 0.0 },
             SurfacePoint3 { x: 0.5, y: 1.0, z: 0.0 },
+            SurfacePoint3 { x: 0.75, y: 0.0, z: 0.0 },
+            SurfacePoint3 { x: 0.75, y: 1.0, z: 0.0 },
             SurfacePoint3 { x: 1.0, y: 0.0, z: 0.0 },
             SurfacePoint3 { x: 1.0, y: 1.0, z: 0.0 },
         ],
-        vec![1.0; 6],
+        vec![1.0; 10],
         vec![0.0, 0.0, 0.0, 0.5, 0.5, 1.0, 1.0, 1.0],
         vec![0.0, 0.0, 1.0, 1.0],
     );

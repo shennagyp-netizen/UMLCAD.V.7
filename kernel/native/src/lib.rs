@@ -1,5 +1,5 @@
 pub mod api;
-#[path = "../../math/functions/mod.rs"]
+#[path = "../../math/mod.rs"]
 pub mod functions;
 pub mod services;
 

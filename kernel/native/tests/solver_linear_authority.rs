@@ -104,3 +104,14 @@ fn zero_column_reduces_rank_and_dof_without_nonfinite_step() {
     assert_eq!(report.degrees_of_freedom, 1);
     assert!(report.delta.iter().all(|v| v.is_finite()));
 }
+
+#[test]
+fn thresholded_near_zero_singular_direction_is_omitted_at_zero_damping() {
+    let j = vec![vec![1.0, 1.0], vec![0.0, 1.0e-12]];
+    let r = vec![-1.0, 0.0];
+    let report = scaled_damped_qr(&j, &r, 0.0, 1.0e-10).unwrap();
+    assert_eq!(report.rank, 1);
+    assert_eq!(report.degrees_of_freedom, 1);
+    assert!(report.delta.iter().all(|v| v.is_finite()));
+    assert!(report.delta.iter().all(|v| v.abs() < 10.0));
+}

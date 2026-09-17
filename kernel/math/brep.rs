@@ -638,7 +638,10 @@ impl BRepSolid {
             surface_area += 0.5 * triangle.b.sub(triangle.a).cross(triangle.c.sub(triangle.a)).length();
         }
 
-        if !signed_volume.is_finite() || signed_volume <= 0.0 {
+        if !signed_volume.is_finite() || signed_volume.abs() <= tolerance
+            .threshold(self.bbox_extent().max(1.0))
+            .map_err(|_| BRepError::InvalidTolerance)?
+        {
             return Err(BRepError::ZeroVolume);
         }
         let centroid = first.scale(1.0 / signed_volume);
@@ -669,7 +672,7 @@ impl BRepSolid {
         let _ = cc;
         Ok(SolidMoments {
             signed_volume,
-            volume: signed_volume,
+            volume: signed_volume.abs(),
             centroid,
             inertia_origin,
             inertia_centroid,

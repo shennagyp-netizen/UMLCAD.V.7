@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { DesignProgram, geometryEndpoint, evaluateDimensions, spatialAnalysis, buildTopology, type DesignProgramSnapshot } from "../kernel/src/native-index.js";
+import { DesignProgram, geometryEndpoint, evaluateDimensions, spatialAnalysis, buildTopology, type DesignProgramSnapshot } from "../kernel/api/src/native-index.js";
 
 function lineProgram() {
   const p = new DesignProgram();

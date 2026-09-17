@@ -122,12 +122,10 @@ fn relation_point(
     let (ids, _) = layout(snapshot);
     let geometry_index = index(&ids, id)?;
     let g = geometry(snapshot, id)?;
-
     if let Some(endpoint_kind) = endpoint_kind {
         let (point, gx, gy) = endpoint_data(g, endpoint_kind)?;
         return Ok((geometry_index, point, gx, gy));
     }
-
     match g {
         Geometry::Circle(circle) => {
             let mut gx = vec![0.0; 3];
@@ -200,11 +198,6 @@ fn radius_gradient(g: &Geometry) -> Result<Vec<f64>, RelationJacobianError> {
     }
 }
 
-/// Gradient of `|cross(p-start, end-start)| / |end-start|`.
-///
-/// The absolute value is intentional: the point-on-line and line/circle
-/// tangent residuals are unsigned geometric distances, and are therefore
-/// non-differentiable at zero residual. Those configurations fail closed.
 fn unsigned_line_distance_gradient(
     point: Point,
     line: &Line,
@@ -215,7 +208,6 @@ fn unsigned_line_distance_gradient(
     if !length.is_finite() || length == 0.0 {
         return Err(RelationJacobianError::Indeterminate);
     }
-
     let qx = point.x - line.start.x;
     let qy = point.y - line.start.y;
     let cross = qx * dy - qy * dx;
@@ -225,13 +217,11 @@ fn unsigned_line_distance_gradient(
     if cross == 0.0 {
         return Err(RelationJacobianError::Indeterminate);
     }
-
     let sign = cross.signum();
     let abs_cross = cross.abs();
     let inv_length = 1.0 / length;
     let inv_length_squared = inv_length * inv_length;
     let point_gradient = vec![sign * dy * inv_length, -sign * dx * inv_length];
-
     let dc = [qy - dy, dx - qx, -qy, qx];
     let dl = [-dx * inv_length, -dy * inv_length, dx * inv_length, dy * inv_length];
     let mut line_gradient = vec![0.0; 4];
@@ -239,7 +229,6 @@ fn unsigned_line_distance_gradient(
         line_gradient[i] = sign * dc[i] * inv_length
             - abs_cross * dl[i] * inv_length_squared;
     }
-
     if !finite(&line_gradient) || !finite(&point_gradient) {
         return Err(RelationJacobianError::NonFinite);
     }
@@ -259,32 +248,33 @@ fn circle_tangent_gradient(
     if !distance.is_finite() || distance == 0.0 {
         return Err(RelationJacobianError::Indeterminate);
     }
-
-    let ext = distance - ra - rb;
-    let delta_r = ra - rb;
-    let int = distance - delta_r.abs();
+    let external = distance - ra - rb;
+    let radius_delta = ra - rb;
+    let internal = distance - radius_delta.abs();
     let (dra, drb) = match mode {
         TangentMode::External => (-1.0, -1.0),
         TangentMode::Internal => {
-            if delta_r == 0.0 {
+            if radius_delta == 0.0 {
                 return Err(RelationJacobianError::Indeterminate);
             }
-            let sign = delta_r.signum();
+            let sign = radius_delta.signum();
             (-sign, sign)
         }
         TangentMode::Any => {
-            if ext.abs() <= int.abs() {
+            if external.abs() == internal.abs() {
+                return Err(RelationJacobianError::Indeterminate);
+            }
+            if external.abs() < internal.abs() {
                 (-1.0, -1.0)
             } else {
-                if delta_r == 0.0 {
+                if radius_delta == 0.0 {
                     return Err(RelationJacobianError::Indeterminate);
                 }
-                let sign = delta_r.signum();
+                let sign = radius_delta.signum();
                 (-sign, sign)
             }
         }
     };
-
     let ux = dx / distance;
     let uy = dy / distance;
     Ok((vec![ux, uy, dra], vec![-ux, -uy, drb]))
@@ -337,7 +327,8 @@ pub fn analytic_relation_jacobian(
                 let (a_tx, a_ty) = angle_gradient(a)?;
                 let (b_tx, b_ty) = angle_gradient(b)?;
                 let mut row = vec![0.0; total];
-                add(&mut row, offsets[first], &[-a_tx, -a_ty, a_tx, a_ty]);
+                // residual = theta_b - theta_a - target
+                add(&mut row, offsets[first], &[a_tx, a_ty, -a_tx, -a_ty]);
                 add(&mut row, offsets[second], &[b_tx, b_ty, -b_tx, -b_ty]);
                 rows.push(row);
             }
@@ -373,10 +364,7 @@ pub fn analytic_relation_jacobian(
                 let mut ay = vec![0.0; width(a)];
                 let mut bx = vec![0.0; width(b)];
                 let mut by = vec![0.0; width(b)];
-                ax[0] = 1.0;
-                ay[1] = 1.0;
-                bx[0] = -1.0;
-                by[1] = -1.0;
+                ax[0] = 1.0; ay[1] = 1.0; bx[0] = -1.0; by[1] = -1.0;
                 add(&mut x, offsets[first], &ax);
                 add(&mut x, offsets[second], &bx);
                 add(&mut y, offsets[first], &ay);
@@ -417,42 +405,42 @@ pub fn analytic_relation_jacobian(
                 match (a, b) {
                     (Geometry::Line(_), Geometry::Line(_)) => return Err(RelationJacobianError::InvalidDomain),
                     (Geometry::Line(line), Geometry::Circle(circle)) => {
-                        let (line_gradient, point_gradient) = unsigned_line_distance_gradient(circle.center, line)?;
-                        add(&mut row, offsets[first], &line_gradient);
-                        add(&mut row, offsets[second], &[point_gradient[0], point_gradient[1], -1.0]);
+                        let (lg, pg) = unsigned_line_distance_gradient(circle.center, line)?;
+                        add(&mut row, offsets[first], &lg);
+                        add(&mut row, offsets[second], &[pg[0], pg[1], -1.0]);
                     }
                     (Geometry::Line(line), Geometry::Arc(arc)) => {
-                        let (line_gradient, point_gradient) = unsigned_line_distance_gradient(arc.center, line)?;
-                        add(&mut row, offsets[first], &line_gradient);
-                        add(&mut row, offsets[second], &[point_gradient[0], point_gradient[1], -1.0, 0.0, 0.0]);
+                        let (lg, pg) = unsigned_line_distance_gradient(arc.center, line)?;
+                        add(&mut row, offsets[first], &lg);
+                        add(&mut row, offsets[second], &[pg[0], pg[1], -1.0, 0.0, 0.0]);
                     }
                     (Geometry::Circle(circle), Geometry::Line(line)) => {
-                        let (line_gradient, point_gradient) = unsigned_line_distance_gradient(circle.center, line)?;
-                        add(&mut row, offsets[first], &[point_gradient[0], point_gradient[1], -1.0]);
-                        add(&mut row, offsets[second], &line_gradient);
+                        let (lg, pg) = unsigned_line_distance_gradient(circle.center, line)?;
+                        add(&mut row, offsets[first], &[pg[0], pg[1], -1.0]);
+                        add(&mut row, offsets[second], &lg);
                     }
                     (Geometry::Arc(arc), Geometry::Line(line)) => {
-                        let (line_gradient, point_gradient) = unsigned_line_distance_gradient(arc.center, line)?;
-                        add(&mut row, offsets[first], &[point_gradient[0], point_gradient[1], -1.0, 0.0, 0.0]);
-                        add(&mut row, offsets[second], &line_gradient);
+                        let (lg, pg) = unsigned_line_distance_gradient(arc.center, line)?;
+                        add(&mut row, offsets[first], &[pg[0], pg[1], -1.0, 0.0, 0.0]);
+                        add(&mut row, offsets[second], &lg);
                     }
-                    (Geometry::Circle(a_circle), Geometry::Circle(b_circle)) => {
-                        let (ga, gb) = circle_tangent_gradient(a_circle.center, a_circle.radius, b_circle.center, b_circle.radius, *mode)?;
+                    (Geometry::Circle(ca), Geometry::Circle(cb)) => {
+                        let (ga, gb) = circle_tangent_gradient(ca.center, ca.radius, cb.center, cb.radius, *mode)?;
                         add(&mut row, offsets[first], &ga);
                         add(&mut row, offsets[second], &gb);
                     }
-                    (Geometry::Circle(a_circle), Geometry::Arc(b_arc)) => {
-                        let (ga, gb) = circle_tangent_gradient(a_circle.center, a_circle.radius, b_arc.center, b_arc.radius, *mode)?;
+                    (Geometry::Circle(ca), Geometry::Arc(cb)) => {
+                        let (ga, gb) = circle_tangent_gradient(ca.center, ca.radius, cb.center, cb.radius, *mode)?;
                         add(&mut row, offsets[first], &ga);
                         add(&mut row, offsets[second], &[gb[0], gb[1], gb[2], 0.0, 0.0]);
                     }
-                    (Geometry::Arc(a_arc), Geometry::Circle(b_circle)) => {
-                        let (ga, gb) = circle_tangent_gradient(a_arc.center, a_arc.radius, b_circle.center, b_circle.radius, *mode)?;
+                    (Geometry::Arc(ca), Geometry::Circle(cb)) => {
+                        let (ga, gb) = circle_tangent_gradient(ca.center, ca.radius, cb.center, cb.radius, *mode)?;
                         add(&mut row, offsets[first], &[ga[0], ga[1], ga[2], 0.0, 0.0]);
                         add(&mut row, offsets[second], &gb);
                     }
-                    (Geometry::Arc(a_arc), Geometry::Arc(b_arc)) => {
-                        let (ga, gb) = circle_tangent_gradient(a_arc.center, a_arc.radius, b_arc.center, b_arc.radius, *mode)?;
+                    (Geometry::Arc(ca), Geometry::Arc(cb)) => {
+                        let (ga, gb) = circle_tangent_gradient(ca.center, ca.radius, cb.center, cb.radius, *mode)?;
                         add(&mut row, offsets[first], &[ga[0], ga[1], ga[2], 0.0, 0.0]);
                         add(&mut row, offsets[second], &[gb[0], gb[1], gb[2], 0.0, 0.0]);
                     }
@@ -465,14 +453,14 @@ pub fn analytic_relation_jacobian(
                 if !matches!(geometry(snapshot, line_geometry_id)?, Geometry::Line(_)) {
                     return Err(RelationJacobianError::InvalidDomain);
                 }
-                let mut x = vec![0.0; total];
-                let mut y = vec![0.0; total];
-                add(&mut x, offsets[point_index], &px);
-                add(&mut y, offsets[point_index], &py);
-                add(&mut x, offsets[line_index], &[-0.5, 0.0, -0.5, 0.0]);
-                add(&mut y, offsets[line_index], &[0.0, -0.5, 0.0, -0.5]);
-                rows.push(x);
-                rows.push(y);
+                let mut row_x = vec![0.0; total];
+                let mut row_y = vec![0.0; total];
+                add(&mut row_x, offsets[point_index], &px);
+                add(&mut row_y, offsets[point_index], &py);
+                add(&mut row_x, offsets[line_index], &[-0.5, 0.0, -0.5, 0.0]);
+                add(&mut row_y, offsets[line_index], &[0.0, -0.5, 0.0, -0.5]);
+                rows.push(row_x);
+                rows.push(row_y);
             }
             Relation::PointOnLine { point, line_geometry_id } => {
                 let (point_index, point_value, px, py) = relation_point(snapshot, point)?;
@@ -482,12 +470,12 @@ pub fn analytic_relation_jacobian(
                 };
                 let (line_gradient, point_gradient) = unsigned_line_distance_gradient(point_value, line)?;
                 let mut row = vec![0.0; total];
+                add(&mut row, offsets[line_index], &line_gradient);
                 let mut point_local = vec![0.0; px.len()];
                 for i in 0..point_local.len() {
                     point_local[i] = point_gradient[0] * px[i] + point_gradient[1] * py[i];
                 }
                 add(&mut row, offsets[point_index], &point_local);
-                add(&mut row, offsets[line_index], &line_gradient);
                 rows.push(row);
             }
             Relation::PointOnCircle { point, circle_geometry_id } => {
@@ -548,16 +536,16 @@ pub fn analytic_relation_jacobian(
                 let (first_index, _, first_px, first_py) = relation_point(snapshot, first)?;
                 let (second_index, _, second_px, second_py) = relation_point(snapshot, second)?;
                 let (about_index, _, about_px, about_py) = relation_point(snapshot, about)?;
-                let mut x = vec![0.0; total];
-                let mut y = vec![0.0; total];
-                add(&mut x, offsets[first_index], &first_px.iter().map(|value| 0.5 * *value).collect::<Vec<_>>());
-                add(&mut x, offsets[second_index], &second_px.iter().map(|value| 0.5 * *value).collect::<Vec<_>>());
-                add(&mut x, offsets[about_index], &about_px.iter().map(|value| -*value).collect::<Vec<_>>());
-                add(&mut y, offsets[first_index], &first_py.iter().map(|value| 0.5 * *value).collect::<Vec<_>>());
-                add(&mut y, offsets[second_index], &second_py.iter().map(|value| 0.5 * *value).collect::<Vec<_>>());
-                add(&mut y, offsets[about_index], &about_py.iter().map(|value| -*value).collect::<Vec<_>>());
-                rows.push(x);
-                rows.push(y);
+                let mut row_x = vec![0.0; total];
+                let mut row_y = vec![0.0; total];
+                add(&mut row_x, offsets[first_index], &first_px.iter().map(|value| 0.5 * *value).collect::<Vec<_>>());
+                add(&mut row_x, offsets[second_index], &second_px.iter().map(|value| 0.5 * *value).collect::<Vec<_>>());
+                add(&mut row_x, offsets[about_index], &about_px.iter().map(|value| -*value).collect::<Vec<_>>());
+                add(&mut row_y, offsets[first_index], &first_py.iter().map(|value| 0.5 * *value).collect::<Vec<_>>());
+                add(&mut row_y, offsets[second_index], &second_py.iter().map(|value| 0.5 * *value).collect::<Vec<_>>());
+                add(&mut row_y, offsets[about_index], &about_py.iter().map(|value| -*value).collect::<Vec<_>>());
+                rows.push(row_x);
+                rows.push(row_y);
             }
         }
     }
@@ -575,94 +563,42 @@ mod tests {
     use super::super::{geometry::{Circle, Geometry, Line}, relations::evaluate_relation, snapshot::GeometryItem};
 
     fn line(id: &str, sx: f64, sy: f64, ex: f64, ey: f64) -> GeometryItem {
-        GeometryItem {
-            id: id.into(),
-            geometry: Geometry::Line(Line { start: Point { x: sx, y: sy }, end: Point { x: ex, y: ey } }),
-            parameter_dependencies: vec![],
-        }
+        GeometryItem { id: id.into(), geometry: Geometry::Line(Line { start: Point { x: sx, y: sy }, end: Point { x: ex, y: ey } }), parameter_dependencies: vec![] }
     }
-
     fn circle(id: &str, x: f64, y: f64, r: f64) -> GeometryItem {
-        GeometryItem {
-            id: id.into(),
-            geometry: Geometry::Circle(Circle { center: Point { x, y }, radius: r }),
-            parameter_dependencies: vec![],
-        }
+        GeometryItem { id: id.into(), geometry: Geometry::Circle(Circle { center: Point { x, y }, radius: r }), parameter_dependencies: vec![] }
     }
-
     fn snapshot(geometry: Vec<GeometryItem>, relations: Vec<Relation>) -> SemanticSnapshot {
-        SemanticSnapshot {
-            parameters: vec![],
-            geometry,
-            constraints: vec![],
-            relations: relations.into_iter().enumerate().map(|(i, relation)| (format!("r{i}"), relation)).collect(),
-        }
+        SemanticSnapshot { parameters: vec![], geometry, constraints: vec![], relations: relations.into_iter().enumerate().map(|(i, relation)| (format!("r{i}"), relation)).collect() }
     }
-
     fn set_parameter(snapshot: &mut SemanticSnapshot, column: usize, delta: f64) {
         let mut cursor = 0usize;
         for item in &mut snapshot.geometry {
             match &mut item.geometry {
                 Geometry::Line(line) => {
-                    if column < cursor + 4 {
-                        match column - cursor {
-                            0 => line.start.x += delta,
-                            1 => line.start.y += delta,
-                            2 => line.end.x += delta,
-                            3 => line.end.y += delta,
-                            _ => unreachable!(),
-                        }
-                        return;
-                    }
+                    if column < cursor + 4 { match column - cursor { 0 => line.start.x += delta, 1 => line.start.y += delta, 2 => line.end.x += delta, 3 => line.end.y += delta, _ => unreachable!() } return; }
                     cursor += 4;
                 }
                 Geometry::Circle(circle) => {
-                    if column < cursor + 3 {
-                        match column - cursor {
-                            0 => circle.center.x += delta,
-                            1 => circle.center.y += delta,
-                            2 => circle.radius += delta,
-                            _ => unreachable!(),
-                        }
-                        return;
-                    }
+                    if column < cursor + 3 { match column - cursor { 0 => circle.center.x += delta, 1 => circle.center.y += delta, 2 => circle.radius += delta, _ => unreachable!() } return; }
                     cursor += 3;
                 }
                 Geometry::Arc(arc) => {
-                    if column < cursor + 5 {
-                        match column - cursor {
-                            0 => arc.center.x += delta,
-                            1 => arc.center.y += delta,
-                            2 => arc.radius += delta,
-                            3 => arc.start_angle += delta,
-                            4 => arc.end_angle += delta,
-                            _ => unreachable!(),
-                        }
-                        return;
-                    }
+                    if column < cursor + 5 { match column - cursor { 0 => arc.center.x += delta, 1 => arc.center.y += delta, 2 => arc.radius += delta, 3 => arc.start_angle += delta, 4 => arc.end_angle += delta, _ => unreachable!() } return; }
                     cursor += 5;
                 }
             }
         }
         panic!("parameter column {column} not found");
     }
-
     fn residual_rows(snapshot: &SemanticSnapshot) -> Vec<f64> {
-        snapshot
-            .relations
-            .iter()
-            .flat_map(|(_, relation)| evaluate_relation(snapshot, relation).unwrap().residuals)
-            .collect()
+        snapshot.relations.iter().flat_map(|(_, relation)| evaluate_relation(snapshot, relation).unwrap().residuals).collect()
     }
 
     #[test]
     fn core_relation_rows_are_finite_and_counted() {
-        let snapshot = snapshot(
-            vec![
-                line("a", 0.0, 0.0, 3.0, 0.0),
-                line("b", 0.0, 1.0, 3.0, 2.0),
-                circle("c", 8.0, 0.0, 2.0),
-            ],
+        let s = snapshot(
+            vec![line("a", 0.0, 0.0, 3.0, 0.0), line("b", 0.0, 1.0, 3.0, 2.0), circle("c", 8.0, 2.0, 2.0)],
             vec![
                 Relation::Parallel { first_geometry_id: "a".into(), second_geometry_id: "b".into() },
                 Relation::Perpendicular { first_geometry_id: "a".into(), second_geometry_id: "b".into() },
@@ -678,27 +614,18 @@ mod tests {
                 Relation::PointOnLine { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, line_geometry_id: "a".into() },
                 Relation::PointOnCircle { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, circle_geometry_id: "c".into() },
                 Relation::DistancePoints { first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, second: RelationPoint::Center { geometry_id: "c".into() }, value: 8.0 },
-                Relation::Symmetric {
-                    first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
-                    second: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start },
-                    about: RelationPoint::Center { geometry_id: "c".into() },
-                },
+                Relation::Symmetric { first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, second: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, about: RelationPoint::Center { geometry_id: "c".into() } },
             ],
         );
-        let jacobian = analytic_relation_jacobian(&snapshot).unwrap();
-        assert_eq!(jacobian.len(), 19);
-        assert!(jacobian.iter().all(|row| row.iter().all(|value| value.is_finite())));
+        let j = analytic_relation_jacobian(&s).unwrap();
+        assert_eq!(j.len(), 19);
+        assert!(j.iter().all(|row| row.iter().all(|value| value.is_finite())));
     }
 
     #[test]
     fn analytic_rows_match_central_difference_oracle() {
-        let snapshot = snapshot(
-            vec![
-                line("a", 0.0, 0.0, 3.0, 0.0),
-                line("b", 0.0, 2.0, 4.0, 3.0),
-                circle("c", 8.0, 2.0, 1.5),
-                circle("d", 11.0, 4.0, 2.0),
-            ],
+        let s = snapshot(
+            vec![line("a", 0.0, 0.0, 3.0, 0.0), line("b", 0.0, 2.0, 4.0, 3.0), circle("c", 8.0, 2.0, 1.5), circle("d", 11.0, 4.0, 2.0)],
             vec![
                 Relation::Parallel { first_geometry_id: "a".into(), second_geometry_id: "b".into() },
                 Relation::Perpendicular { first_geometry_id: "a".into(), second_geometry_id: "b".into() },
@@ -714,62 +641,43 @@ mod tests {
                 Relation::PointOnLine { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, line_geometry_id: "a".into() },
                 Relation::PointOnCircle { point: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, circle_geometry_id: "c".into() },
                 Relation::DistancePoints { first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, second: RelationPoint::Center { geometry_id: "c".into() }, value: 8.0 },
-                Relation::Symmetric {
-                    first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
-                    second: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start },
-                    about: RelationPoint::Center { geometry_id: "c".into() },
-                },
+                Relation::Symmetric { first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, second: RelationPoint::Endpoint { geometry_id: "b".into(), point: Endpoint::Start }, about: RelationPoint::Center { geometry_id: "c".into() } },
             ],
         );
-
-        let analytic = analytic_relation_jacobian(&snapshot).unwrap();
-        let base = residual_rows(&snapshot);
+        let analytic = analytic_relation_jacobian(&s).unwrap();
+        let base = residual_rows(&s);
         assert_eq!(analytic.len(), base.len());
-
-        let (_, offsets) = layout(&snapshot);
-        let columns = offsets.last().copied().unwrap_or(0);
+        let (_, offsets) = layout(&s);
         let h = 1.0e-6;
-        for column in 0..columns {
-            let mut plus = snapshot.clone();
-            let mut minus = snapshot.clone();
-            set_parameter(&mut plus, column, h);
-            set_parameter(&mut minus, column, -h);
-            let plus_values = residual_rows(&plus);
-            let minus_values = residual_rows(&minus);
+        for column in 0..offsets.last().copied().unwrap_or(0) {
+            let mut plus = s.clone(); let mut minus = s.clone();
+            set_parameter(&mut plus, column, h); set_parameter(&mut minus, column, -h);
+            let plus_values = residual_rows(&plus); let minus_values = residual_rows(&minus);
             for row in 0..analytic.len() {
                 let numerical = (plus_values[row] - minus_values[row]) / (2.0 * h);
                 let expected = analytic[row][column];
                 let scale = numerical.abs().max(expected.abs()).max(1.0);
-                assert!(
-                    (numerical - expected).abs() <= 5.0e-5 * scale,
-                    "row {row}, col {column}: analytic={expected:.12e}, numerical={numerical:.12e}"
-                );
+                assert!((numerical - expected).abs() <= 5.0e-5 * scale,
+                    "row {row}, col {column}: analytic={expected:.12e}, numerical={numerical:.12e}");
             }
         }
     }
 
     #[test]
     fn zero_residual_point_on_line_is_explicitly_indeterminate() {
-        let snapshot = snapshot(
+        let s = snapshot(
             vec![line("a", 0.0, 0.0, 1.0, 0.0), line("b", 0.0, 0.0, 1.0, 0.0)],
-            vec![Relation::PointOnLine {
-                point: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
-                line_geometry_id: "b".into(),
-            }],
+            vec![Relation::PointOnLine { point: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, line_geometry_id: "b".into() }],
         );
-        assert_eq!(analytic_relation_jacobian(&snapshot), Err(RelationJacobianError::Indeterminate));
+        assert_eq!(analytic_relation_jacobian(&s), Err(RelationJacobianError::Indeterminate));
     }
 
     #[test]
     fn coincident_distance_points_are_explicitly_indeterminate() {
-        let snapshot = snapshot(
+        let s = snapshot(
             vec![line("a", 0.0, 0.0, 1.0, 0.0)],
-            vec![Relation::DistancePoints {
-                first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
-                second: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start },
-                value: 0.0,
-            }],
+            vec![Relation::DistancePoints { first: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, second: RelationPoint::Endpoint { geometry_id: "a".into(), point: Endpoint::Start }, value: 0.0 }],
         );
-        assert_eq!(analytic_relation_jacobian(&snapshot), Err(RelationJacobianError::Indeterminate));
+        assert_eq!(analytic_relation_jacobian(&s), Err(RelationJacobianError::Indeterminate));
     }
 }

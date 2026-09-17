@@ -3,10 +3,10 @@
 ## Snapshot
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
-- Main head at handoff update: `f014d8fdc7263bc0bb1fe704efeba857086e40fa` before this documentation commit
-- Latest completed implementation station: M10/P0 authoritative accepted-step convergence history
-- Latest merged implementation PR: #24, `math: make accepted-step history authoritative`
-- PR #24 merge commit: `f014d8fdc7263bc0bb1fe704efeba857086e40fa`
+- Main head at handoff update: `ceea20ba2f032e9a07b3b97f0c843682900ecc45` before this documentation commit
+- Latest completed implementation station: M10/P0 mixed-unit nonlinear solver scale authority
+- Latest merged implementation PR: #25, `test: add mixed-unit nonlinear solver authority`
+- PR #25 merge commit: `ceea20ba2f032e9a07b3b97f0c843682900ecc45`
 
 ## Completed mathematical-authority state
 Main is post-merge green through the current M10 solver-authority stations. The V7 mathematical-authority program is not complete; the M0-M16 roadmap remains active.
@@ -26,6 +26,7 @@ Completed and validated stations now include:
 - backend-neutral row-scaling contract for linearized systems;
 - production row scaling of each analytic Jacobian row and matching residual row by the same explicit semantic scale before the existing nalgebra-backed damped SVD solve.
 - truthful accepted-step convergence history authority that excludes rejected trials while preserving the authoritative attempted-iteration count;
+- adversarial mixed-unit nonlinear solver regression coverage combining fixed geometry, coincident endpoints, model-unit distance, and angular relation equations across scales through `1e9`;
 
 PR #23 specifically closed the previous mathematical mismatch in which convergence/acceptance used dimensionless scaled residuals while the nonlinear linearization step consumed raw mixed-unit residual rows. The production solve now applies the same semantic row normalization to both the Jacobian and residual before the existing solver backend.
 
@@ -76,13 +77,19 @@ For PR #24:
 - post-merge Rust kernel validation on `f014d8fd...`: PASS;
 - post-merge comprehensive E2E/red-team gate on `f014d8fd...`: PASS.
 
+For PR #25:
+- exact-head Rust kernel validation: PASS;
+- exact-head comprehensive E2E/red-team gate: PASS;
+- post-merge Rust kernel validation on `ceea20ba...`: PASS;
+- post-merge comprehensive E2E/red-team gate on `ceea20ba...`: PASS.
+
 The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, black-box HTTP, Demo, raw HTTP red-team, release-path, and ignored-test checks.
 
 ## Immediate continuation
-1. Add adversarial mixed-unit nonlinear fixtures that exercise row scaling together with coupled distance/angle/relation equations across the declared geometry-scale range.
-2. Expand numerical-boundary tests for rank transitions, conditioning, damping, stagnation, accepted-history behavior, and deterministic repeated solves.
-3. Audit every remaining supported constraint/relation family for explicit analytic Jacobian coverage; unsupported equations must fail explicitly rather than re-enter finite differences.
-4. Review the solver's non-convergence classification so rejected-trial, stagnation, singular, invalid-domain, and max-iteration states remain explicit and mathematically distinguishable.
+1. Expand numerical-boundary tests for rank transitions, conditioning, damping, stagnation, accepted-history behavior, mixed-unit scale consistency, and deterministic repeated solves.
+2. Audit every remaining supported constraint/relation family for explicit analytic Jacobian coverage; unsupported equations must fail explicitly rather than re-enter finite differences.
+3. Review the solver's non-convergence classification so rejected-trial, stagnation, singular, invalid-domain, and max-iteration states remain explicit and mathematically distinguishable.
+4. Harden solver-result rank/conditioning/DOF evidence against contradictory terminal states and numerical boundary transitions.
 5. Finish the remaining M10 solver foundation, then advance to the M8/M9 construction and B-Rep mathematical-authority families according to `docs/MATH_AUTHORITY_ROADMAP.md`.
 6. Evaluate GPU acceleration only later as a conformance-tested implementation backend; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 

@@ -83,7 +83,7 @@ pub fn solve_snapshot(
     snapshot: &SemanticSnapshot,
     options: SolveOptions,
 ) -> Result<ConstraintSolveResult, String> {
-    let result = solver_legacy::solve_snapshot(snapshot, options.clone())?;
+    let result = solver_legacy::solve_snapshot_row_scaled(snapshot, options.clone())?;
     certify(result, &options)
 }
 

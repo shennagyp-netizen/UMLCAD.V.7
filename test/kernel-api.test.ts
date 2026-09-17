@@ -8,7 +8,7 @@ import {
   buildIdentity,
   analyzeSourceModule,
   orderSourceModules,
-} from "../kernel/src/index.js";
+} from "../kernel/api/src/index.js";
 
 class SimplePart extends Drawing {
   protected configure(): void {

@@ -43,7 +43,7 @@ pub mod snapshot;
 pub mod solid;
 pub mod spatial;
 pub mod spatial_accel;
-#[path = "solver.rs"]
+#[path = "solver_legacy_with_production.rs"]
 mod solver_legacy;
 pub mod terminal_authority;
 pub mod solver {

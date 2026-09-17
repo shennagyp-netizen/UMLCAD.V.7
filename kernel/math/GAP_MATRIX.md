@@ -24,8 +24,8 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | Trim mathematics | Existing historical implementation plus current math foundation | Existing project tests | Unified parameter-space trims, nesting/self-intersection/touch classification, 3D correspondence | Curves / predicates | Medium | P0 | Missing as unified V7 layer |
 | General distance/projection | `distance.rs`, existing spatial | Focused primitive tests | General curve/surface closest-point engine with verification | Curves / surfaces | High | P0 | Partial |
 | General intersections | Existing bounded V6 families + `intersections.rs` | Existing V7 tests | General curve-curve, curve-surface, surface-surface candidate isolation/refinement/verification | Polynomial / interval / surfaces | Medium | P0 | Partial |
-| Offset / sweep / loft / blend | Existing `offsets.rs`, `sweeps.rs` | Existing focused tests | Unified general mathematical construction layer | Surface differential / intersection | Medium | P0 | Existing bounded families; extension pending |
-| Fillet / chamfer | Existing bounded implementation | Existing tests | General analytic construction framework | Intersections / curvature | Medium | P1 | Partial |
+| Offset / sweep / loft / blend | `construction.rs` plus existing `offsets.rs`/`sweeps.rs` | Independent construction authority tests | Future extensions require new explicit certified domains | Surface differential / intersection | Medium | P0 | Implemented / Tested (certified domains) |
+| Fillet / chamfer | `construction.rs` bounded analytic box families + existing backend contracts | Independent closed-form tests + backend contracts | General arbitrary-edge fillet/chamfer remains a future extension | Intersections / curvature | Medium | P1 | Implemented / Tested (bounded families) |
 | B-Rep supporting math | Existing topology plus bounded V6 mathematics | Existing topology tests | Unified edge/face/wire/shell incidence and geometric consistency validators | Predicates / intersections | Medium | P0 | Partial |
 | Solid mathematics | Existing bounded volume/engineering evidence | Existing tests | General point-in-solid, centroid/inertia, orientation/closure mathematics | B-Rep | Low/Medium | P0 | Partial |
 | Boolean support | Existing bounded/native pathways | Existing tests | General topology-aware region construction from intersections | B-Rep + intersections | Low/Medium | P0 | Partial |
@@ -52,6 +52,22 @@ As of main commit `8fea60633c4f95f0175d18faa54878e7af9f44a6`, the current suppor
 - exact-head and post-merge Rust + comprehensive E2E/red-team gates are green for the M10 closure PR.
 
 M10 status is therefore `Implemented / Tested`. This does not imply completion of M8, M9, or M0-M16 as a whole.
+
+## M8 closure record
+
+As of main commit `fdb34d5a1e03ed399f900848b6dbe96da71d1a13`, M8 is closed for the currently supported certified construction domains:
+- convex planar offsets with deterministic miter joins;
+- linear extrusion and off-axis-safe polygon revolution;
+- corresponding convex polygon lofts;
+- circular, variable-radius, and circular-arc pipe mathematics;
+- analytic Hermite blends with G0/G1/G2 continuity verification;
+- deterministic frame and twist construction with explicit singularity handling;
+- bounded all-edge box fillet/chamfer mathematics;
+- closed-box shell/thickening mathematics;
+- fail-closed non-finite, degenerate, self-intersection, parameter, singular-frame, unsupported-domain, and overflow handling;
+- exact-head and post-merge Rust + comprehensive E2E/red-team gates are green.
+
+M8 status is therefore `Implemented / Tested` for the declared certified domains. Arbitrary freeform offset/fillet/chamfer/topology construction remains outside this milestone and requires separate mathematical contracts.
 
 ## Execution order
 

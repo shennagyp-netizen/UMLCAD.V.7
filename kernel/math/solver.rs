@@ -2,6 +2,7 @@
 
 use super::{
     constraints::{geometry_difference, residual as constraint_residual},
+    convergence::{verify_terminal, TerminalConvergenceStatus},
     geometry::{Arc, Circle, Geometry, Line, Point},
     jacobian::analytic_constraint_jacobian,
     relations::evaluate_relation,
@@ -87,6 +88,10 @@ pub struct ConstraintSolveResult {
     pub final_residual_norm: f64,
     pub initial_scaled_residual_norm: f64,
     pub final_scaled_residual_norm: f64,
+    /// 2-norm of the last accepted solver step in the raw parameter vector.
+    /// Zero means that no step was accepted, as in a zero-iteration convergence
+    /// or a failure before the first accepted proposal.
+    pub final_step_norm: f64,
     pub analysis: ConstraintAnalysis,
     pub geometry: Vec<(String, Geometry)>,
 }
@@ -623,6 +628,7 @@ pub fn solve_snapshot(
             final_residual_norm: initial_residual_norm,
             initial_scaled_residual_norm,
             final_scaled_residual_norm: initial_scaled_residual_norm,
+            final_step_norm: 0.0,
             analysis,
             geometry: materialize(snapshot, &values, &ids, &offsets)?,
         });
@@ -631,6 +637,7 @@ pub fn solve_snapshot(
     let mut damping = options.initial_damping;
     let mut rank = 0usize;
     let mut condition = f64::INFINITY;
+    let mut last_step_norm = 0.0;
 
     for iteration in 1..=options.max_iterations {
         let (base_raw, _, _, relation_equations, relations_satisfied) = residuals(
@@ -665,6 +672,7 @@ pub fn solve_snapshot(
                     final_residual_norm: current_analysis.residual_norm,
                     initial_scaled_residual_norm,
                     final_scaled_residual_norm: current_analysis.scaled_residual_norm,
+                    final_step_norm: last_step_norm,
                     analysis: current_analysis,
                     geometry: materialize(snapshot, &values, &ids, &offsets)?,
                 });
@@ -672,6 +680,11 @@ pub fn solve_snapshot(
         };
         rank = linear.rank;
         condition = linear.condition_number;
+        let candidate_step_norm = stable_norm(&linear.delta);
+        if !candidate_step_norm.is_finite() {
+            damping = (damping * 10.0).min(1.0e12);
+            continue;
+        }
 
         let mut proposal = values.clone();
         for (value, delta) in proposal.iter_mut().zip(linear.delta.iter()) {
@@ -711,8 +724,16 @@ pub fn solve_snapshot(
 
         if proposed_scaled_norm < current_scaled_norm {
             values = proposal;
+            last_step_norm = candidate_step_norm;
             damping = (damping * 0.3).max(1.0e-12);
-            if proposed_scaled_norm <= options.residual_tolerance
+            let terminal = verify_terminal(
+                proposed_scaled_norm,
+                candidate_step_norm,
+                options.residual_tolerance,
+                options.step_tolerance,
+                iteration,
+            );
+            if terminal.status == TerminalConvergenceStatus::Converged
                 && proposed_relations_satisfied
             {
                 let final_analysis = analysis(
@@ -739,6 +760,7 @@ pub fn solve_snapshot(
                     final_residual_norm: stable_norm(&proposed_raw),
                     initial_scaled_residual_norm,
                     final_scaled_residual_norm: proposed_scaled_norm,
+                    final_step_norm: last_step_norm,
                     analysis: final_analysis,
                     geometry: materialize(snapshot, &values, &ids, &offsets)?,
                 });
@@ -776,6 +798,7 @@ pub fn solve_snapshot(
         final_residual_norm: stable_norm(&final_raw),
         initial_scaled_residual_norm,
         final_scaled_residual_norm: stable_norm(&final_scaled),
+        final_step_norm: last_step_norm,
         analysis: final_analysis,
         geometry: materialize(snapshot, &values, &ids, &offsets)?,
     })

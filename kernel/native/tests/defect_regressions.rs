@@ -88,21 +88,21 @@ fn solver_uses_analytic_relation_jacobian_without_finite_difference() {
     // This value would make the former finite-difference step overflow. The
     // production solver must now ignore it because the analytic relation row
     // is authoritative.
-    let result = solve_snapshot(
-        &model,
-        SolveOptions {
-            max_iterations: 10,
-            finite_difference_step: f64::MAX,
-            ..Default::default()
-        },
-    )
-    .expect("analytic relation Jacobian should make the solve independent of finite differences");
+    let options = SolveOptions {
+        max_iterations: 10,
+        finite_difference_step: f64::MAX,
+        ..Default::default()
+    };
+    let result = solve_snapshot(&model, options.clone())
+        .expect("analytic relation Jacobian should make the solve independent of finite differences");
 
     assert!(result.converged, "reason={:?}", result.reason);
     assert_eq!(result.analysis.relation_count, 1);
     assert_eq!(result.analysis.relation_equation_count, 1);
     assert_eq!(result.analysis.rank, 1);
-    assert!(result.final_scaled_residual_norm <= 1.0e-8);
+    assert!(result.final_scaled_residual_norm <= options.residual_tolerance);
+    assert!(result.final_step_norm.is_finite());
+    assert!(result.final_step_norm <= options.step_tolerance);
 }
 
 #[test]

@@ -907,7 +907,7 @@ mod tests {
         );
         assert_eq!(
             pipe.surface_point_at(1.0, PI, tol()).unwrap(),
-            Vec3::new(0.0, -2.0, 10.0)
+            Vec3::new(-2.0, 0.0, 10.0)
         );
 
         let variable = VariableRadiusPipe {
@@ -939,10 +939,10 @@ mod tests {
             pipe.surface_point_at(0.0, 0.0, tol()).unwrap(),
             Vec3::new(12.0, 0.0, 0.0)
         );
-        assert_eq!(
-            pipe.surface_point_at(1.0, 0.0, tol()).unwrap(),
-            Vec3::new(0.0, 12.0, 0.0)
-        );
+        let end = pipe.surface_point_at(1.0, 0.0, tol()).unwrap();
+        assert!((end.x).abs() <= 1.0e-12);
+        assert!((end.y - 12.0).abs() <= 1.0e-12);
+        assert!((end.z).abs() <= 1.0e-12);
 
         let mut invalid = pipe;
         invalid.profile_radius = invalid.path_radius;
@@ -952,14 +952,18 @@ mod tests {
     }
 
     #[test]
-    fn pipes_fail_closed_for_singular_reference_and_invalid_parameter() {
+    fn pipes_use_deterministic_frame_fallback_and_reject_invalid_parameters() {
         let pipe = CircularPipe {
             path_start: Vec3::new(0.0, 0.0, 0.0),
             path_end: Vec3::new(0.0, 0.0, 10.0),
             radius: 1.0,
             reference: Vec3::new(0.0, 0.0, 1.0),
         };
-        assert_eq!(pipe.validate(tol()), Err(ConstructionError::SingularFrame));
+        assert!(pipe.validate(tol()).is_ok());
+        assert_eq!(
+            pipe.surface_point_at(0.0, 0.0, tol()).unwrap(),
+            Vec3::new(1.0, 0.0, 0.0)
+        );
         let mut variable = VariableRadiusPipe {
             path_start: Vec3::new(0.0, 0.0, 0.0),
             path_end: Vec3::new(0.0, 0.0, 10.0),

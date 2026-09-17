@@ -6,21 +6,21 @@ license = "MIT"
 build = "build.rs"
 
 [dependencies]
-umlcad-v6-geometry-api = { path = "../geometry-api" }
-umlcad-v6-freeform-api = { path = "../freeform-api" }
-umlcad-v6-nurbs-surface-api = { path = "../nurbs-surface-api" }
-umlcad-v6-surface-operations-api = { path = "../surface-operations-api" }
-umlcad-v6-offset-api = { path = "../offset-api" }
-umlcad-v6-sweep-api = { path = "../sweep-api" }
-umlcad-v6-fillet-api = { path = "../fillet-api" }
-umlcad-v6-shell-api = { path = "../shell-api" }
-umlcad-v6-draft-api = { path = "../draft-api" }
-umlcad-v6-mesh-api = { path = "../mesh-api" }
-umlcad-v6-exchange-api = { path = "../exchange-api" }
-umlcad-v6-topology-api = { path = "../topology-api" }
-umlcad-v6-kernel-integration-api = { path = "../kernel-integration-api" }
-umlcad-v6-reference-evolution-api = { path = "../reference-evolution-api" }
-umlcad-v6-reference-migration-api = { path = "../reference-migration-api" }
+umlcad-v6-geometry-api = { path = "../contracts/crates/geometry-api" }
+umlcad-v6-freeform-api = { path = "../contracts/crates/freeform-api" }
+umlcad-v6-nurbs-surface-api = { path = "../contracts/crates/nurbs-surface-api" }
+umlcad-v6-surface-operations-api = { path = "../contracts/crates/surface-operations-api" }
+umlcad-v6-offset-api = { path = "../contracts/crates/offset-api" }
+umlcad-v6-sweep-api = { path = "../contracts/crates/sweep-api" }
+umlcad-v6-fillet-api = { path = "../contracts/crates/fillet-api" }
+umlcad-v6-shell-api = { path = "../contracts/crates/shell-api" }
+umlcad-v6-draft-api = { path = "../contracts/crates/draft-api" }
+umlcad-v6-mesh-api = { path = "../contracts/crates/mesh-api" }
+umlcad-v6-exchange-api = { path = "../contracts/crates/exchange-api" }
+umlcad-v6-topology-api = { path = "../contracts/crates/topology-api" }
+umlcad-v6-kernel-integration-api = { path = "../contracts/crates/kernel-integration-api" }
+umlcad-v6-reference-evolution-api = { path = "../contracts/crates/reference-evolution-api" }
+umlcad-v6-reference-migration-api = { path = "../contracts/crates/reference-migration-api" }
 
 [build-dependencies]
 cmake = "0.1"

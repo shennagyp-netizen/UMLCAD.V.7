@@ -23,6 +23,7 @@ pub mod linalg;
 #[cfg(test)]
 mod linalg_authority_exhaustive;
 pub mod linear_consistency;
+pub mod linearization;
 pub mod mat;
 pub mod nurbs;
 pub mod nurbs3d;

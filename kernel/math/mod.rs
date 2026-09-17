@@ -43,8 +43,9 @@ pub mod snapshot;
 pub mod solid;
 pub mod spatial;
 pub mod spatial_accel;
-#[path = "solver.rs"]
-mod solver_legacy;
+mod solver_legacy {
+    include!(concat!(env!("OUT_DIR"), "/solver_generated.rs"));
+}
 pub mod terminal_authority;
 pub mod solver {
     pub use super::terminal_authority::*;

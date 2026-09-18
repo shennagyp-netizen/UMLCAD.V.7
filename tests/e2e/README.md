@@ -48,3 +48,14 @@ The runner writes a JSON report to `tests/e2e/artifacts/e2e-report.json` and ret
 The E2E runner also executes `architecture_contract.py`. This guard checks the repository's .NET assembly dependency graph and source-level namespace boundaries before system-CAD milestones proceed.
 
 The current `UMLCAD.Kernel.Client → UMLCAD.Framework` reference is explicitly treated as a transitional legacy compatibility edge. New CAD semantic/engine code must not create dependencies back toward the application host or the concrete kernel client.
+
+
+## Architecture authority
+
+The system architecture is documented and mechanically projected through:
+
+- `docs/architecture/ABSTRACTION_AND_DEPENDENCY_MODEL.md`
+- `docs/architecture/architecture.json`
+- `docs/architecture/c4/`
+
+The E2E architecture stage verifies the current repository against the logical architecture. It does not treat the current .NET project tree as the architectural definition.

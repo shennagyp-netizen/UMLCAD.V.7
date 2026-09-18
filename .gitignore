@@ -1,5 +1,8 @@
 # Generated and local build artifacts
 node_modules/
-projects/demo/bin/
+**/node_modules/
+**/bin/
+**/obj/
+**/target/
 projects/demo/debug/
-kernel/contracts/target/debug/
+.DS_Store

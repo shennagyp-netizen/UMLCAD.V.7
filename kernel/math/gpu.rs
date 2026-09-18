@@ -350,6 +350,8 @@ pub enum GpuError {
     InvalidComparisonTolerance,
     ConformanceLengthMismatch,
     ConformanceNonFiniteOutput,
+    ConformanceInvalidCandidateSet,
+    ConformanceDuplicateCandidate,
     NumericalMismatch,
     BitwiseMismatch,
 }
@@ -363,6 +365,81 @@ pub struct ConformanceReport {
     pub compared_values: usize,
     pub max_absolute_error: f64,
     pub max_relative_error: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CandidatePairConformanceReport {
+    pub backend: BackendKind,
+    pub reference_pair_count: usize,
+    pub candidate_pair_count: usize,
+    pub false_negative_count: usize,
+    pub false_positive_count: usize,
+    pub first_false_negative: Option<(usize, usize)>,
+    pub first_false_positive: Option<(usize, usize)>,
+    pub repeat_exact: bool,
+}
+
+impl CandidatePairConformanceReport {
+    pub fn conforms(&self) -> bool {
+        self.false_negative_count == 0 && self.repeat_exact
+    }
+
+    pub fn exact_match(&self) -> bool {
+        self.conforms() && self.false_positive_count == 0
+    }
+}
+
+pub fn compare_candidate_pairs(
+    backend: BackendKind,
+    reference: &[(usize, usize)],
+    candidate: &[(usize, usize)],
+    repeat: &[(usize, usize)],
+) -> Result<CandidatePairConformanceReport, GpuError> {
+    fn canonicalize(pairs: &[(usize, usize)]) -> Result<Vec<(usize, usize)>, GpuError> {
+        let mut canonical = pairs.to_vec();
+        if canonical
+            .iter()
+            .any(|&(left, right)| left >= right)
+        {
+            return Err(GpuError::ConformanceInvalidCandidateSet);
+        }
+        canonical.sort_unstable();
+        if canonical.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(GpuError::ConformanceDuplicateCandidate);
+        }
+        Ok(canonical)
+    }
+
+    let reference = canonicalize(reference)?;
+    let candidate = canonicalize(candidate)?;
+    let repeat = canonicalize(repeat)?;
+
+    let mut false_negatives = reference
+        .iter()
+        .copied()
+        .filter(|pair| candidate.binary_search(pair).is_err());
+    let first_false_negative = false_negatives.next();
+    let false_negative_count = usize::from(first_false_negative.is_some())
+        + false_negatives.count();
+
+    let mut false_positives = candidate
+        .iter()
+        .copied()
+        .filter(|pair| reference.binary_search(pair).is_err());
+    let first_false_positive = false_positives.next();
+    let false_positive_count = usize::from(first_false_positive.is_some())
+        + false_positives.count();
+
+    Ok(CandidatePairConformanceReport {
+        backend,
+        reference_pair_count: reference.len(),
+        candidate_pair_count: candidate.len(),
+        false_negative_count,
+        false_positive_count,
+        first_false_negative,
+        first_false_positive,
+        repeat_exact: candidate == repeat,
+    })
 }
 
 pub fn compare_f64_batches(
@@ -836,6 +913,63 @@ mod tests {
                 1.0,
             ),
             Err(GpuError::BitwiseMismatch)
+        );
+    }
+
+    #[test]
+    fn candidate_pair_conformance_reports_false_negatives_and_false_positives() {
+        let report = compare_candidate_pairs(
+            BackendKind::Metal,
+            &[(0, 1), (2, 3)],
+            &[(0, 1), (0, 2)],
+            &[(0, 1), (0, 2)],
+        ).unwrap();
+
+        assert_eq!(report.reference_pair_count, 2);
+        assert_eq!(report.candidate_pair_count, 2);
+        assert_eq!(report.false_negative_count, 1);
+        assert_eq!(report.first_false_negative, Some((2, 3)));
+        assert_eq!(report.false_positive_count, 1);
+        assert_eq!(report.first_false_positive, Some((0, 2)));
+        assert!(report.repeat_exact);
+        assert!(!report.conforms());
+        assert!(!report.exact_match());
+    }
+
+    #[test]
+    fn candidate_pair_conformance_accepts_conservative_superset() {
+        let report = compare_candidate_pairs(
+            BackendKind::Cuda,
+            &[(0, 1), (2, 3)],
+            &[(0, 1), (0, 2), (2, 3)],
+            &[(0, 1), (0, 2), (2, 3)],
+        ).unwrap();
+
+        assert_eq!(report.false_negative_count, 0);
+        assert_eq!(report.false_positive_count, 1);
+        assert!(report.conforms());
+        assert!(!report.exact_match());
+    }
+
+    #[test]
+    fn candidate_pair_conformance_rejects_malformed_sets() {
+        assert_eq!(
+            compare_candidate_pairs(
+                BackendKind::Metal,
+                &[(0, 1)],
+                &[(1, 0)],
+                &[(1, 0)],
+            ),
+            Err(GpuError::ConformanceInvalidCandidateSet)
+        );
+        assert_eq!(
+            compare_candidate_pairs(
+                BackendKind::Metal,
+                &[(0, 1)],
+                &[(0, 1), (0, 1)],
+                &[(0, 1)],
+            ),
+            Err(GpuError::ConformanceDuplicateCandidate)
         );
     }
 

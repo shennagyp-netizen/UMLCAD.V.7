@@ -1,0 +1,41 @@
+name: Metal hardware validation
+
+on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  metal:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Verify Apple Silicon and Metal device
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -m
+          system_profiler SPHardwareDataType
+          system_profiler SPDisplaysDataType
+
+      - name: Run Metal backend validation
+        shell: bash
+        run: |
+          set -o pipefail
+          set -o pipefail
+          cargo test --manifest-path kernel/native/Cargo.toml gpu::metal -- --nocapture 2>&1 | tee metal-test.log
+      - name: Upload Metal test log
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: metal-test-log
+          path: metal-test.log
+          if-no-files-found: error

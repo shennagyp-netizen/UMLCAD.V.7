@@ -281,26 +281,6 @@ impl PlanarRegion3 {
         Ok(RegionClass::Inside)
     }
 
-    pub fn point_from_uv
-            let edge = b.sub(a);
-            let rel = uv.sub(a);
-            let cross = edge.cross(rel);
-            cross.is_finite()
-                && cross.abs() <= band * (edge.length() + rel.length() + 1.0)
-                && uv.x >= a.x.min(b.x) - band
-                && uv.x <= a.x.max(b.x) + band
-                && uv.y >= a.y.min(b.y) - band
-                && uv.y <= a.y.max(b.y) + band
-        };
-        let on_outer = self.outer.iter().enumerate().any(|(i, a)| {
-            point_on_segment(*a, self.outer[(i + 1) % self.outer.len()])
-        });
-        if on_outer {
-            return Ok(RegionClass::OnBoundary);
-        }
-        Ok(RegionClass::Inside)
-    }
-
     pub fn point_from_uv(&self, uv: Vec2, tolerance: Tolerance) -> Result<Vec3, BRepError> {
         self.validate(tolerance)?;
         if !uv.is_finite() { return Err(BRepError::NonFinite); }

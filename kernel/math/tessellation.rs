@@ -1149,6 +1149,10 @@ mod trimmed_surface_tests {
     use super::*;
     use crate::math::geometry::Point;
 
+    fn planar_normal(_: f64, _: f64) -> Result<Vec3, TessellationError> {
+        Ok(Vec3::new(0.0, 0.0, 1.0))
+    }
+
     fn square_trim() -> TrimLoop2 {
         TrimLoop2 {
             curves: vec![

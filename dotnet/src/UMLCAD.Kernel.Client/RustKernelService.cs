@@ -217,6 +217,12 @@ public static class RustKernelServiceCollectionExtensions
             client.Timeout = options.RequestTimeout;
         });
 
+        services.AddHttpClient<IExtrusionGeometryService, RustExtrusionGeometryService>(client =>
+        {
+            client.BaseAddress = options.BaseAddress;
+            client.Timeout = options.RequestTimeout;
+        });
+
         return services;
     }
 }

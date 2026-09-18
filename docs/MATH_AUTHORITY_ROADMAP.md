@@ -233,3 +233,18 @@ Every capability must be distinguished as `Implemented`, `Tested`, `Hardware-val
 > CPU defines the reference behavior. Metal and CUDA accelerate it. OCCT can challenge it. Nothing downstream defines it.
 
 > Do not chase feature count. Build strong mathematical primitives from which professional CAD features can be constructed.
+
+
+## M14 closure record
+
+M14 is implemented and repository-tested for the declared NVIDIA CUDA acceleration domain, but is not hardware-validated in the current environment. The real backend is implemented outside `kernel/math` using `cudarc` as the CUDA driver/NVRTC boundary; `nalgebra` remains the existing CPU numerical infrastructure and CPU f64 remains semantic authority.
+- real CUDA compute kernel for batched AABB candidate generation using native device f64;
+- explicit invalid/non-finite/batch-size handling;
+- CUDA driver/NVRTC absence fails closed instead of panicking during capability discovery;
+- GPU candidate output is reconstructed in deterministic CPU order;
+- every exact CPU f64 overlap must be present or the adapter returns a false-negative error;
+- repeated hardware execution is compared for deterministic candidate output;
+- hardware tests are feature-gated with `cuda-hardware` so ordinary authoritative CI contains zero ignored tests;
+- CUDA hardware validation remains **Not yet hardware-validated** because no NVIDIA runner has executed the feature-gated hardware suite.
+
+The M14 certified domain does not include CUDA execution of the full f64 vector/matrix/transform/NURBS solver stack. Those remain CPU-authoritative pending additional contracts and M15 cross-backend conformance.

@@ -57,15 +57,6 @@ public sealed record AxisAlignedBoxSolidKernelTopology(
     }
 }
 
-public enum GeometryKernelStatus
-{
-    Succeeded,
-    Failed,
-    Unsupported,
-    Ambiguous,
-    Indeterminate,
-}
-
 public sealed record AxisAlignedBoxSolidKernelResult(
     GeometryKernelStatus Status,
     ContractResultId? ResultId,

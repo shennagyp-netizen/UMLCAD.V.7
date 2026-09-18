@@ -52,6 +52,8 @@ impl CudaBackend {
 #[cfg(target_os = "linux")]
 mod imp {
     use super::*;
+    use std::panic::{catch_unwind, AssertUnwindSafe};
+
     use cudarc::{driver::{CudaContext, LaunchConfig, PushKernelArg}, nvrtc::compile_ptx};
 
     const KERNEL: &str = r#"
@@ -89,9 +91,11 @@ extern "C" __global__ void candidate_pairs(
 
     impl CudaBackend {
         pub fn new() -> Result<Self, CudaError> {
-            let context = CudaContext::new(0)
+            let context = catch_unwind(AssertUnwindSafe(|| CudaContext::new(0)))
+                .map_err(|_| CudaError::DeviceUnavailable("CUDA driver library unavailable".into()))?
                 .map_err(|e| CudaError::DeviceUnavailable(format!("{e:?}")))?;
-            let ptx = compile_ptx(KERNEL)
+            let ptx = catch_unwind(AssertUnwindSafe(|| compile_ptx(KERNEL)))
+                .map_err(|_| CudaError::Compilation("NVRTC library unavailable".into()))?
                 .map_err(|e| CudaError::Compilation(format!("{e:?}")))?;
             let module = context.load_module(ptx)
                 .map_err(|e| CudaError::Module(format!("{e:?}")))?;
@@ -101,7 +105,8 @@ extern "C" __global__ void candidate_pairs(
         pub fn capability() -> BackendCapability {
             BackendCapability {
                 backend: BackendKind::Cuda,
-                available: CudaContext::new(0).is_ok(),
+                available: catch_unwind(AssertUnwindSafe(|| CudaContext::new(0).is_ok()))
+                    .unwrap_or(false),
                 f64: true,
                 deterministic: true,
                 max_batch: Some(MAX_ITEMS),

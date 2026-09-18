@@ -1,0 +1,5 @@
+# Generated and local build artifacts
+node_modules/
+projects/demo/bin/
+projects/demo/debug/
+kernel/contracts/target/debug/

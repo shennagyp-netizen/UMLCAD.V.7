@@ -1,0 +1,30 @@
+name: Documentation validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y latexmk texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra
+
+      - name: Build handbook
+        working-directory: docs
+        run: latexmk -pdf -interaction=nonstopmode -halt-on-error doc.tex
+
+      - name: Verify PDF
+        working-directory: docs
+        run: |
+          test -s doc.pdf
+          pdfinfo doc.pdf | grep '^Pages:'

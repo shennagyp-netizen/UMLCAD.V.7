@@ -241,6 +241,31 @@ impl PlanarRegion3 {
                 }
             }
         }
+
+        // Hole loops must be pairwise disjoint and non-nested.
+        for i in 0..self.holes.len() {
+            for j in (i + 1)..self.holes.len() {
+                if point_in_convex_loop(self.holes[i][0], &self.holes[j], eps)
+                    || point_in_convex_loop(self.holes[j][0], &self.holes[i], eps)
+                {
+                    return Err(BRepError::InvalidRegion);
+                }
+                for a in 0..self.holes[i].len() {
+                    for b in 0..self.holes[j].len() {
+                        if segment_intersects_2d(
+                            self.holes[i][a],
+                            self.holes[i][(a + 1) % self.holes[i].len()],
+                            self.holes[j][b],
+                            self.holes[j][(b + 1) % self.holes[j].len()],
+                            eps,
+                        ) {
+                            return Err(BRepError::InvalidRegion);
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -1204,6 +1229,24 @@ mod tests {
         assert!((c.x-12.0).abs()<=1.0e-12 && (c.y-21.5).abs()<=1.0e-12 && (c.z-30.0).abs()<=1.0e-12);
         assert_eq!(region.classify_point(Vec3::new(12.0,21.0,30.0),tol()).unwrap(),RegionClass::Inside);
         assert_eq!(region.classify_point(Vec3::new(12.0,25.0,30.0),tol()).unwrap(),RegionClass::Outside);
+    }
+
+    #[test]
+    fn planar_region_rejects_nested_holes() {
+        let region = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0),Vec2::new(10.0,0.0),
+                Vec2::new(10.0,10.0),Vec2::new(0.0,10.0),
+            ],
+            holes: vec![
+                vec![Vec2::new(2.0,2.0),Vec2::new(8.0,2.0),Vec2::new(8.0,8.0),Vec2::new(2.0,8.0)],
+                vec![Vec2::new(4.0,4.0),Vec2::new(6.0,4.0),Vec2::new(6.0,6.0),Vec2::new(4.0,6.0)],
+            ],
+        };
+        assert_eq!(region.validate(tol()), Err(BRepError::InvalidRegion));
     }
 
     #[test]

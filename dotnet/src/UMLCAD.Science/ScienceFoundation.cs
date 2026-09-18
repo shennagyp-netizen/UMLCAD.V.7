@@ -9,18 +9,23 @@ public readonly record struct QuantityDimension(
     public static QuantityDimension Dimensionless => new(0, 0, 0, 0);
 }
 
-public readonly record struct Quantity(
-    double SiValue,
-    QuantityDimension Dimension,
-    string UnitSymbol)
+public readonly record struct Quantity
 {
-    public Quantity
-    {
-        if (!double.IsFinite(SiValue))
-            throw new ArgumentOutOfRangeException(nameof(SiValue), "Quantity values must be finite.");
+    public double SiValue { get; }
+    public QuantityDimension Dimension { get; }
+    public string UnitSymbol { get; }
 
-        if (string.IsNullOrWhiteSpace(UnitSymbol))
-            throw new ArgumentException("UnitSymbol is required.", nameof(UnitSymbol));
+    public Quantity(double siValue, QuantityDimension dimension, string unitSymbol)
+    {
+        if (!double.IsFinite(siValue))
+            throw new ArgumentOutOfRangeException(nameof(siValue), "Quantity values must be finite.");
+
+        if (string.IsNullOrWhiteSpace(unitSymbol))
+            throw new ArgumentException("UnitSymbol is required.", nameof(unitSymbol));
+
+        SiValue = siValue;
+        Dimension = dimension;
+        UnitSymbol = unitSymbol;
     }
 }
 
@@ -35,27 +40,43 @@ public enum MaterialFamily
     Other,
 }
 
-public sealed record MaterialProperties(
-    double DensityKgPerM3,
-    double YoungsModulusPa,
-    double YieldStrengthPa,
-    double UltimateStrengthPa,
-    double DuctilityPercent,
-    double ThermalConductivityWPerMk,
-    double ElectricalConductivitySiemensPerM)
+public sealed record MaterialProperties
 {
-    public MaterialProperties
-    {
-        ValidateFiniteNonNegative(DensityKgPerM3, nameof(DensityKgPerM3));
-        ValidateFiniteNonNegative(YoungsModulusPa, nameof(YoungsModulusPa));
-        ValidateFiniteNonNegative(YieldStrengthPa, nameof(YieldStrengthPa));
-        ValidateFiniteNonNegative(UltimateStrengthPa, nameof(UltimateStrengthPa));
-        ValidateFiniteNonNegative(DuctilityPercent, nameof(DuctilityPercent));
-        ValidateFiniteNonNegative(ThermalConductivityWPerMk, nameof(ThermalConductivityWPerMk));
-        ValidateFiniteNonNegative(ElectricalConductivitySiemensPerM, nameof(ElectricalConductivitySiemensPerM));
+    public double DensityKgPerM3 { get; }
+    public double YoungsModulusPa { get; }
+    public double YieldStrengthPa { get; }
+    public double UltimateStrengthPa { get; }
+    public double DuctilityPercent { get; }
+    public double ThermalConductivityWPerMk { get; }
+    public double ElectricalConductivitySiemensPerM { get; }
 
-        if (YieldStrengthPa > UltimateStrengthPa && UltimateStrengthPa > 0d)
+    public MaterialProperties(
+        double densityKgPerM3,
+        double youngsModulusPa,
+        double yieldStrengthPa,
+        double ultimateStrengthPa,
+        double ductilityPercent,
+        double thermalConductivityWPerMk,
+        double electricalConductivitySiemensPerM)
+    {
+        ValidateFiniteNonNegative(densityKgPerM3, nameof(densityKgPerM3));
+        ValidateFiniteNonNegative(youngsModulusPa, nameof(youngsModulusPa));
+        ValidateFiniteNonNegative(yieldStrengthPa, nameof(yieldStrengthPa));
+        ValidateFiniteNonNegative(ultimateStrengthPa, nameof(ultimateStrengthPa));
+        ValidateFiniteNonNegative(ductilityPercent, nameof(ductilityPercent));
+        ValidateFiniteNonNegative(thermalConductivityWPerMk, nameof(thermalConductivityWPerMk));
+        ValidateFiniteNonNegative(electricalConductivitySiemensPerM, nameof(electricalConductivitySiemensPerM));
+
+        if (yieldStrengthPa > ultimateStrengthPa && ultimateStrengthPa > 0d)
             throw new ArgumentException("Yield strength cannot exceed ultimate strength.");
+
+        DensityKgPerM3 = densityKgPerM3;
+        YoungsModulusPa = youngsModulusPa;
+        YieldStrengthPa = yieldStrengthPa;
+        UltimateStrengthPa = ultimateStrengthPa;
+        DuctilityPercent = ductilityPercent;
+        ThermalConductivityWPerMk = thermalConductivityWPerMk;
+        ElectricalConductivitySiemensPerM = electricalConductivitySiemensPerM;
     }
 
     private static void ValidateFiniteNonNegative(double value, string name)
@@ -65,17 +86,22 @@ public sealed record MaterialProperties(
     }
 }
 
-public sealed record Material(
-    string Name,
-    MaterialFamily Family,
-    MaterialProperties Properties)
+public sealed record Material
 {
-    public Material
-    {
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Material name is required.", nameof(Name));
+    public string Name { get; }
+    public MaterialFamily Family { get; }
+    public MaterialProperties Properties { get; }
 
-        ArgumentNullException.ThrowIfNull(Properties);
+    public Material(string name, MaterialFamily family, MaterialProperties properties)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Material name is required.", nameof(name));
+
+        ArgumentNullException.ThrowIfNull(properties);
+
+        Name = name;
+        Family = family;
+        Properties = properties;
     }
 }
 
@@ -88,56 +114,75 @@ public enum PhenomenonKind
     CuttingProcessResponse,
 }
 
-public sealed record PhenomenaSimulationRequest(
-    string RequestId,
-    PhenomenonKind Phenomenon,
-    IReadOnlyDictionary<string, double> Inputs)
+public sealed record PhenomenaSimulationRequest
 {
-    public PhenomenaSimulationRequest
+    public string RequestId { get; }
+    public PhenomenonKind Phenomenon { get; }
+    public IReadOnlyDictionary<string, double> Inputs { get; }
+
+    public PhenomenaSimulationRequest(
+        string requestId,
+        PhenomenonKind phenomenon,
+        IReadOnlyDictionary<string, double> inputs)
     {
-        if (string.IsNullOrWhiteSpace(RequestId))
-            throw new ArgumentException("RequestId is required.", nameof(RequestId));
+        if (string.IsNullOrWhiteSpace(requestId))
+            throw new ArgumentException("RequestId is required.", nameof(requestId));
 
-        ArgumentNullException.ThrowIfNull(Inputs);
+        ArgumentNullException.ThrowIfNull(inputs);
 
-        foreach (var pair in Inputs)
+        var normalized = new Dictionary<string, double>(inputs, StringComparer.Ordinal);
+        foreach (var pair in normalized)
         {
             if (string.IsNullOrWhiteSpace(pair.Key))
-                throw new ArgumentException("Simulation input names cannot be empty.", nameof(Inputs));
+                throw new ArgumentException("Simulation input names cannot be empty.", nameof(inputs));
             if (!double.IsFinite(pair.Value))
-                throw new ArgumentOutOfRangeException(nameof(Inputs), "Simulation inputs must be finite.");
+                throw new ArgumentOutOfRangeException(nameof(inputs), "Simulation inputs must be finite.");
         }
 
-        Inputs = new Dictionary<string, double>(Inputs, StringComparer.Ordinal);
+        RequestId = requestId;
+        Phenomenon = phenomenon;
+        Inputs = normalized;
     }
 }
 
-public sealed record PhenomenaSimulationResult(
-    string RequestId,
-    PhenomenonKind Phenomenon,
-    bool IsSuccessful,
-    IReadOnlyDictionary<string, double> Outputs,
-    string ProviderId,
-    string Diagnostic)
+public sealed record PhenomenaSimulationResult
 {
-    public PhenomenaSimulationResult
+    public string RequestId { get; }
+    public PhenomenonKind Phenomenon { get; }
+    public bool IsSuccessful { get; }
+    public IReadOnlyDictionary<string, double> Outputs { get; }
+    public string ProviderId { get; }
+    public string Diagnostic { get; }
+
+    public PhenomenaSimulationResult(
+        string requestId,
+        PhenomenonKind phenomenon,
+        bool isSuccessful,
+        IReadOnlyDictionary<string, double> outputs,
+        string providerId,
+        string diagnostic)
     {
-        if (string.IsNullOrWhiteSpace(RequestId))
-            throw new ArgumentException("RequestId is required.", nameof(RequestId));
-        if (string.IsNullOrWhiteSpace(ProviderId))
-            throw new ArgumentException("ProviderId is required.", nameof(ProviderId));
+        if (string.IsNullOrWhiteSpace(requestId))
+            throw new ArgumentException("RequestId is required.", nameof(requestId));
+        if (string.IsNullOrWhiteSpace(providerId))
+            throw new ArgumentException("ProviderId is required.", nameof(providerId));
 
-        Outputs = Outputs is null
-            ? throw new ArgumentNullException(nameof(Outputs))
-            : new Dictionary<string, double>(Outputs, StringComparer.Ordinal);
+        var normalized = outputs is null
+            ? throw new ArgumentNullException(nameof(outputs))
+            : new Dictionary<string, double>(outputs, StringComparer.Ordinal);
 
-        foreach (var pair in Outputs)
+        foreach (var pair in normalized)
         {
             if (!double.IsFinite(pair.Value))
-                throw new ArgumentOutOfRangeException(nameof(Outputs), "Simulation outputs must be finite.");
+                throw new ArgumentOutOfRangeException(nameof(outputs), "Simulation outputs must be finite.");
         }
 
-        Diagnostic ??= string.Empty;
+        RequestId = requestId;
+        Phenomenon = phenomenon;
+        IsSuccessful = isSuccessful;
+        Outputs = normalized;
+        ProviderId = providerId;
+        Diagnostic = diagnostic ?? string.Empty;
     }
 }
 

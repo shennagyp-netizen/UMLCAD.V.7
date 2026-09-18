@@ -18,6 +18,7 @@ public sealed record EvaluationOutcome(
     AuthoritativeResultIdentity? ResultIdentity,
     IReadOnlyList<string> Diagnostics)
 {
+    public AuthoritativeCadResult? Result { get; init; }
     public EvaluationOutcome
     {
         if (StepId.Value == Guid.Empty)

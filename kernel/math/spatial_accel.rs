@@ -582,26 +582,81 @@ impl Bvh3 {
         if !tolerance.is_finite() || tolerance < 0.0 {
             return Vec::new();
         }
+        let Some(root) = self.root else {
+            return Vec::new();
+        };
+
+        fn node_bounds(node: &BvhNode) -> Aabb3 {
+            match node {
+                BvhNode::Leaf { item } => item.bounds,
+                BvhNode::Branch { bounds, .. } => *bounds,
+            }
+        }
+
         let mut out = Vec::new();
-        for i in 0..self.nodes.len() {
-            if let BvhNode::Leaf { item: a } = &self.nodes[i] {
-                for j in i + 1..self.nodes.len() {
-                    if let BvhNode::Leaf { item: b } = &self.nodes[j] {
-                        if a.bounds.intersects(b.bounds, tolerance) {
-                            let pair = if a.index < b.index {
-                                (a.index, b.index)
-                            } else {
-                                (b.index, a.index)
-                            };
-                            if !out.contains(&pair) {
-                                out.push(pair);
-                            }
-                        }
+        let mut stack = vec![(root, root)];
+
+        while let Some((a_index, b_index)) = stack.pop() {
+            let a = &self.nodes[a_index];
+            let b = &self.nodes[b_index];
+
+            if !node_bounds(a).intersects(node_bounds(b), tolerance) {
+                continue;
+            }
+
+            if a_index == b_index {
+                match a {
+                    BvhNode::Leaf { .. } => {}
+                    BvhNode::Branch { left, right, .. } => {
+                        stack.push((*right, *right));
+                        stack.push((*left, *right));
+                        stack.push((*left, *left));
                     }
+                }
+                continue;
+            }
+
+            match (a, b) {
+                (BvhNode::Leaf { item: left }, BvhNode::Leaf { item: right }) => {
+                    if left.bounds.intersects(right.bounds, tolerance) {
+                        let pair = if left.index < right.index {
+                            (left.index, right.index)
+                        } else {
+                            (right.index, left.index)
+                        };
+                        out.push(pair);
+                    }
+                }
+                (BvhNode::Leaf { .. }, BvhNode::Branch { left, right, .. }) => {
+                    stack.push((a_index, *right));
+                    stack.push((a_index, *left));
+                }
+                (BvhNode::Branch { left, right, .. }, BvhNode::Leaf { .. }) => {
+                    stack.push((*right, b_index));
+                    stack.push((*left, b_index));
+                }
+                (
+                    BvhNode::Branch {
+                        left: a_left,
+                        right: a_right,
+                        ..
+                    },
+                    BvhNode::Branch {
+                        left: b_left,
+                        right: b_right,
+                        ..
+                    },
+                ) => {
+                    stack.push((*a_right, *b_right));
+                    stack.push((*a_right, *b_left));
+                    stack.push((*a_left, *b_right));
+                    stack.push((*a_left, *b_left));
                 }
             }
         }
+
         out.sort_unstable();
+        out.dedup();
         out
     }
 }
@@ -642,7 +697,37 @@ mod tests {
         let a = Bvh3::build(&items).unwrap().candidate_pairs(1.0e-12);
         let b = Bvh3::build(&items).unwrap().candidate_pairs(1.0e-12);
         assert_eq!(a, b);
-        assert_eq!(a, vec![(0, 2), (1, 3)]);
+        assert_eq!(a, vec![(0, 1), (2, 3)]);
+    }
+
+    #[test]
+    fn candidate_pairs_match_bruteforce_overlap_oracle() {
+        let items = vec![
+            (0, box3(0.0, 0.0, 0.0)),
+            (1, box3(0.5, 0.0, 0.0)),
+            (2, box3(3.0, 3.0, 3.0)),
+            (3, box3(3.5, 3.0, 3.0)),
+            (4, box3(8.0, 0.0, 0.0)),
+        ];
+        let tolerance = 1.0e-12;
+        let tree = Bvh3::build(&items).unwrap();
+        let mut expected = Vec::new();
+        for i in 0..items.len() {
+            for j in i + 1..items.len() {
+                if items[i].1.intersects(items[j].1, tolerance) {
+                    expected.push((items[i].0.min(items[j].0), items[i].0.max(items[j].0)));
+                }
+            }
+        }
+        expected.sort_unstable();
+        expected.dedup();
+        assert_eq!(tree.candidate_pairs(tolerance), expected);
+
+        let reordered = vec![
+            items[4], items[2], items[0], items[3], items[1],
+        ];
+        let reordered_tree = Bvh3::build(&reordered).unwrap();
+        assert_eq!(tree.candidate_pairs(tolerance), reordered_tree.candidate_pairs(tolerance));
     }
 
     #[test]

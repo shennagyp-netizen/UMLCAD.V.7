@@ -8,7 +8,7 @@
 
 ## Current development head
 
-`0dccf7406e8b58240385eb6727586b422e28debd`
+`78ef3af457e2f646ef459743d83ac0230ac22e23`
 
 PR: #39 — production S1 vertical-slice TDD gate.
 
@@ -151,3 +151,31 @@ TDD RED
 → full repository gates
 → exact evidence
 ```
+## .NET semantic profile/result increment
+
+This increment remains strictly within the .NET system-CAD layer. The existing Rust/OCCT kernel is frozen and no kernel source was changed.
+
+Implemented:
+- ExtrusionFeatureSpecification now carries an explicit ProfileGeometryId.
+- SpecificationGraph verifies that the selected profile geometry belongs to the referenced SketchFeatureSpecification.
+- Extrusion evaluation identity includes the selected profile geometry identity.
+- CadSketchEvaluationResult is now a first-class authoritative .NET result carrying the sketch frame, solved circle identities, solver terminal evidence, result identity, and evidence hash.
+- RustCadKernelEvaluator preserves and validates the authoritative solved-sketch result before downstream feature consumption.
+- Existing S1 tests were updated so circle A and circle B are explicitly bound to feature A and feature B rather than referring only to the containing sketch.
+
+TDD:
+- RED commit for explicit profile selection: f180a0b9fb3f1d638389f23fc7f4b0606d63ef9a.
+- RED execution was attempted conceptually but the local environment has no .NET SDK and the isolated RED commit produced no GitHub Actions run. No executable RED PASS/FAIL is claimed.
+- RED test for authoritative sketch-frame preservation: 0f423737cf67ee63100b3ca90ec61d60b97eb0ed.
+- Implementation commits followed the RED tests.
+
+Validation:
+- Local C# execution is unavailable because dotnet is not installed in the development container.
+- Repository GitHub Actions remain infrastructure-blocked when they create zero-step jobs; those runs are not interpreted as product test failures.
+- The active S1 branch still requires executed authoritative E2E/full-gate evidence before any GREEN declaration.
+
+Current S1 architectural boundary:
+- Sketch semantics and authoritative sketch-result integration are now present in the canonical .NET Engine path.
+- Exact circular-prism capability exists in the already-developed frozen kernel/client layer and is not modified here.
+- Additive/subtractive body evolution and final authoritative B-Rep composition remain incomplete because the current client-visible S1 transport does not yet expose a production Boolean composition path.
+- No polygonal circle approximation, legacy BuildPackage fallback, viewer heuristic, or duplicate solver/kernel has been introduced.

@@ -47,6 +47,7 @@ public sealed class S1ProductionVerticalSliceTddTests
         var featureA = new ExtrusionFeatureSpecification(
             new CadId("feature-a"),
             sketch.Id,
+            new CadId("circle-a"),
             support,
             new CadVector3(0d, 0d, 1d),
             10d,
@@ -55,6 +56,7 @@ public sealed class S1ProductionVerticalSliceTddTests
         var featureB = new ExtrusionFeatureSpecification(
             new CadId("feature-b"),
             sketch.Id,
+            new CadId("circle-b"),
             support,
             new CadVector3(0d, 0d, -1d),
             8d,

@@ -69,7 +69,9 @@ public sealed class S1ProductionVerticalSliceTddTests
             EvaluationTolerance = new KernelTolerance(1e-9, 1e-9)
         };
 
-        var evaluator = new RustCadKernelEvaluator(new DeterministicBoxService());
+        var evaluator = new RustCadKernelEvaluator(
+            new DeterministicBoxService(),
+            new DeterministicSketchService());
         var result = await new CadEvaluationEngine(evaluator).RecomputeAsync(document);
 
         Assert.True(
@@ -85,6 +87,40 @@ public sealed class S1ProductionVerticalSliceTddTests
         Assert.Equal(
             result.FinalAuthoritativeResult!.ResultId,
             result.Representation!.SourceResultId);
+    }
+
+    private sealed class DeterministicSketchService : ISketchConstraintService
+    {
+        public Task<SketchSolveKernelResult> SolveAsync(
+            SketchSolveRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return Task.FromResult(
+                new SketchSolveKernelResult(
+                    GeometryKernelStatus.Succeeded,
+                    true,
+                    "converged",
+                    0,
+                    0d,
+                    0d,
+                    0d,
+                    0d,
+                    0d,
+                    request.Circles.Count * 3,
+                    0,
+                    0,
+                    request.Circles.Count * 3,
+                    1d,
+                    request.Circles.Select(circle =>
+                        new SketchSolvedCircle(
+                            circle.Id,
+                            circle.X,
+                            circle.Y,
+                            circle.Radius)).ToArray(),
+                    Array.Empty<string>()));
+        }
     }
 
     private sealed class DeterministicBoxService : IAuthoritativeGeometryService

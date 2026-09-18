@@ -37,20 +37,26 @@ public enum ManufacturingProcessKind
     Grinding,
 }
 
-public sealed record MachineCapability(
-    ManufacturingProcessKind Process,
-    double MinimumStockThicknessMm,
-    double MaximumStockThicknessMm)
+public sealed record MachineCapability
 {
-    public MachineCapability
+    public ManufacturingProcessKind Process { get; }
+    public double MinimumStockThicknessMm { get; }
+    public double MaximumStockThicknessMm { get; }
+
+    public MachineCapability(
+        ManufacturingProcessKind process,
+        double minimumStockThicknessMm,
+        double maximumStockThicknessMm)
     {
-        if (!double.IsFinite(MinimumStockThicknessMm) ||
-            !double.IsFinite(MaximumStockThicknessMm) ||
-            MinimumStockThicknessMm < 0d ||
-            MaximumStockThicknessMm < MinimumStockThicknessMm)
-        {
-            throw new ArgumentOutOfRangeException(nameof(MinimumStockThicknessMm));
-        }
+        if (!double.IsFinite(minimumStockThicknessMm) ||
+            !double.IsFinite(maximumStockThicknessMm) ||
+            minimumStockThicknessMm < 0d ||
+            maximumStockThicknessMm < minimumStockThicknessMm)
+            throw new ArgumentOutOfRangeException(nameof(minimumStockThicknessMm));
+
+        Process = process;
+        MinimumStockThicknessMm = minimumStockThicknessMm;
+        MaximumStockThicknessMm = maximumStockThicknessMm;
     }
 
     public bool SupportsThickness(double thicknessMm) =>
@@ -59,35 +65,45 @@ public sealed record MachineCapability(
         thicknessMm <= MaximumStockThicknessMm;
 }
 
-public sealed record ToolDefinition(
-    string ToolId,
-    ToolKind Kind,
-    string InterfaceId,
-    double NominalDiameterMm,
-    double MinimumDiameterMm,
-    double MaximumDiameterMm)
+public sealed record ToolDefinition
 {
-    public ToolDefinition
-    {
-        if (string.IsNullOrWhiteSpace(ToolId))
-            throw new ArgumentException("ToolId is required.", nameof(ToolId));
-        if (string.IsNullOrWhiteSpace(InterfaceId))
-            throw new ArgumentException("InterfaceId is required.", nameof(InterfaceId));
-        if (!double.IsFinite(NominalDiameterMm) ||
-            NominalDiameterMm < 0d)
-        {
-            throw new ArgumentOutOfRangeException(nameof(NominalDiameterMm));
-        }
+    public string ToolId { get; }
+    public ToolKind Kind { get; }
+    public string InterfaceId { get; }
+    public double NominalDiameterMm { get; }
+    public double MinimumDiameterMm { get; }
+    public double MaximumDiameterMm { get; }
 
-        if (!double.IsFinite(MinimumDiameterMm) ||
-            !double.IsFinite(MaximumDiameterMm) ||
-            MinimumDiameterMm < 0d ||
-            MaximumDiameterMm < MinimumDiameterMm ||
-            NominalDiameterMm < MinimumDiameterMm ||
-            NominalDiameterMm > MaximumDiameterMm)
-        {
-            throw new ArgumentOutOfRangeException(nameof(MinimumDiameterMm));
-        }
+    public ToolDefinition(
+        string toolId,
+        ToolKind kind,
+        string interfaceId,
+        double nominalDiameterMm,
+        double minimumDiameterMm,
+        double maximumDiameterMm)
+    {
+        if (string.IsNullOrWhiteSpace(toolId))
+            throw new ArgumentException("ToolId is required.", nameof(toolId));
+        if (string.IsNullOrWhiteSpace(interfaceId))
+            throw new ArgumentException("InterfaceId is required.", nameof(interfaceId));
+
+        if (!double.IsFinite(nominalDiameterMm) || nominalDiameterMm < 0d)
+            throw new ArgumentOutOfRangeException(nameof(nominalDiameterMm));
+
+        if (!double.IsFinite(minimumDiameterMm) ||
+            !double.IsFinite(maximumDiameterMm) ||
+            minimumDiameterMm < 0d ||
+            maximumDiameterMm < minimumDiameterMm ||
+            nominalDiameterMm < minimumDiameterMm ||
+            nominalDiameterMm > maximumDiameterMm)
+            throw new ArgumentOutOfRangeException(nameof(minimumDiameterMm));
+
+        ToolId = toolId;
+        Kind = kind;
+        InterfaceId = interfaceId;
+        NominalDiameterMm = nominalDiameterMm;
+        MinimumDiameterMm = minimumDiameterMm;
+        MaximumDiameterMm = maximumDiameterMm;
     }
 
     public bool SupportsDiameter(double diameterMm) =>
@@ -98,7 +114,9 @@ public sealed record ToolDefinition(
 
 public static class MachineProcessCompatibility
 {
-    public static bool IsCompatible(MachineKind machine, ManufacturingProcessKind process) =>
+    public static bool IsCompatible(
+        MachineKind machine,
+        ManufacturingProcessKind process) =>
         machine switch
         {
             MachineKind.MachiningCenter => process == ManufacturingProcessKind.Milling,
@@ -114,7 +132,9 @@ public static class MachineProcessCompatibility
 
 public static class ToolProcessCompatibility
 {
-    public static bool IsCompatible(ManufacturingProcessKind process, ToolKind tool) =>
+    public static bool IsCompatible(
+        ManufacturingProcessKind process,
+        ToolKind tool) =>
         process switch
         {
             ManufacturingProcessKind.Milling =>
@@ -130,25 +150,37 @@ public static class ToolProcessCompatibility
         };
 }
 
-public sealed record MachineDefinition(
-    string MachineId,
-    MachineKind Kind,
-    string ToolInterfaceId,
-    IReadOnlyList<MachineCapability> Capabilities)
+public sealed record MachineDefinition
 {
-    public MachineDefinition
-    {
-        if (string.IsNullOrWhiteSpace(MachineId))
-            throw new ArgumentException("MachineId is required.", nameof(MachineId));
-        if (string.IsNullOrWhiteSpace(ToolInterfaceId))
-            throw new ArgumentException("ToolInterfaceId is required.", nameof(ToolInterfaceId));
+    public string MachineId { get; }
+    public MachineKind Kind { get; }
+    public string ToolInterfaceId { get; }
+    public IReadOnlyList<MachineCapability> Capabilities { get; }
 
-        Capabilities = Capabilities?.ToArray() ??
-            throw new ArgumentNullException(nameof(Capabilities));
+    public MachineDefinition(
+        string machineId,
+        MachineKind kind,
+        string toolInterfaceId,
+        IReadOnlyList<MachineCapability> capabilities)
+    {
+        if (string.IsNullOrWhiteSpace(machineId))
+            throw new ArgumentException("MachineId is required.", nameof(machineId));
+        if (string.IsNullOrWhiteSpace(toolInterfaceId))
+            throw new ArgumentException("ToolInterfaceId is required.", nameof(toolInterfaceId));
+
+        Capabilities = capabilities?.ToArray()
+            ?? throw new ArgumentNullException(nameof(capabilities));
+
+        MachineId = machineId;
+        Kind = kind;
+        ToolInterfaceId = toolInterfaceId;
     }
 
-    public bool SupportsProcess(ManufacturingProcessKind process, double thicknessMm) =>
-        Capabilities.Any(x => x.Process == process && x.SupportsThickness(thicknessMm));
+    public bool SupportsProcess(
+        ManufacturingProcessKind process,
+        double thicknessMm) =>
+        Capabilities.Any(
+            x => x.Process == process && x.SupportsThickness(thicknessMm));
 }
 
 public static class MachineToolCompatibility
@@ -161,7 +193,10 @@ public static class MachineToolCompatibility
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(tool);
 
-        return string.Equals(machine.ToolInterfaceId, tool.InterfaceId, StringComparison.Ordinal) &&
+        return string.Equals(
+                machine.ToolInterfaceId,
+                tool.InterfaceId,
+                StringComparison.Ordinal) &&
             ToolProcessCompatibility.IsCompatible(process, tool.Kind);
     }
 }

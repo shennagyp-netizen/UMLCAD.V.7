@@ -4,7 +4,7 @@
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
 - Main head before PR #30 merge: `d267d9cb5d277da6d655fefd9d122c1c165e9a53`
-- Latest completed roadmap family after merge: M14 — NVIDIA CUDA (declared AABB domain; hardware-unvalidated)
+- Latest completed roadmap family after merge: M15 — Cross-backend conformance (declared AABB domain; Metal-validated, CUDA hardware-unverified)
 - Latest merged M10 closure PR: #27, `math: complete solver result status authority`
 - PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
 - Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
@@ -13,7 +13,7 @@
 - PR #30 validated implementation head: `9d04c05f67f4e5542df56b8612806fe8296f624b`
 
 ## Completed mathematical-authority state
-PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M15 is now the next incomplete roadmap family after the M14 post-merge verification.
+PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M16 is now the next incomplete roadmap family after the M15 post-merge verification.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -105,7 +105,7 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 1. Verify PR #30's final exact-head Rust and comprehensive E2E/red-team gates on the documentation head, then merge it.
 2. Verify post-merge main Rust and comprehensive E2E/red-team gates on the resulting main commit.
 3. After post-merge green, begin M12 GPU abstraction from the updated main head.
-4. M14 is merged and post-merge green on `f5095cdf53e5db1ef610c8e2fd3620920456e2da`; begin M15 from that verified `main` head. CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+4. M15 is merged and post-merge green on its verified `main` head; begin M16 from that verified `main` head. CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 
 ## M11 completion boundary
 
@@ -213,3 +213,7 @@ M14 is closed on `main` for the declared NVIDIA CUDA acceleration domain at merg
 - Normal repository gates contain zero ignored CUDA tests; hardware cases are feature-gated behind `cuda-hardware` and must be explicitly enabled on an NVIDIA runner.
 - CUDA hardware status: **Not yet hardware-validated**. No confirmed NVIDIA hardware execution record was available during M14 closure.
 - M15 remains responsible for CPU/Metal/CUDA cross-backend conformance; M16 remains final performance/crossover and full red-team closure.
+
+## M15 completion boundary
+
+M15 establishes CPU/Metal/CUDA conformance for the currently shared certified workload: batched AABB candidate generation. The CPU reference fixture is identical across the available backends; candidate sets are canonicalized before comparison; false negatives are semantic failures; broad-phase false positives are reported separately; and repeat execution must remain deterministic. Metal is hardware-validated on Apple Silicon. CUDA hardware execution is not claimed because no NVIDIA runner was available during M15. M16 is now the active milestone for performance/crossover and final red-team closure.

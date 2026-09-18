@@ -5,12 +5,127 @@
 //! produce false positives but, for finite valid boxes, never omit overlapping
 //! leaf boxes.
 
+use std::collections::BTreeMap;
+
 use super::vec::Vec3;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Aabb3 {
     pub min: Vec3,
     pub max: Vec3,
+}
+
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BoundingSphere3 {
+    pub center: Vec3,
+    pub radius: f64,
+}
+
+impl BoundingSphere3 {
+    pub fn new(center: Vec3, radius: f64) -> Result<Self, BvhError> {
+        if !center.is_finite() || !radius.is_finite() {
+            return Err(BvhError::NonFinite);
+        }
+        if radius < 0.0 {
+            return Err(BvhError::InvalidBounds);
+        }
+        Ok(Self { center, radius })
+    }
+
+    pub fn from_aabb(bounds: Aabb3) -> Self {
+        let center = bounds.center();
+        let radius = 0.5 * bounds.diagonal();
+        Self { center, radius }
+    }
+
+    pub fn from_points(points: &[Vec3]) -> Result<Self, BvhError> {
+        let bounds = Aabb3::from_points(points)?;
+        Ok(Self::from_aabb(bounds))
+    }
+
+    pub fn contains_point(self, point: Vec3, tolerance: f64) -> bool {
+        if !point.is_finite() || !tolerance.is_finite() || tolerance < 0.0 {
+            return false;
+        }
+        let distance = point.sub(self.center).length();
+        distance.is_finite() && distance <= self.radius + tolerance
+    }
+
+    pub fn intersects(self, other: Self, tolerance: f64) -> bool {
+        if !tolerance.is_finite() || tolerance < 0.0 {
+            return false;
+        }
+        let distance = self.center.sub(other.center).length();
+        distance.is_finite() && distance <= self.radius + other.radius + tolerance
+    }
+
+    pub fn intersects_aabb(self, bounds: Aabb3, tolerance: f64) -> bool {
+        if !tolerance.is_finite() || tolerance < 0.0 {
+            return false;
+        }
+        let closest = Vec3::new(
+            self.center.x.clamp(bounds.min.x, bounds.max.x),
+            self.center.y.clamp(bounds.min.y, bounds.max.y),
+            self.center.z.clamp(bounds.min.z, bounds.max.z),
+        );
+        let distance = self.center.sub(closest).length();
+        distance.is_finite() && distance <= self.radius + tolerance
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ParameterBounds2 {
+    pub min_u: f64,
+    pub max_u: f64,
+    pub min_v: f64,
+    pub max_v: f64,
+}
+
+impl ParameterBounds2 {
+    pub fn new(min_u: f64, max_u: f64, min_v: f64, max_v: f64) -> Result<Self, BvhError> {
+        let values = [min_u, max_u, min_v, max_v];
+        if values.iter().any(|value| !value.is_finite()) {
+            return Err(BvhError::NonFinite);
+        }
+        if min_u > max_u || min_v > max_v {
+            return Err(BvhError::InvalidBounds);
+        }
+        Ok(Self { min_u, max_u, min_v, max_v })
+    }
+
+    pub fn center(self) -> (f64, f64) {
+        (
+            0.5 * self.min_u + 0.5 * self.max_u,
+            0.5 * self.min_v + 0.5 * self.max_v,
+        )
+    }
+
+    pub fn subdivide(self) -> [Self; 4] {
+        let (mid_u, mid_v) = self.center();
+        [
+            Self { min_u: self.min_u, max_u: mid_u, min_v: self.min_v, max_v: mid_v },
+            Self { min_u: mid_u, max_u: self.max_u, min_v: self.min_v, max_v: mid_v },
+            Self { min_u: self.min_u, max_u: mid_u, min_v: mid_v, max_v: self.max_v },
+            Self { min_u: mid_u, max_u: self.max_u, min_v: mid_v, max_v: self.max_v },
+        ]
+    }
+}
+
+pub fn subdivide_aabb8(bounds: Aabb3) -> [Aabb3; 8] {
+    let center = bounds.center();
+    let min = bounds.min;
+    let max = bounds.max;
+    [
+        Aabb3 { min, max: Vec3::new(center.x, center.y, center.z) },
+        Aabb3 { min: Vec3::new(center.x, min.y, min.z), max: Vec3::new(max.x, center.y, center.z) },
+        Aabb3 { min: Vec3::new(min.x, center.y, min.z), max: Vec3::new(center.x, max.y, center.z) },
+        Aabb3 { min: Vec3::new(center.x, center.y, min.z), max: Vec3::new(max.x, max.y, center.z) },
+        Aabb3 { min: Vec3::new(min.x, min.y, center.z), max: Vec3::new(center.x, center.y, max.z) },
+        Aabb3 { min: Vec3::new(center.x, min.y, center.z), max: Vec3::new(max.x, center.y, max.z) },
+        Aabb3 { min: Vec3::new(min.x, center.y, center.z), max: Vec3::new(center.x, max.y, max.z) },
+        Aabb3 { min: center, max },
+    ]
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,6 +225,11 @@ impl Aabb3 {
             && axis_overlap(self.min.y, self.max.y, other.min.y, other.max.y, tolerance)
             && axis_overlap(self.min.z, self.max.z, other.min.z, other.max.z, tolerance)
     }
+
+    pub fn bounding_sphere(self) -> BoundingSphere3 {
+        BoundingSphere3::from_aabb(self)
+    }
+
 }
 
 fn axis_overlap(a_min: f64, a_max: f64, b_min: f64, b_max: f64, tolerance: f64) -> bool {
@@ -338,6 +458,49 @@ mod tests {
         )
         .unwrap();
         assert!(!a.intersects(b, f64::MAX));
+    }
+
+    #[test]
+    fn bounding_sphere_is_conservative_for_aabb() {
+        let bounds = box3(-2.0, 1.0, 4.0);
+        let sphere = bounds.bounding_sphere();
+        assert!(sphere.contains_point(bounds.min, 1.0e-12));
+        assert!(sphere.contains_point(bounds.max, 1.0e-12));
+        assert!(sphere.intersects_aabb(bounds, 0.0));
+    }
+
+    #[test]
+    fn parameter_bounds_and_spatial_subdivision_are_deterministic() {
+        let bounds = ParameterBounds2::new(0.0, 1.0, -2.0, 2.0).unwrap();
+        let children = bounds.subdivide();
+        assert_eq!(children[0].center(), (0.25, -1.0));
+        assert_eq!(children[3].center(), (0.75, 1.0));
+
+        let root = Aabb3::new(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(2.0, 4.0, 6.0),
+        ).unwrap();
+        let children = subdivide_aabb8(root);
+        assert_eq!(children.len(), 8);
+        assert_eq!(children[0].max, Vec3::new(1.0, 2.0, 3.0));
+        assert_eq!(children[7].min, Vec3::new(1.0, 2.0, 3.0));
+        for child in children {
+            assert!(child.min.x <= child.max.x);
+            assert!(child.min.y <= child.max.y);
+            assert!(child.min.z <= child.max.z);
+        }
+    }
+
+    #[test]
+    fn bounding_sphere_rejects_invalid_values() {
+        assert_eq!(
+            BoundingSphere3::new(Vec3::new(0.0, 0.0, 0.0), -1.0),
+            Err(BvhError::InvalidBounds)
+        );
+        assert_eq!(
+            BoundingSphere3::new(Vec3::new(f64::NAN, 0.0, 0.0), 1.0),
+            Err(BvhError::NonFinite)
+        );
     }
 
     #[test]

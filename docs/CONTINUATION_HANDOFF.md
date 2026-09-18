@@ -3,15 +3,13 @@
 ## Snapshot
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
-- Main head before PR #30 merge: `d267d9cb5d277da6d655fefd9d122c1c165e9a53`
-- Latest completed roadmap family after merge: M16 — Performance + final red team
-- Latest merged M10 closure PR: #27, `math: complete solver result status authority`
-- PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
-- Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
-- PR #28 merge commit: `fdb34d5a1e03ed399f900848b6dbe96da71d1a13`
-- M9 closure PR: #30, `math: complete M8/M9 authority hardening`
-- PR #30 validated implementation head: `9d04c05f67f4e5542df56b8612806fe8296f624b`
-
+- Architecture documentation baseline before this revision: `3943653171af8524e25ed928c19026d595e081ba`
+- Latest mathematical roadmap family: M16 — Performance + final red team
+- M0–M16 is closed for its declared certified mathematical domains; this is not a claim that all CAD mathematics is implemented.
+- Active System-CAD architecture authority: `docs/SYSTEM_CAD_ARCHITECTURE.md`.
+- The active architecture defines C4 Level 1–4, the canonical semantic evaluation path, domain ownership/dependency direction, Product Structure/BOM, Drawing/PMI, CAM/postprocessing, phenomena simulation adapters, templates/components/sheets, and the mandatory early vertical slice.
+- The audited `main` tree still contains the established Rust mathematical/native foundation plus the current Framework/kernel-client compatibility surface; the complete target System-CAD evaluation stack is not yet claimed as implemented on `main`.
+- `docs/doc.tex` is the published handbook and must remain consistent with the active System-CAD architecture.
 ## Completed mathematical-authority state
 PR #30 completes M9 for the declared certified domains. M0-M16 is now closed after the M16 post-merge verification.
 
@@ -102,10 +100,10 @@ M9 family status at PR #30 head: **Implemented / Tested** for its declared certi
 The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, black-box HTTP, Demo, raw HTTP red-team, release-path, and ignored-test checks.
 
 ## Immediate continuation
-1. Verify PR #30's final exact-head Rust and comprehensive E2E/red-team gates on the documentation head, then merge it.
-2. Verify post-merge main Rust and comprehensive E2E/red-team gates on the resulting main commit.
-3. After post-merge green, begin M12 GPU abstraction from the updated main head.
-4. M16 is merged and post-merge green on `3d494ebbffb6f944e3e574ab04234deeffd9f91a`. The current M0-M16 roadmap is complete; no further roadmap station is defined by this plan. CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+1. Treat `docs/SYSTEM_CAD_ARCHITECTURE.md` as the authority for the target System-CAD structure; do not infer the architecture from the historical M0–M16 sequence.
+2. Start the next System-CAD increment from the exact current `main` head, inspect the implemented boundaries, and define the smallest authoritative RED at the affected semantic boundary.
+3. Use the mandatory early vertical slice as the architectural proof: cube → semantic face reference → sketch on face → two circles/constraints → feature directions → authoritative result/topology provenance → derived representation → viewer semantic selection.
+4. Do not restart or extend M12–M16 merely because older handoff text mentions them. The mathematical roadmap is closed; future mathematical work requires a new explicit contract.
 
 ## M11 completion boundary
 

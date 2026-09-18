@@ -159,15 +159,25 @@ impl TrimLoop2 {
 
     pub fn orientation(&self, tolerance: f64) -> Result<Tri, TrimError> {
         let area = self.signed_area(tolerance)?;
-        let scale = self
-            .curves
-            .iter()
-            .map(|curve| {
-                let point = curve.start();
-                point.x.abs().max(point.y.abs())
-            })
-            .fold(0.0, f64::max)
-            .max(1.0);
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
+        let mut max_x = f64::NEG_INFINITY;
+        let mut max_y = f64::NEG_INFINITY;
+        let mut geometric_scale: f64 = 0.0;
+        for curve in &self.curves {
+            let start = curve.start();
+            let end = curve.end();
+            min_x = min_x.min(start.x).min(end.x);
+            min_y = min_y.min(start.y).min(end.y);
+            max_x = max_x.max(start.x).max(end.x);
+            max_y = max_y.max(start.y).max(end.y);
+            geometric_scale = geometric_scale.max(start.distance(end));
+            if let TrimCurve2::Arc(arc) = curve {
+                geometric_scale = geometric_scale.max(arc.radius);
+            }
+        }
+        let extent = (max_x - min_x).hypot(max_y - min_y);
+        let scale = extent.max(geometric_scale).max(1.0);
         let eps = tolerance * scale * scale;
         if !eps.is_finite() {
             return Ok(Tri::Indeterminate);
@@ -240,11 +250,13 @@ fn ray_crossing(c: &TrimCurve2, p: Point, tol: f64) -> RayHit {
             let d = end.sub(*start);
             let relative = p.sub(*start);
             let cross = d.cross(relative);
-            let scale = (d.length() + relative.length()).max(f64::MIN_POSITIVE);
-            if !cross.is_finite() || !scale.is_finite() {
+            let line_scale = d.length().max(f64::MIN_POSITIVE);
+            if !cross.is_finite() || !line_scale.is_finite() {
                 return RayHit::Indeterminate;
             }
-            if cross.abs() <= tol * scale
+            // cross has units of length²; compare it with tolerance × line
+            // length so the boundary test is translation- and scale-consistent.
+            if cross.abs() <= tol * line_scale
                 && p.x >= min_x - tol
                 && p.x <= max_x + tol
                 && p.y >= min_y - tol
@@ -396,6 +408,33 @@ mod tests {
             q.classify_point(Point { x: 0.0, y: 0.5 }, 1.0e-12).unwrap(),
             RegionClass::OnBoundary
         );
+    }
+
+    #[test]
+    fn trim_orientation_is_translation_invariant() {
+        let local = square();
+        let shifted = TrimLoop2 {
+            curves: vec![
+                TrimCurve2::Line {
+                    start: Point { x: 1.0e12, y: 1.0e12 },
+                    end: Point { x: 1.0e12 + 1.0, y: 1.0e12 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0e12 + 1.0, y: 1.0e12 },
+                    end: Point { x: 1.0e12 + 1.0, y: 1.0e12 + 1.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0e12 + 1.0, y: 1.0e12 + 1.0 },
+                    end: Point { x: 1.0e12, y: 1.0e12 + 1.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0e12, y: 1.0e12 + 1.0 },
+                    end: Point { x: 1.0e12, y: 1.0e12 },
+                },
+            ],
+        };
+        assert_eq!(local.orientation(1.0e-12).unwrap(), Tri::True);
+        assert_eq!(shifted.orientation(1.0e-12).unwrap(), Tri::True);
     }
 
     #[test]

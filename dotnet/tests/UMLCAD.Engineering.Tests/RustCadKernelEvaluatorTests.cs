@@ -43,7 +43,10 @@ public sealed class RustCadKernelEvaluatorTests
                 box,
                 null,
                 Array.Empty<ReferenceResolution>(),
-                Array.Empty<CadFeatureEvaluationResult>()));
+                Array.Empty<CadFeatureEvaluationResult>())
+            {
+                Tolerance = new KernelTolerance(1e-7, 1e-8)
+            });
 
         Assert.Equal(CadEvaluationStatus.Succeeded, response.Status);
         Assert.NotNull(response.AuthoritativeResult);
@@ -61,8 +64,10 @@ public sealed class RustCadKernelEvaluatorTests
         Assert.Equal(6d, top.Measure);
         Assert.True(geometry.LastRequest is not null);
         Assert.Equal("evaluation-001", geometry.LastRequest!.OperationIdentity);
+        Assert.Equal(new KernelTolerance(1e-7, 1e-8), geometry.LastRequest.Tolerance);
         Assert.Equal(new KernelVector3(10d, 20d, 30d), geometry.LastRequest.Min);
         Assert.Equal(new KernelVector3(12d, 23d, 34d), geometry.LastRequest.Max);
+        Assert.Equal(new KernelTolerance(1e-9, 1e-9), geometry.LastRequest.Tolerance);
     }
 
     [Fact]

@@ -120,6 +120,32 @@ public sealed class CadEvaluationVerticalSliceTests
     }
 
     [Fact]
+    public void Evaluation_identity_changes_when_document_tolerance_changes()
+    {
+        var document = CreateVerticalSliceDocument();
+        var changedTolerance = document with
+        {
+            EvaluationTolerance = new KernelTolerance(1e-7, 1e-8)
+        };
+
+        var firstPlan = EvaluationPlanner.Plan(SpecificationGraph.Build(document));
+        var secondPlan = EvaluationPlanner.Plan(SpecificationGraph.Build(changedTolerance));
+
+        var first = EvaluationIdentity.ComputeDocument(
+            document,
+            firstPlan,
+            Array.Empty<CadFeatureEvaluationResult>(),
+            "semantic-default");
+        var second = EvaluationIdentity.ComputeDocument(
+            changedTolerance,
+            secondPlan,
+            Array.Empty<CadFeatureEvaluationResult>(),
+            "semantic-default");
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
     public void Specification_cycles_are_rejected_before_kernel_calls()
     {
         var support = SupportReference();
@@ -164,7 +190,10 @@ public sealed class CadEvaluationVerticalSliceTests
 
         return new CadDocumentSpecification(
             new CadId("vertical-slice"), "A", "mm",
-            new CadFeatureSpecification[] { baseFeature, sketch, featureA, featureB });
+            new CadFeatureSpecification[] { baseFeature, sketch, featureA, featureB })
+        {
+            EvaluationTolerance = new KernelTolerance(1e-9, 1e-9)
+        };
     }
 
     private static CadReference SupportReference() =>

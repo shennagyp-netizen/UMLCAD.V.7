@@ -166,12 +166,19 @@ public static class EvaluationIdentity
         IReadOnlyList<CadFeatureEvaluationResult> upstream,
         string representationPolicy,
         string evaluationContext = "",
-        string kernelContractVersion = CadContractVersions.KernelEvaluation)
+        string kernelContractVersion = CadContractVersions.KernelEvaluation,
+        KernelTolerance? tolerance = null)
     {
         var builder = new StringBuilder();
         Append(builder, "kernelContract", kernelContractVersion);
         Append(builder, "representationPolicy", representationPolicy);
         Append(builder, "evaluationContext", evaluationContext);
+
+        if (tolerance is { } evaluationTolerance)
+        {
+            Append(builder, "tolerance.absolute", evaluationTolerance.Absolute);
+            Append(builder, "tolerance.relative", evaluationTolerance.Relative);
+        }
         AppendFeature(builder, feature);
 
         foreach (var reference in references.OrderBy(x => x.Reference.ReferenceId.Value, StringComparer.Ordinal))
@@ -205,6 +212,9 @@ public static class EvaluationIdentity
         Append(builder, "revision", document.Revision);
         Append(builder, "configuration", document.Configuration);
         Append(builder, "representationPolicy", representationPolicy);
+
+        Append(builder, "tolerance.absolute", document.EvaluationTolerance.Absolute);
+        Append(builder, "tolerance.relative", document.EvaluationTolerance.Relative);
 
         foreach (var id in plan.FeatureIds)
             Append(builder, "plan", id.Value);
@@ -360,7 +370,9 @@ public sealed class CadEvaluationEngine
                 references,
                 upstream,
                 representationPolicy,
-                $"{document.Revision}|{document.Configuration}");
+                $"{document.Revision}|{document.Configuration}",
+                CadContractVersions.KernelEvaluation,
+                document.EvaluationTolerance);
 
             var invalidReference = references.FirstOrDefault(x => !x.IsResolved);
             if (invalidReference is not null)
@@ -404,7 +416,10 @@ public sealed class CadEvaluationEngine
                 feature,
                 upstreamResult,
                 references,
-                upstream);
+                upstream)
+            {
+                Tolerance = document.EvaluationTolerance
+            };
 
             KernelEvaluationResponse response;
             try

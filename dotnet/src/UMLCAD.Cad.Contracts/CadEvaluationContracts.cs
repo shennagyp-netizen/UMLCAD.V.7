@@ -280,11 +280,14 @@ public sealed record CadDocumentSpecification(
     string Configuration,
     IReadOnlyList<CadFeatureSpecification> Features)
 {
+    public KernelTolerance EvaluationTolerance { get; init; } = new(1e-9, 1e-9);
+
     public void Validate()
     {
         if (!DocumentId.IsValid) throw new ArgumentException("Document ID is required.");
         if (string.IsNullOrWhiteSpace(Revision) || string.IsNullOrWhiteSpace(Configuration))
             throw new ArgumentException("Document revision and configuration are required.");
+
         var ids = new HashSet<CadId>();
         foreach (var feature in Features)
         {
@@ -387,6 +390,8 @@ public sealed record KernelEvaluationRequest(
     IReadOnlyList<ReferenceResolution> ResolvedReferences,
     IReadOnlyList<CadFeatureEvaluationResult> UpstreamEvaluations)
 {
+    public KernelTolerance Tolerance { get; init; } = new(1e-9, 1e-9);
+
     public void Validate()
     {
         if (!EvaluationId.IsValid) throw new ArgumentException("Kernel evaluation ID is required.");

@@ -9,8 +9,6 @@ namespace UMLCAD.Kernel.Client;
 /// </summary>
 public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
 {
-    private const double GeometryTolerance = 1e-9;
-
     private readonly IAuthoritativeGeometryService _boxGeometry;
 
     public RustCadKernelEvaluator(IAuthoritativeGeometryService boxGeometry)
@@ -56,9 +54,7 @@ public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
                     request.EvaluationId.Value,
                     min,
                     max,
-                    new KernelTolerance(
-                        GeometryTolerance,
-                        GeometryTolerance),
+                    request.Tolerance,
                     new ContractVersion("1.0")),
                 cancellationToken);
         }

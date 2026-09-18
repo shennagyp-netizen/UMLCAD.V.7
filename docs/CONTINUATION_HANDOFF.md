@@ -397,3 +397,8 @@ Next .NET implementation boundary:
 Commit `75dc2ea...` separated semantic reference resolution from kernel execution. The follow-on frame-hardening work adds explicit immutable right-handed `XAxis/YAxis/ZAxis` basis vectors to `CadFrame`, validates orthonormality/handedness, and includes the complete basis in deterministic evaluation identity.
 
 This remains a .NET semantic contract change only. The existing Rust mathematical authority is unchanged.
+
+
+## System-CAD tolerance authority
+
+The .NET S1 evaluation path now carries document-level tolerance semantics end-to-end. `CadDocumentSpecification.EvaluationTolerance` participates in deterministic document/feature identity, and `KernelEvaluationRequest.Tolerance` is consumed by the production box adapter. The kernel remains unchanged.

@@ -51,3 +51,9 @@ The production Rust kernel already contains authoritative B-Rep/topology mathema
 ## Downstream
 
 Drawing, CAM, Sheet Metal, BOM, and other engineering domains consume AuthoritativeCadResult/representation contracts. They do not redefine geometric truth.
+
+
+## Evaluation tolerance authority
+
+S1 now carries an explicit document-level `KernelTolerance` policy. The policy participates in feature/document evaluation identity and is copied into every `KernelEvaluationRequest`. The production Rust adapter consumes the request policy rather than maintaining a hidden geometry tolerance.
+

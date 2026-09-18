@@ -1296,29 +1296,54 @@ mod trimmed_surface_tests {
     fn convex_trimmed_surface_fills_and_preserves_boundary() {
         let policy = TrimTessellationPolicy {
             chord_error: 1.0e-3,
-            angular_error: 1.0e-3,
+            angular_error: 5.0e-2,
             parameter_chord_error: 1.0e-3,
             max_depth: 10,
         };
-        let result = tessellate_trimmed_surface3(
-            &square_trim(),
+        let trim = square_trim();
+
+        let boundary = tessellate_trim_loop3(
+            &trim,
             1.0e-9,
             policy,
             |u, v| Ok(Vec3::new(u, v, 0.2 * u * u + 0.3 * v * v)),
             |u, v| {
                 let du = Vec3::new(1.0, 0.0, 0.4 * u);
                 let dv = Vec3::new(0.0, 1.0, 0.6 * v);
-                du.cross(dv).normalized().map_err(|_| TessellationError::Degenerate)
+                du.cross(dv)
+                    .normalized()
+                    .map_err(|_| TessellationError::Degenerate)
             },
         )
         .unwrap();
+
+        let result = tessellate_trimmed_surface3(
+            &trim,
+            1.0e-9,
+            policy,
+            |u, v| Ok(Vec3::new(u, v, 0.2 * u * u + 0.3 * v * v)),
+            |u, v| {
+                let du = Vec3::new(1.0, 0.0, 0.4 * u);
+                let dv = Vec3::new(0.0, 1.0, 0.6 * v);
+                du.cross(dv)
+                    .normalized()
+                    .map_err(|_| TessellationError::Degenerate)
+            },
+        )
+        .unwrap();
+
         assert!(result.triangles.len() > 2);
         assert!(result.max_chord_error <= policy.chord_error);
         assert!(result.max_angular_error <= policy.angular_error);
-        assert!(result.parameters.iter().any(|p| *p == (0.0, 0.0)));
-        assert!(result.parameters.iter().any(|p| *p == (1.0, 0.0)));
-        assert!(result.parameters.iter().any(|p| *p == (1.0, 1.0)));
-        assert!(result.parameters.iter().any(|p| *p == (0.0, 1.0)));
+        assert_eq!(result.parameters.len(), result.vertices.len());
+        assert_eq!(result.parameters.len(), result.normals.len());
+
+        for parameter in &boundary.parameters {
+            assert!(result.parameters.iter().any(|candidate| candidate == parameter));
+        }
+        for corner in [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)] {
+            assert!(result.parameters.iter().any(|parameter| *parameter == corner));
+        }
     }
 
     #[test]

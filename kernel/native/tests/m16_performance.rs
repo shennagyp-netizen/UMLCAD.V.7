@@ -164,7 +164,7 @@ fn m16_metal_performance_evidence_is_finite_and_reports_crossover() {
             readback_median,
             postprocess_median,
         ] {
-            assert!(timing.is_finite());
+            assert!(timing.as_secs_f64().is_finite());
         }
         assert!(roundtrip_overhead_pct.is_finite());
         assert!(cpu_throughput.is_finite() && metal_throughput.is_finite());

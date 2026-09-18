@@ -557,6 +557,52 @@ def sketch_solve_geometry_checks(runner: Runner) -> bool:
     runner.log(("PASS" if ok else "FAIL") + " python-sketch-solve/repeat-determinism")
     passed &= ok
 
+    # Metamorphic scale check: uniform geometric scaling should preserve the
+    # solved dimensionless sketch shape while scaling coordinates/radii.
+    scaled_payload = json.loads(json.dumps(deterministic_payload))
+    scale = 1000.0
+    for circle in scaled_payload["circles"]:
+        circle["x"] *= scale
+        circle["y"] *= scale
+        circle["radius"] *= scale
+    scaled_body = json.dumps(scaled_payload).encode()
+    scaled_request = (
+        "POST /v1/sketch/solve HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Type: application/json\r\n"
+        f"Content-Length: {len(scaled_body)}\r\n"
+        "Connection: close\r\n\r\n"
+    )
+    try:
+        _, base_response = status_and_body(http_request(deterministic_body, deterministic_request))
+        _, scaled_response = status_and_body(http_request(scaled_body, scaled_request))
+        base_value = json.loads(base_response.decode("utf-8"))
+        scaled_value = json.loads(scaled_response.decode("utf-8"))
+        base_circles = {x["id"]: x for x in base_value["circles"]}
+        scaled_circles = {x["id"]: x for x in scaled_value["circles"]}
+        ok = set(base_circles) == set(scaled_circles)
+        for circle_id in base_circles:
+            a = base_circles[circle_id]
+            b = scaled_circles[circle_id]
+            ok = ok and abs((b["x"] / scale) - a["x"]) <= 1e-8
+            ok = ok and abs((b["y"] / scale) - a["y"]) <= 1e-8
+            ok = ok and abs((b["radius"] / scale) - a["radius"]) <= 1e-8
+        detail = scaled_response
+    except Exception as exc:
+        ok = False
+        detail = str(exc).encode()
+    runner.results.append(
+        Result(
+            "python-sketch-solve/scale-metamorphic",
+            ["raw-socket-http-probe", "scale-metamorphic"],
+            0 if ok else 1,
+            0.0,
+            detail.decode("utf-8", errors="replace")[-3000:]
+        )
+    )
+    runner.log(("PASS" if ok else "FAIL") + " python-sketch-solve/scale-metamorphic")
+    passed &= ok
+
     return passed
 
 def raw_redteam_checks(runner: Runner) -> bool:

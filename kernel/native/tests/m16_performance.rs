@@ -224,8 +224,6 @@ fn m16_metal_performance_evidence_is_finite_and_reports_crossover() {
         assert!(batch_efficiency_pct.is_finite());
         assert!((pair_count as f64).is_finite());
     }
-
-);
 }
 
 #[test]

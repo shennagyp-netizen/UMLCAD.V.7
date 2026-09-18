@@ -103,6 +103,65 @@ public sealed record SketchSolvedCircle(
     double Y,
     double Radius);
 
+public sealed record CadSketchEvaluationResult(
+    CadId SketchId,
+    CadResultId ResultId,
+    string KernelContractVersion,
+    CadFrame Frame,
+    IReadOnlyList<SketchSolvedCircle> Circles,
+    bool Converged,
+    string Reason,
+    int Iterations,
+    double FinalResidualNorm,
+    double FinalScaledResidualNorm,
+    double FinalStepNorm,
+    int DegreesOfFreedom,
+    int VariableCount,
+    int EquationCount,
+    double ConditionEstimate,
+    string EvidenceHash)
+{
+    public void Validate()
+    {
+        if (!SketchId.IsValid || !ResultId.IsValid)
+            throw new ArgumentException("Sketch evaluation identities are required.");
+        if (KernelContractVersion != CadContractVersions.KernelEvaluation)
+            throw new ArgumentException("Unsupported sketch kernel contract version.");
+
+        Frame.Validate();
+
+        if (Circles is null || Circles.Count == 0)
+            throw new ArgumentException("Sketch evaluation requires solved circle geometry.", nameof(Circles));
+
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var circle in Circles)
+        {
+            if (!ids.Add(circle.Id))
+                throw new ArgumentException($"Duplicate solved sketch circle '{circle.Id}'.");
+            if (!double.IsFinite(circle.X) ||
+                !double.IsFinite(circle.Y) ||
+                !double.IsFinite(circle.Radius) ||
+                circle.Radius <= 0d)
+                throw new ArgumentException($"Solved sketch circle '{circle.Id}' is invalid.");
+        }
+
+        if (!Converged ||
+            string.IsNullOrWhiteSpace(Reason) ||
+            Iterations < 0 ||
+            DegreesOfFreedom < 0 ||
+            VariableCount < 0 ||
+            EquationCount < 0 ||
+            !double.IsFinite(FinalResidualNorm) ||
+            !double.IsFinite(FinalScaledResidualNorm) ||
+            !double.IsFinite(FinalStepNorm) ||
+            !double.IsFinite(ConditionEstimate) ||
+            string.IsNullOrWhiteSpace(EvidenceHash))
+        {
+            throw new ArgumentException("Sketch evaluation evidence is incomplete or invalid.");
+        }
+    }
+}
+
 public sealed record SketchSolveKernelResult(
     GeometryKernelStatus Status,
     bool Succeeded,

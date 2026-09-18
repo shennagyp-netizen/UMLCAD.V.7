@@ -262,8 +262,6 @@ fn ray_crossing(c: &TrimCurve2, p: Point, tol: f64) -> RayHit {
             if !cross.is_finite() || !line_scale.is_finite() {
                 return RayHit::Indeterminate;
             }
-            // cross has units of length²; compare it with tolerance × line
-            // length so the boundary test is translation- and scale-consistent.
             if cross.abs() <= tol * line_scale
                 && p.x >= min_x - tol
                 && p.x <= max_x + tol
@@ -285,20 +283,21 @@ fn ray_crossing(c: &TrimCurve2, p: Point, tol: f64) -> RayHit {
         }
         TrimCurve2::Arc(arc) => {
             let rel = (p.y - arc.center.y) / arc.radius;
-            if !rel.is_finite() {
+            let radial_tolerance = tol / arc.radius.max(f64::MIN_POSITIVE);
+            if !rel.is_finite() || !radial_tolerance.is_finite() {
                 return RayHit::Indeterminate;
             }
-            if rel.abs() > 1.0 + tol {
+            if rel.abs() > 1.0 + radial_tolerance {
                 return RayHit::None;
             }
-            if rel.abs() >= 1.0 - tol {
+            if rel.abs() >= 1.0 - radial_tolerance {
                 return RayHit::Indeterminate;
             }
             let theta = rel.clamp(-1.0, 1.0).asin();
             let candidates = [theta, std::f64::consts::PI - theta];
             let mut hit = 0usize;
             for angle in candidates {
-                if arc.contains_angle(angle) {
+                if angle_in_arc_tolerant(angle, arc.start_angle, arc.end_angle, tol, arc.radius) {
                     let x = arc.center.x + arc.radius * angle.cos();
                     if !x.is_finite() {
                         return RayHit::Indeterminate;
@@ -360,11 +359,10 @@ fn arc_contains_point_tolerant(arc: Arc, point: Point, tolerance: f64) -> Tri {
     if !distance.is_finite() || !radial.is_finite() {
         return Tri::Indeterminate;
     }
-    let radial_band = tolerance * arc.radius.max(1.0);
-    if !radial_band.is_finite() {
+    if !tolerance.is_finite() || tolerance < 0.0 {
         return Tri::Indeterminate;
     }
-    if (distance - arc.radius).abs() > radial_band {
+    if (distance - arc.radius).abs() > tolerance {
         return Tri::False;
     }
     if distance <= f64::MIN_POSITIVE {
@@ -412,8 +410,7 @@ fn line_arc_intersection(start: Point, end: Point, arc: Arc, tolerance: f64) -> 
         vec![along - half, along + half]
     };
     for distance in candidates {
-        let segment_band = tolerance.max(f64::MIN_POSITIVE);
-        if distance < -segment_band || distance > length + segment_band {
+        if distance < -tolerance || distance > length + tolerance {
             continue;
         }
         let point = start.add(unit.scale(distance));
@@ -427,9 +424,8 @@ fn line_arc_intersection(start: Point, end: Point, arc: Arc, tolerance: f64) -> 
 }
 
 fn same_circle_arcs_overlap(a: Arc, b: Arc, tolerance: f64) -> Tri {
-    let radius_scale = a.radius.max(b.radius).max(1.0);
     if (a.center.sub(b.center)).length() > tolerance
-        || (a.radius - b.radius).abs() > tolerance * radius_scale
+        || (a.radius - b.radius).abs() > tolerance
     {
         return Tri::False;
     }
@@ -462,7 +458,7 @@ fn arc_arc_intersection(a: Arc, b: Arc, tolerance: f64) -> Tri {
     let distance = delta.length();
     let scale = a.radius.max(b.radius).max(distance).max(1.0);
     let center_band = tolerance;
-    let radius_band = tolerance * scale;
+    let radius_band = tolerance;
     if !distance.is_finite() || !scale.is_finite() || !radius_band.is_finite() {
         return Tri::Indeterminate;
     }
@@ -530,9 +526,214 @@ fn segment_intersection(a: Point, b: Point, c: Point, d: Point, tol: f64) -> Tri
     let c2 = ab.cross(d.sub(a));
     let c3 = cd.cross(a.sub(c));
     let c4 = cd.cross(b.sub(c));
-    let scale = (ab.length() * cd.length()).max(f64::MIN_POSITIVE);
-    let epsilon = tol * scale;
+    let geometric_scale = ab.length()
+        .max(cd.length())
+        .max(a.sub(c).length())
+        .max(a.sub(d).length())
+        .max(f64::MIN_POSITIVE);
+    let epsilon = tol * geometric_scale;
     if !epsilon.is_finite() {
         return Tri::Indeterminate;
     }
     let s1 = if c1 > epsilon { 1 } else if c1 < -epsilon { -1 } else { 0 };
+    let s2 = if c2 > epsilon { 1 } else if c2 < -epsilon { -1 } else { 0 };
+    let s3 = if c3 > epsilon { 1 } else if c3 < -epsilon { -1 } else { 0 };
+    let s4 = if c4 > epsilon { 1 } else if c4 < -epsilon { -1 } else { 0 };
+    if (s1 == 0 && is_on_segment(a, b, c, tol))
+        || (s2 == 0 && is_on_segment(a, b, d, tol))
+        || (s3 == 0 && is_on_segment(c, d, a, tol))
+        || (s4 == 0 && is_on_segment(c, d, b, tol))
+    {
+        Tri::True
+    } else if s1 * s2 < 0 && s3 * s4 < 0 {
+        Tri::True
+    } else {
+        Tri::False
+    }
+}
+
+fn is_on_segment(a: Point, b: Point, p: Point, tol: f64) -> bool {
+    let min_x = a.x.min(b.x) - tol;
+    let max_x = a.x.max(b.x) + tol;
+    let min_y = a.y.min(b.y) - tol;
+    let max_y = a.y.max(b.y) + tol;
+    p.x >= min_x && p.x <= max_x && p.y >= min_y && p.y <= max_y
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn square() -> TrimLoop2 {
+        TrimLoop2 {
+            curves: vec![
+                TrimCurve2::Line {
+                    start: Point { x: 0.0, y: 0.0 },
+                    end: Point { x: 1.0, y: 0.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0, y: 0.0 },
+                    end: Point { x: 1.0, y: 1.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0, y: 1.0 },
+                    end: Point { x: 0.0, y: 1.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 0.0, y: 1.0 },
+                    end: Point { x: 0.0, y: 0.0 },
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn closed_square_has_positive_orientation_and_inside_test() {
+        let q = square();
+        assert_eq!(q.validate(1.0e-12), Ok(()));
+        assert_eq!(q.orientation(1.0e-12).unwrap(), Tri::True);
+        assert_eq!(
+            q.classify_point(Point { x: 0.5, y: 0.5 }, 1.0e-12).unwrap(),
+            RegionClass::Inside
+        );
+        assert_eq!(
+            q.classify_point(Point { x: 2.0, y: 0.5 }, 1.0e-12).unwrap(),
+            RegionClass::Outside
+        );
+    }
+
+    #[test]
+    fn boundary_is_not_inside_or_outside() {
+        let q = square();
+        assert_eq!(
+            q.classify_point(Point { x: 0.0, y: 0.5 }, 1.0e-12).unwrap(),
+            RegionClass::OnBoundary
+        );
+    }
+
+    #[test]
+    fn trim_orientation_is_translation_invariant() {
+        let local = square();
+        let shifted = TrimLoop2 {
+            curves: vec![
+                TrimCurve2::Line {
+                    start: Point { x: 1.0e12, y: 1.0e12 },
+                    end: Point { x: 1.0e12 + 1.0, y: 1.0e12 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0e12 + 1.0, y: 1.0e12 },
+                    end: Point { x: 1.0e12 + 1.0, y: 1.0e12 + 1.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0e12 + 1.0, y: 1.0e12 + 1.0 },
+                    end: Point { x: 1.0e12, y: 1.0e12 + 1.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0e12, y: 1.0e12 + 1.0 },
+                    end: Point { x: 1.0e12, y: 1.0e12 },
+                },
+            ],
+        };
+        assert_eq!(local.orientation(1.0e-12).unwrap(), Tri::True);
+        assert_eq!(shifted.orientation(1.0e-12).unwrap(), Tri::True);
+        assert!((local.signed_area(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-9);
+        assert!((shifted.signed_area(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-6);
+    }
+
+    #[test]
+    fn analytic_line_arc_and_arc_arc_intersections_are_certified() {
+        let arc = TrimCurve2::Arc(Arc {
+            center: Point { x: 0.0, y: 0.0 },
+            radius: 2.0,
+            start_angle: 0.0,
+            end_angle: std::f64::consts::PI,
+        });
+        let line = TrimCurve2::Line {
+            start: Point { x: -3.0, y: 1.0 },
+            end: Point { x: 3.0, y: 1.0 },
+        };
+        assert_eq!(curve_pair_intersects(&line, &arc, 1.0e-9), Tri::True);
+
+        let crossing = TrimCurve2::Arc(Arc {
+            center: Point { x: 2.0, y: 0.0 },
+            radius: 2.0,
+            start_angle: std::f64::consts::FRAC_PI_2,
+            end_angle: 3.0 * std::f64::consts::FRAC_PI_2,
+        });
+        assert_eq!(curve_pair_intersects(&arc, &crossing, 1.0e-9), Tri::True);
+
+        let disjoint = TrimCurve2::Arc(Arc {
+            center: Point { x: 6.0, y: 0.0 },
+            radius: 1.0,
+            start_angle: 0.0,
+            end_angle: std::f64::consts::PI,
+        });
+        assert_eq!(curve_pair_intersects(&arc, &disjoint, 1.0e-9), Tri::False);
+    }
+
+    #[test]
+    fn overlapping_same_circle_arcs_are_self_intersections() {
+        let a = TrimCurve2::Arc(Arc {
+            center: Point { x: 0.0, y: 0.0 },
+            radius: 2.0,
+            start_angle: 0.0,
+            end_angle: std::f64::consts::PI,
+        });
+        let b = TrimCurve2::Arc(Arc {
+            center: Point { x: 0.0, y: 0.0 },
+            radius: 2.0,
+            start_angle: std::f64::consts::FRAC_PI_2,
+            end_angle: 3.0 * std::f64::consts::FRAC_PI_2,
+        });
+        assert_eq!(curve_pair_intersects(&a, &b, 1.0e-9), Tri::True);
+    }
+
+    #[test]
+    fn nonclosed_loop_is_rejected() {
+        let q = TrimLoop2 {
+            curves: vec![
+                TrimCurve2::Line {
+                    start: Point { x: 0.0, y: 0.0 },
+                    end: Point { x: 1.0, y: 0.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0, y: 0.0 },
+                    end: Point { x: 1.0, y: 1.0 },
+                },
+            ],
+        };
+        assert_eq!(q.validate(1.0e-12), Err(TrimError::NotClosed));
+    }
+
+    #[test]
+    fn unsupported_arc_pair_is_indeterminate_during_validation() {
+        let loop_with_two_nonadjacent_arcs = TrimLoop2 {
+            curves: vec![
+                TrimCurve2::Line {
+                    start: Point { x: 0.0, y: 0.0 },
+                    end: Point { x: 2.0, y: 0.0 },
+                },
+                TrimCurve2::Arc(Arc {
+                    center: Point { x: 2.0, y: 1.0 },
+                    radius: 1.0,
+                    start_angle: -std::f64::consts::FRAC_PI_2,
+                    end_angle: std::f64::consts::PI,
+                }),
+                TrimCurve2::Arc(Arc {
+                    center: Point { x: -1.0, y: 1.0 },
+                    radius: 1.0,
+                    start_angle: 0.0,
+                    end_angle: std::f64::consts::PI,
+                }),
+                TrimCurve2::Line {
+                    start: Point { x: -1.0, y: 2.0 },
+                    end: Point { x: 0.0, y: 0.0 },
+                },
+            ],
+        };
+        assert!(matches!(
+            loop_with_two_nonadjacent_arcs.validate(1.0e-12),
+            Err(TrimError::Indeterminate) | Err(TrimError::NotClosed) | Err(TrimError::SelfIntersection)
+        ));
+    }
+}

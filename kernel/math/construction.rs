@@ -1098,3 +1098,6 @@ mod tests {
         assert_eq!(
             variable.validate(tol()),
             Err(ConstructionError::InvalidDimensions)
+        );
+    }
+}

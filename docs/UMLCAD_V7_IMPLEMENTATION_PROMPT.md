@@ -34,35 +34,41 @@ The Python E2E project is the authoritative system integration and red-team boun
 
 ---
 
-## 1. Mandatory reading before code changes
+## Architecture authority
 
-Before modifying code, inspect the actual repository and read the governing documents:
+Before implementing any capability, treat the following as normative:
 
-```text
-README.md
-docs/CONTINUATION_HANDOFF.md
-docs/MATH_AUTHORITY_ROADMAP.md
-docs/CATIA_SYSTEM_IMPLEMENTATION_ROADMAP.md
-```
+⟦BT⟧
+docs/architecture/ABSTRACTION_AND_DEPENDENCY_MODEL.md
+docs/architecture/architecture.json
+docs/architecture/c4/
+⟦BT⟧
 
-Then inspect the relevant implementation areas:
+The C4 model describes system/runtime boundaries. The abstraction model describes dependency and ownership direction. The machine-readable manifest is the executable architectural description consumed by the E2E architecture guard.
 
-```text
-dotnet/
-kernel/
-viewer/
-tests/e2e/
-projects/demo/
-.github/workflows/
-```
+A .NET project is not automatically a C4 Container.
 
-Read existing implementations and tests before adding new abstractions.
+The project tree is an implementation projection of the logical architecture.
 
-The repository is authoritative.
+The key dependency law is:
 
-If the roadmap conflicts with an established mathematical contract, reconcile the design before implementation. Do not silently weaken the mathematical contract.
+⟦BT⟧
+Foundation → Mathematics → Science → CAD Core
+                                      ↓
+                           Engineering Resources
+                                      ↓
+                           Engineering Domains
+⟦BT⟧
 
----
+with outward integration:
+
+⟦BT⟧
+UMLCAD-owned service/contract → adapter/provider → external technology
+⟦BT⟧
+
+Lower layers provide facts/services. Upper layers interpret them as engineering meaning.
+
+Peer domains may exchange stable published results/contracts, but private implementation dependencies are forbidden by default.
 
 # 2. Primary architectural law
 
@@ -125,123 +131,96 @@ It does not decide CAD semantics, exact topology, exact hidden-line classificati
 
 # 3. Domain modules: the central implementation rule
 
-A specialized domain is implemented as a semantic module over the shared foundations.
+A domain module owns engineering meaning, rules, parameterization, semantic composition, and result interpretation.
 
-Examples:
+It consumes lower-level facts and services:
 
-```text
-PartDesign
-Sketching
-HybridGeometry
-Freeform
-SheetMetal
-Assembly
-Kinematics
-Drawing
-PMI
-Knowledge
-Configurations
-Templates
-SimulationMapping
-```
+⟦BT⟧
+Domain
+  → Science services
+  → CAD Core services/results
+  → Engineering Resource services where applicable
+  → shared expression/quantity services
+  → Phenomena Simulation Service where applicable
+⟦BT⟧
 
-The domain module owns:
+It does not own the concrete kernel.
 
-```text
-engineering meaning
-domain parameters
-domain equations/rules
-preconditions/postconditions
-references/context
-semantic definitions
-result interpretation
-```
+Exact geometry follows:
 
-The domain module does **not** own:
+⟦BT⟧
+Domain Definition
+      ↓
+Domain Evaluator
+      ↓
+Evaluation Engine
+      ↓
+explicit mathematical contract
+      ↓
+Rust mathematical authority
+⟦BT⟧
 
-```text
-concrete Rust-client lifetime
-kernel caches
-viewer GPU state
-hidden global mutable state
-an alternative geometry kernel
-```
+### Result flow versus dependency
 
-### Correct boundary
+A domain may consume a stable published result from another domain:
 
-```text
-Domain definition
-    ↓
-validate / normalize
-    ↓
-Engine
-    ↓
-explicit kernel contract
-    ↓
-Rust authority
-```
+⟦BT⟧
+Sheet Metal → published FlatPatternResult → CAM
+⟦BT⟧
 
-### Incorrect boundary
+This does not authorize:
 
-```text
-SheetMetalBend.ExecuteRust(...)
-AssemblyConstraint.CallKernel(...)
-FreeformSurface.DoGeometryInternally(...)
-```
+⟦BT⟧
+CAM → private SheetMetal implementation/state
+⟦BT⟧
 
-The same rule applies to every specialized CAD domain.
-
----
+Data/result flow and compile-time implementation dependency are separate architectural concepts.
 
 # 4. Sheet Metal rule
 
-Sheet Metal equations belong to the Sheet Metal domain semantically and to the shared expression system computationally.
+Sheet Metal is a bounded engineering discipline and should be implemented as a separate library when its public/dependency boundary is introduced.
 
-For example:
+Preferred boundary:
 
-```text
+⟦BT⟧
+UMLCAD.Engineering.SheetMetal
+⟦BT⟧
+
+It owns:
+
+⟦BT⟧
+SheetMetalPart
+Thickness
+BendDefinition
+BendRadius
+BendAngle
+KFactor
+BendAllowance
+BendDeduction
+BendTable
+ReliefDefinition
+FlangeDefinition
+CornerDefinition
+FoldDefinition
+UnfoldDefinition
+FlatPatternDefinition
+⟦BT⟧
+
+It uses shared Science material facts, Engineering Resource machine/tool capabilities, the expression system, CAD Core references/results, and the Phenomena Simulation Service when applicable.
+
+Example semantic equation:
+
+⟦BT⟧
 BendAllowance = ((pi / 180) * (R + (K * T)) * A)
-```
+⟦BT⟧
 
-The canonical expression must be fully parenthesized and represented by an immutable AST.
+The expression subsystem owns AST, units, dimensions, dependency extraction, canonicalization, and evaluation mechanics.
 
-Sheet Metal owns:
+Sheet Metal owns the engineering meaning of K, T, R, A, bend tables, validity rules, material/process compatibility, and machine/tool constraints.
 
-```text
-what R/T/K/A mean
-material/bend rule selection
-bend table selection
-validity conditions
-fold/unfold semantics
-relief semantics
-flat-pattern semantics
-```
+Exact bend/fold/unfold geometry is requested through the common Engine → Math Contract → Rust boundary.
 
-Exact geometry belongs behind contracts:
-
-```text
-bend geometry
-offsets
-intersections
-trim
-fold/unfold topology
-correspondence
-```
-
-The Sheet Metal module therefore depends conceptually on:
-
-```text
-Cad.Expressions
-Cad.Semantics
-Cad.Engine
-Cad.Contracts
-```
-
-but not directly on a concrete Rust implementation.
-
-This is the canonical pattern for specialized modules.
-
----
+The application must reject incompatible material/process/machine combinations from their declared properties/capabilities. Do not implement material compatibility as a collection of special-case names.
 
 # 5. .NET technical boundaries
 
@@ -557,76 +536,112 @@ Do not force the Rust mathematical authority to own commercial CAD joint taxonom
 
 ---
 
-# 14. Simulation representation
+# 14. Phenomena Simulation Service and representation
 
-Simulation models may use meshes, but meshes are derived representations.
+Phenomena simulation is a reusable scientific capability, not a peer application that CAM depends upon.
 
-Preserve:
+The architecture is:
 
-```text
-part identity
-occurrence identity
-transform
-material/physical properties
-mesh identity
-constraint identity
-connection/contact identity
-configuration
-```
+⟦BT⟧
+Phenomena Simulation Service
+        ↓
+provider contract
+        ↓
+multiple implementations/providers
+        ↓
+internal solver or external scientific application
+⟦BT⟧
 
-Never flatten away assembly semantics unless a downstream solver explicitly asks for a flattened representation.
+The service models physical phenomena, subject to explicit scientific contracts.
 
-The physics solver is outside the CAD kernel authority boundary.
+Examples include, where contracted:
 
----
+⟦BT⟧
+deformation
+stress/strain response
+thermal response
+vibration
+cutting-process response
+⟦BT⟧
 
-# 15. Materials / appearance / textures
+CAM may consume the service:
 
-Separate:
+⟦BT⟧
+CAM → Phenomena Simulation Service
+⟦BT⟧
 
-```text
-engineering material
-physical properties
-drafting properties
-appearance
-texture assets
-```
+Sheet Metal and other engineering domains may also consume it.
 
-Texture and shading do not change CAD geometry identity.
+The provider is an implementation choice. CAM must not depend on a concrete solver application such as ANSYS or Abaqus.
 
-Viewer owns GPU material presentation.
+Simulation meshes and other visualization/solver representations remain derived from authoritative engineering/scientific inputs. They do not replace the authoritative CAD result or scientific model.
 
----
+# 15. Materials and physical properties
 
+Material identity and scientifically defined material properties belong to the Science layer.
+
+A shared material model may include:
+
+⟦BT⟧
+composition/classification
+density
+elastic properties
+plastic properties
+thermal properties
+electrical properties
+hardness
+other scientifically defined properties
+⟦BT⟧
+
+Engineering domains interpret those facts.
+
+For example:
+
+⟦BT⟧
+Science:
+    "This material has these properties."
+
+Sheet Metal:
+    "Given those properties, this bending process is valid/invalid."
+
+CAM:
+    "Given those properties, this manufacturing process is feasible
+     under these machine/tool conditions."
+⟦BT⟧
+
+The system must not duplicate material truth independently in Sheet Metal, CAM, or simulation implementations.
+
+Material compatibility is therefore a rule over declared properties/capabilities, not an ad-hoc name check.
 # 16. Drawing / PMI
 
-Drawing is generated engineering documentation.
+Drawing is an upper engineering domain.
 
-Core objects:
+For a dimension:
 
-```text
+⟦BT⟧
 Drawing
-Sheet
-View
-Section
-Detail
-Auxiliary
-Clipping
-DisplayMode
-Dimension
-Annotation
-BOM
-PMI
-Datum
-Tolerance
-```
+   ↓
+Reference Resolution
+   ↓
+Authoritative CAD Result
+   ↓
+Science Measurement / Quantity / Unit services
+   ↓
+Drawing applies drafting rules
+   ↓
+dimension representation
+⟦BT⟧
 
-Projection/HLR/section results must originate from contracted geometry/model mathematics.
+Authority is separated:
 
-Viewer only displays the result.
+⟦BT⟧
+CAD      → authoritative geometry/topology
+Science  → measurement/unit/scientific calculation
+Drawing  → drafting meaning and rules
+Viewer   → presentation
+⟦BT⟧
 
----
-
+Therefore Science does not depend on Drawing. Drawing consumes scientific services.
 # 17. Freeform
 
 Treat Freeform as a major domain.
@@ -955,6 +970,41 @@ Never invent missing repository facts.
 ---
 
 # Final governing statement
+
+Build UMLCAD V7 as:
+
+⟦BT⟧
+one immutable CAD semantic/product model
++ shared mathematical/expression services
++ shared scientific/material/phenomena services
++ shared engineering resource model
++ independent engineering domains
++ one dependency/evaluation engine
++ deterministic caches
++ explicit mathematical contracts
++ thin Rust mathematical authority
++ authoritative engineering results
++ derived consumer representations
++ outward adapters/providers
++ semantic viewer/client
++ Python authoritative E2E/red-team
+⟦BT⟧
+
+For any new domain:
+
+⟦BT⟧
+1. identify the semantic owner;
+2. identify reusable lower-level services;
+3. identify the published result/contract;
+4. identify consumers;
+5. prohibit private peer implementation coupling;
+6. identify external adapters/providers;
+7. identify the authoritative layer for disagreements.
+⟦BT⟧
+
+The product is the engineering system. The mathematical kernel is one authority inside it.
+
+
 
 Build UMLCAD V7 as:
 

@@ -4,7 +4,7 @@
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
 - Main head before PR #30 merge: `d267d9cb5d277da6d655fefd9d122c1c165e9a53`
-- Latest completed roadmap family after merge: M15 — Cross-backend conformance (declared AABB domain; CPU/Metal hardware-validated; CUDA hardware-unvalidated)
+- Latest completed roadmap family after merge: M16 — Performance + final red team
 - Latest merged M10 closure PR: #27, `math: complete solver result status authority`
 - PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
 - Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
@@ -105,7 +105,7 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 1. Verify PR #30's final exact-head Rust and comprehensive E2E/red-team gates on the documentation head, then merge it.
 2. Verify post-merge main Rust and comprehensive E2E/red-team gates on the resulting main commit.
 3. After post-merge green, begin M12 GPU abstraction from the updated main head.
-4. M15 is merged and post-merge green on `b88862004debfda016d11c3d7da4dced0501065a`; begin M16 from that verified `main` head. CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+4. M16 is merged and post-merge green on `3d494ebbffb6f944e3e574ab04234deeffd9f91a`. The current M0-M16 roadmap is complete; no further roadmap station is defined by this plan. CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 
 ## M11 completion boundary
 
@@ -196,7 +196,7 @@ Apple Metal's lack of native hardware `f64` is represented explicitly in the bac
 
 Exact-head validation on `b32e8c9...`: Rust kernel workflow #492 PASS; comprehensive E2E/red-team workflow #414 PASS; Metal hardware workflow #11 PASS on the `macos-14` Apple Silicon runner. Earlier failures on the same milestone were corrected before closure and are not part of the validated head.
 
-M14 is the current CUDA backend milestone; M15 remains cross-backend conformance; M16 remains final performance/crossover and red-team closure.
+M16 is the final roadmap family for the current mathematical-authority plan; M14 and M15 remain historical closure records.
 
 ## M14 completion boundary
 
@@ -212,7 +212,7 @@ M14 is closed on `main` for the declared NVIDIA CUDA acceleration domain at merg
 - CUDA implementation: real device-native-f64 AABB candidate generation via `cudarc`, CPU f64 acceptance/reference authority, deterministic CPU reconstruction, fail-closed false-negative detection, and explicit no-driver handling.
 - Normal repository gates contain zero ignored CUDA tests; hardware cases are feature-gated behind `cuda-hardware` and must be explicitly enabled on an NVIDIA runner.
 - CUDA hardware status: **Not yet hardware-validated**. No confirmed NVIDIA hardware execution record was available during M14 closure.
-- M15 cross-backend conformance is now closed for the declared common AABB candidate-generation workload; M16 remains final performance/crossover and full red-team closure.
+- M15 cross-backend conformance is now closed for the declared common AABB candidate-generation workload; M16 is the final performance/crossover and full red-team closure.
 
 ## M15 post-merge closure record
 
@@ -229,11 +229,13 @@ M15 is closed on `main` for the declared common CPU/Metal/CUDA AABB candidate-ge
 
 ## M16 completion boundary
 
-M16 is now the final roadmap family and is closed on the M16 branch after exact-head Rust, comprehensive E2E/red-team, Metal hardware, and release-performance validation all passed.
+M16 is now the final roadmap family and is closed on `main` at merge commit `3d494ebbffb6f944e3e574ab04234deeffd9f91a` after exact-head and post-merge Rust, comprehensive E2E/red-team, Metal hardware, and release-performance validation all passed.
 
-The final validated branch head is `9257d508676c1b20dde7dc7528e3b8a64ed05825`.
+The final validated M16 implementation head was `3be00ca87b054000724cabd1d3393786ad78d334`; the resulting `main` merge is `3d494ebbffb6f944e3e574ab04234deeffd9f91a`.
 
 M16 performance evidence on Apple Silicon (`macos-14`) measured the declared AABB candidate-generation workload at batches 32, 64, 128, 256, and 512. Median CPU/Metal latencies were respectively 1.25/745.79 µs, 4.79/1260.67 µs, 17.33/1136.58 µs, 61.88/2035.33 µs, and 229.75/10602.17 µs. No CPU/Metal crossover occurred in that tested range. The report also captured host preparation, buffer setup/upload, device execution, readback, CPU post-processing, transfer/setup overhead, throughput, and batch efficiency.
+
+Post-merge main gates on `3d494ebbffb6f944e3e574ab04234deeffd9f91a`: Rust kernel workflow #554 PASS; comprehensive E2E/red-team workflow #476 PASS; Metal hardware workflow #73 PASS; M16 performance workflow #11 PASS.
 
 The final M16 red-team matrix covers:
 - scale invariance across 1e-12 through 1e12;

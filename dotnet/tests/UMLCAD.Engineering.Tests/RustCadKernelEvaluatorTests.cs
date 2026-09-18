@@ -1,3 +1,6 @@
+using System.Net;
+using System.Net.Http.Json;
+using Microsoft.Extensions.Options;
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Engine;
 using UMLCAD.Kernel.Client;
@@ -68,6 +71,85 @@ public sealed class RustCadKernelEvaluatorTests
         Assert.Equal(new KernelVector3(10d, 20d, 30d), geometry.LastRequest.Min);
         Assert.Equal(new KernelVector3(12d, 23d, 34d), geometry.LastRequest.Max);
         Assert.Equal(new KernelTolerance(1e-9, 1e-9), geometry.LastRequest.Tolerance);
+    }
+
+    [Fact]
+    public async Task ProductionAdapterConsumesTheTypedBoxHttpContract()
+    {
+        var handler = new RecordingHttpHandler(async request =>
+        {
+            Assert.Equal(HttpMethod.Post, request.Method);
+            Assert.Equal(
+                "http://kernel.test/v1/geometry/box-solid",
+                request.RequestUri!.ToString());
+
+            var payload = await request.Content!.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal(
+                AxisAlignedBoxSolidRequest.ContractSchema,
+                payload.GetProperty("schema").GetString());
+            Assert.Equal(
+                "evaluation-http-001",
+                payload.GetProperty("operationIdentity").GetString());
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new
+                {
+                    schema = AxisAlignedBoxSolidRequest.ContractSchema,
+                    status = "succeeded",
+                    succeeded = true,
+                    resultId = "solid:http-001",
+                    evidenceHash = "evidence:http-001",
+                    topology = new[]
+                    {
+                        new { kind = "Face", key = "f_bottom" },
+                        new { kind = "Face", key = "f_top" },
+                        new { kind = "Face", key = "f_back" },
+                        new { kind = "Face", key = "f_front" },
+                        new { kind = "Face", key = "f_left" },
+                        new { kind = "Face", key = "f_right" }
+                    },
+                    volume = 24d,
+                    surfaceArea = 52d,
+                    centroid = new { x = 1d, y = 1.5d, z = 2d },
+                    diagnostics = Array.Empty<string>()
+                })
+            };
+        });
+
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("http://kernel.test/")
+        };
+
+        var geometryService = new RustGeometryKernelService(
+            httpClient,
+            Options.Create(new RustKernelOptions
+            {
+                BaseAddress = new Uri("http://kernel.test/"),
+                RequestTimeout = TimeSpan.FromSeconds(5)
+            }));
+
+        var evaluator = new RustCadKernelEvaluator(geometryService);
+
+        var response = await evaluator.EvaluateAsync(
+            new KernelEvaluationRequest(
+                new CadId("evaluation-http-001"),
+                new BoxFeatureSpecification(
+                    new CadId("box"),
+                    new CadFrame(new CadId("part"), CadFrameKind.Part, 0d, 0d, 0d),
+                    2d, 3d, 4d),
+                null,
+                Array.Empty<ReferenceResolution>(),
+                Array.Empty<CadFeatureEvaluationResult>())
+            {
+                Tolerance = new KernelTolerance(1e-7, 1e-8)
+            });
+
+        Assert.Equal(CadEvaluationStatus.Succeeded, response.Status);
+        Assert.Equal("solid:http-001", response.AuthoritativeResult!.ResultId.Value);
+        Assert.Equal(24d, response.AuthoritativeResult.Volume);
+        Assert.Equal(6, response.AuthoritativeResult.Topology.Faces.Count);
     }
 
     [Fact]
@@ -291,6 +373,15 @@ public sealed class RustCadKernelEvaluatorTests
         Assert.Equal(
             result.FinalAuthoritativeResult.ResultId,
             new CadResultId(result.Representation!.SourceResultId.Value));
+    }
+
+    private sealed class RecordingHttpHandler(
+        Func<HttpRequestMessage, Task<HttpResponseMessage>> responder) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            responder(request);
     }
 
     private sealed class RecordingBoxGeometryService(

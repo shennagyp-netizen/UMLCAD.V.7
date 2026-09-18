@@ -52,12 +52,29 @@ pub enum KernelRequest {
         bounds: AxisAlignedBox,
         tolerance: Tolerance,
     },
+    ExtrudeConvexPlanarProfile {
+        operation_identity: String,
+        region: crate::functions::brep::PlanarRegion3,
+        depth: f64,
+        tolerance: Tolerance,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct BoxSolidTopology {
     pub kind: String,
     pub key: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExtrusionReport {
+    pub result_id: String,
+    pub evidence_hash: String,
+    pub topology: Vec<BoxSolidTopology>,
+    pub volume: f64,
+    pub surface_area: f64,
+    pub centroid: Vec3,
+    pub solid: BRepSolid,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -81,6 +98,7 @@ pub enum KernelResponse {
     Dimensions(Vec<crate::functions::dimensions::EvaluatedDimension>),
     Dxf(String),
     BoxSolid(BoxSolidReport),
+    Extrusion(ExtrusionReport),
 }
 
 pub fn dispatch(request: KernelRequest) -> Result<KernelResponse, KernelError> {

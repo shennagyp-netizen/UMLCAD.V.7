@@ -4,7 +4,7 @@
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
 - Main head before PR #30 merge: `d267d9cb5d277da6d655fefd9d122c1c165e9a53`
-- Latest completed roadmap family after merge: M12 — GPU abstraction (backend-neutral; no hardware backend)
+- Latest completed roadmap family after merge: M13 — Apple Silicon Metal
 - Latest merged M10 closure PR: #27, `math: complete solver result status authority`
 - PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
 - Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
@@ -13,7 +13,7 @@
 - PR #30 validated implementation head: `9d04c05f67f4e5542df56b8612806fe8296f624b`
 
 ## Completed mathematical-authority state
-PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M13 is now the next incomplete roadmap family after the M12 post-merge verification.
+PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M14 is now the next incomplete roadmap family after the M13 post-merge verification.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -105,7 +105,7 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 1. Verify PR #30's final exact-head Rust and comprehensive E2E/red-team gates on the documentation head, then merge it.
 2. Verify post-merge main Rust and comprehensive E2E/red-team gates on the resulting main commit.
 3. After post-merge green, begin M12 GPU abstraction from the updated main head.
-4. Keep real Metal/CUDA execution deferred to M13/M14; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+4. M13 is merged and post-merge green; begin M14 from the verified `main` head. CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 
 ## M11 completion boundary
 
@@ -196,4 +196,8 @@ Apple Metal's lack of native hardware `f64` is represented explicitly in the bac
 
 Exact-head validation on `b32e8c9...`: Rust kernel workflow #492 PASS; comprehensive E2E/red-team workflow #414 PASS; Metal hardware workflow #11 PASS on the `macos-14` Apple Silicon runner. Earlier failures on the same milestone were corrected before closure and are not part of the validated head.
 
-M14 remains the CUDA backend; M15 remains cross-backend conformance; M16 remains final performance/crossover and red-team closure.
+M14 is the current CUDA backend milestone; M15 remains cross-backend conformance; M16 remains final performance/crossover and red-team closure.
+
+## M14 completion boundary
+
+M14 is implemented and tested for the declared CUDA AABB candidate-generation domain. The CPU f64 implementation remains authoritative. CUDA uses device-native f64 for the certified predicate; candidate ordering is reconstructed deterministically on the CPU; exact CPU overlap omission fails closed. The CUDA driver/NVRTC absence path is explicitly handled as unavailable rather than panic-prone. Hardware validation is **Not yet hardware-validated** because the repository has no confirmed NVIDIA runner execution record for this milestone.

@@ -326,8 +326,203 @@ fn curve_pair_intersects(a: &TrimCurve2, b: &TrimCurve2, tol: f64) -> Tri {
             TrimCurve2::Line { start: a0, end: a1 },
             TrimCurve2::Line { start: b0, end: b1 },
         ) => segment_intersection(*a0, *a1, *b0, *b1, tol),
-        _ => Tri::Indeterminate,
+        (
+            TrimCurve2::Line { start: a0, end: a1 },
+            TrimCurve2::Arc(arc),
+        ) => line_arc_intersection(*a0, *a1, *arc, tol),
+        (
+            TrimCurve2::Arc(arc),
+            TrimCurve2::Line { start: b0, end: b1 },
+        ) => line_arc_intersection(*b0, *b1, *arc, tol),
+        (TrimCurve2::Arc(a), TrimCurve2::Arc(b)) => arc_arc_intersection(*a, *b, tol),
     }
+}
+
+fn angle_in_arc_tolerant(angle: f64, start: f64, end: f64, linear_tolerance: f64, radius: f64) -> bool {
+    let delta = end - start;
+    let angle_tolerance = linear_tolerance / radius.max(f64::MIN_POSITIVE);
+    if !delta.is_finite() || !angle_tolerance.is_finite() {
+        return false;
+    }
+    if delta.abs() >= 2.0 * std::f64::consts::PI - angle_tolerance {
+        return true;
+    }
+    if delta > 0.0 {
+        (angle - start).rem_euclid(2.0 * std::f64::consts::PI) <= delta + angle_tolerance
+    } else {
+        (start - angle).rem_euclid(2.0 * std::f64::consts::PI) <= -delta + angle_tolerance
+    }
+}
+
+fn arc_contains_point_tolerant(arc: Arc, point: Point, tolerance: f64) -> Tri {
+    let radial = point.sub(arc.center);
+    let distance = radial.length();
+    if !distance.is_finite() || !radial.is_finite() {
+        return Tri::Indeterminate;
+    }
+    let radial_band = tolerance * arc.radius.max(1.0);
+    if !radial_band.is_finite() {
+        return Tri::Indeterminate;
+    }
+    if (distance - arc.radius).abs() > radial_band {
+        return Tri::False;
+    }
+    if distance <= f64::MIN_POSITIVE {
+        return Tri::Indeterminate;
+    }
+    let angle = radial.y.atan2(radial.x);
+    if !angle.is_finite() {
+        return Tri::Indeterminate;
+    }
+    if angle_in_arc_tolerant(angle, arc.start_angle, arc.end_angle, tolerance, arc.radius) {
+        Tri::True
+    } else {
+        Tri::False
+    }
+}
+
+fn line_arc_intersection(start: Point, end: Point, arc: Arc, tolerance: f64) -> Tri {
+    if !start.is_finite() || !end.is_finite() || arc.validate().is_err()
+        || !tolerance.is_finite() || tolerance < 0.0
+    {
+        return Tri::Indeterminate;
+    }
+    let direction = end.sub(start);
+    let length = direction.length();
+    if !length.is_finite() || length <= f64::MIN_POSITIVE {
+        return Tri::Indeterminate;
+    }
+    let unit = direction.scale(1.0 / length);
+    let center_offset = arc.center.sub(start);
+    let along = center_offset.dot(unit);
+    let perpendicular = center_offset.sub(unit.scale(along));
+    let h2 = arc.radius * arc.radius - perpendicular.dot(perpendicular);
+    let scale = arc.radius.max(length).max(center_offset.length()).max(1.0);
+    let band2 = 2.0 * scale * tolerance + tolerance * tolerance;
+    if [along, h2, scale, band2].iter().any(|v| !v.is_finite()) {
+        return Tri::Indeterminate;
+    }
+    if h2 < -band2 {
+        return Tri::False;
+    }
+    let half = h2.max(0.0).sqrt();
+    let candidates = if half <= tolerance {
+        vec![along]
+    } else {
+        vec![along - half, along + half]
+    };
+    for distance in candidates {
+        let segment_band = tolerance.max(f64::MIN_POSITIVE);
+        if distance < -segment_band || distance > length + segment_band {
+            continue;
+        }
+        let point = start.add(unit.scale(distance));
+        match arc_contains_point_tolerant(arc, point, tolerance) {
+            Tri::True => return Tri::True,
+            Tri::Indeterminate => return Tri::Indeterminate,
+            Tri::False => {}
+        }
+    }
+    Tri::False
+}
+
+fn same_circle_arcs_overlap(a: Arc, b: Arc, tolerance: f64) -> Tri {
+    let radius_scale = a.radius.max(b.radius).max(1.0);
+    if (a.center.sub(b.center)).length() > tolerance
+        || (a.radius - b.radius).abs() > tolerance * radius_scale
+    {
+        return Tri::False;
+    }
+    let full_a = (a.end_angle - a.start_angle).abs() >= 2.0 * std::f64::consts::PI
+        - tolerance / a.radius.max(f64::MIN_POSITIVE);
+    let full_b = (b.end_angle - b.start_angle).abs() >= 2.0 * std::f64::consts::PI
+        - tolerance / b.radius.max(f64::MIN_POSITIVE);
+    if full_a || full_b {
+        return Tri::True;
+    }
+    let endpoints = [
+        (a.start_angle, b),
+        (a.end_angle, b),
+        (b.start_angle, a),
+        (b.end_angle, a),
+    ];
+    for (angle, target) in endpoints {
+        if angle_in_arc_tolerant(angle, target.start_angle, target.end_angle, tolerance, target.radius) {
+            return Tri::True;
+        }
+    }
+    Tri::False
+}
+
+fn arc_arc_intersection(a: Arc, b: Arc, tolerance: f64) -> Tri {
+    if a.validate().is_err() || b.validate().is_err() || !tolerance.is_finite() || tolerance < 0.0 {
+        return Tri::Indeterminate;
+    }
+    let delta = b.center.sub(a.center);
+    let distance = delta.length();
+    let scale = a.radius.max(b.radius).max(distance).max(1.0);
+    let center_band = tolerance;
+    let radius_band = tolerance * scale;
+    if !distance.is_finite() || !scale.is_finite() || !radius_band.is_finite() {
+        return Tri::Indeterminate;
+    }
+    if distance <= center_band && (a.radius - b.radius).abs() <= radius_band {
+        return same_circle_arcs_overlap(a, b, tolerance);
+    }
+    if distance > a.radius + b.radius + center_band
+        || distance < (a.radius - b.radius).abs() - center_band
+    {
+        return Tri::False;
+    }
+    if distance <= f64::MIN_POSITIVE {
+        return Tri::Indeterminate;
+    }
+    let numerator = a.radius * a.radius - b.radius * b.radius + distance * distance;
+    let along = numerator / (2.0 * distance);
+    let h2 = a.radius * a.radius - along * along;
+    let band2 = 2.0 * scale * tolerance + tolerance * tolerance;
+    if !numerator.is_finite() || !along.is_finite() || !h2.is_finite() || !band2.is_finite() {
+        return Tri::Indeterminate;
+    }
+    if h2 < -band2 {
+        return Tri::False;
+    }
+    let half = h2.max(0.0).sqrt();
+    let base = a.center.add(delta.scale(along / distance));
+    let perpendicular = Vec3::new(0.0, 0.0, 0.0);
+    let unit_perp = Point {
+        x: -delta.y / distance,
+        y: delta.x / distance,
+    };
+    let first = Point {
+        x: base.x + unit_perp.x * half,
+        y: base.y + unit_perp.y * half,
+    };
+    let second = Point {
+        x: base.x - unit_perp.x * half,
+        y: base.y - unit_perp.y * half,
+    };
+    let candidates = if half <= tolerance {
+        vec![first]
+    } else {
+        vec![first, second]
+    };
+    for point in candidates {
+        if !point.is_finite() {
+            return Tri::Indeterminate;
+        }
+        match arc_contains_point_tolerant(a, point, tolerance) {
+            Tri::True => match arc_contains_point_tolerant(b, point, tolerance) {
+                Tri::True => return Tri::True,
+                Tri::Indeterminate => return Tri::Indeterminate,
+                Tri::False => {}
+            },
+            Tri::Indeterminate => return Tri::Indeterminate,
+            Tri::False => {}
+        }
+    }
+    let _ = perpendicular;
+    Tri::False
 }
 
 fn segment_intersection(a: Point, b: Point, c: Point, d: Point, tol: f64) -> Tri {
@@ -462,6 +657,54 @@ mod tests {
             ],
         };
         assert_eq!(q.validate(1.0e-12), Err(TrimError::NotClosed));
+    }
+
+    #[test]
+    fn analytic_line_arc_and_arc_arc_intersections_are_certified() {
+        let arc = TrimCurve2::Arc(Arc {
+            center: Point { x: 0.0, y: 0.0 },
+            radius: 2.0,
+            start_angle: 0.0,
+            end_angle: std::f64::consts::PI,
+        });
+        let line = TrimCurve2::Line {
+            start: Point { x: -3.0, y: 1.0 },
+            end: Point { x: 3.0, y: 1.0 },
+        };
+        assert_eq!(curve_pair_intersects(&line, &arc, 1.0e-9), Tri::True);
+
+        let crossing = TrimCurve2::Arc(Arc {
+            center: Point { x: 2.0, y: 0.0 },
+            radius: 2.0,
+            start_angle: std::f64::consts::FRAC_PI_2,
+            end_angle: 3.0 * std::f64::consts::FRAC_PI_2,
+        });
+        assert_eq!(curve_pair_intersects(&arc, &crossing, 1.0e-9), Tri::True);
+
+        let disjoint = TrimCurve2::Arc(Arc {
+            center: Point { x: 6.0, y: 0.0 },
+            radius: 1.0,
+            start_angle: 0.0,
+            end_angle: std::f64::consts::PI,
+        });
+        assert_eq!(curve_pair_intersects(&arc, &disjoint, 1.0e-9), Tri::False);
+    }
+
+    #[test]
+    fn overlapping_same_circle_arcs_are_self_intersections() {
+        let a = TrimCurve2::Arc(Arc {
+            center: Point { x: 0.0, y: 0.0 },
+            radius: 2.0,
+            start_angle: 0.0,
+            end_angle: std::f64::consts::PI,
+        });
+        let b = TrimCurve2::Arc(Arc {
+            center: Point { x: 0.0, y: 0.0 },
+            radius: 2.0,
+            start_angle: std::f64::consts::FRAC_PI_2,
+            end_angle: 3.0 * std::f64::consts::FRAC_PI_2,
+        });
+        assert_eq!(curve_pair_intersects(&a, &b, 1.0e-9), Tri::True);
     }
 
     #[test]

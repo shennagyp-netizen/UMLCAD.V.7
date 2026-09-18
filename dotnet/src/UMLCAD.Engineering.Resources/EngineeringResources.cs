@@ -63,6 +63,7 @@ public sealed record ToolDefinition(
     string ToolId,
     ToolKind Kind,
     string InterfaceId,
+    double NominalDiameterMm,
     double MinimumDiameterMm,
     double MaximumDiameterMm)
 {
@@ -72,10 +73,18 @@ public sealed record ToolDefinition(
             throw new ArgumentException("ToolId is required.", nameof(ToolId));
         if (string.IsNullOrWhiteSpace(InterfaceId))
             throw new ArgumentException("InterfaceId is required.", nameof(InterfaceId));
+        if (!double.IsFinite(NominalDiameterMm) ||
+            NominalDiameterMm < 0d)
+        {
+            throw new ArgumentOutOfRangeException(nameof(NominalDiameterMm));
+        }
+
         if (!double.IsFinite(MinimumDiameterMm) ||
             !double.IsFinite(MaximumDiameterMm) ||
             MinimumDiameterMm < 0d ||
-            MaximumDiameterMm < MinimumDiameterMm)
+            MaximumDiameterMm < MinimumDiameterMm ||
+            NominalDiameterMm < MinimumDiameterMm ||
+            NominalDiameterMm > MaximumDiameterMm)
         {
             throw new ArgumentOutOfRangeException(nameof(MinimumDiameterMm));
         }

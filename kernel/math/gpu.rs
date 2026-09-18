@@ -25,6 +25,9 @@ pub enum BackendKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Precision {
     F64,
+    /// Explicitly non-authoritative f32 representation used only for conservative
+    /// broad-phase candidate generation. Exact geometry remains CPU f64.
+    F32ConservativeBroadPhase,
 }
 
 const LEGACY_VECTOR_OPS: &[GpuOperation] = &[GpuOperation::VectorBatch];
@@ -235,6 +238,7 @@ impl GpuBatchMemory {
     pub fn payload_bytes(self) -> Result<usize, GpuError> {
         let element_bytes = match self.precision {
             Precision::F64 => 8usize,
+            Precision::F32ConservativeBroadPhase => 4usize,
         };
         self.elements
             .checked_mul(self.components_per_element)

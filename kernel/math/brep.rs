@@ -1271,6 +1271,16 @@ mod tests {
     }
 
     #[test]
+    fn solid_rejects_edge_with_same_face_on_both_sides() {
+        let mut solid = tetra_brep();
+        solid.coedges.iter_mut()
+            .find(|c| c.id == "c1_2")
+            .expect("tetrahedron test coedge exists")
+            .face = "f0".into();
+        assert_eq!(solid.validate(tol()), Err(BRepError::NonManifoldEdge));
+    }
+
+    #[test]
     fn solid_rejects_reversed_global_orientation() {
         let mut solid = tetra_brep();
         for face in &mut solid.faces { face.orientation = !face.orientation; }

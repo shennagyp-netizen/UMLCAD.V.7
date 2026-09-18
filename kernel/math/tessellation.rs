@@ -422,7 +422,7 @@ where
             let p01 = eval(u0, v1)?;
             let p11 = eval(u1, v1)?;
             let samples = [
-                make_surface_sample(u0, v0, &eval, &normal)?,
+                make_surface_sample(um, v0, &eval, &normal)?,
                 make_surface_sample(u1, vm, &eval, &normal)?,
                 make_surface_sample(u0, vm, &eval, &normal)?,
                 make_surface_sample(um, v1, &eval, &normal)?,

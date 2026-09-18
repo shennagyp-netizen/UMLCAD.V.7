@@ -20,11 +20,15 @@ public sealed record ExtrusionRequest(
     ContractVersion ContractVersion)
 {
     public const string ContractId = "UMLCAD.Geometry.ExtrudeConvexPlanarProfile";
+    public const string ContractSchema = "uml-cad-extrude-convex-planar-profile/1.0.0";
 
     public ExtrusionRequest
     {
         if (string.IsNullOrWhiteSpace(OperationIdentity))
             throw new ArgumentException("OperationIdentity is required.", nameof(OperationIdentity));
+
+        if (ContractVersion.Value != "1.0")
+            throw new ArgumentException("Unsupported extrusion contract version.", nameof(ContractVersion));
 
         Profile = Profile?.ToArray() ??
             throw new ArgumentNullException(nameof(Profile));
@@ -51,7 +55,7 @@ public sealed record ExtrusionTopology(
 }
 
 public sealed record ExtrusionKernelResult(
-    AxisAlignedBoxSolidKernelStatus Status,
+    GeometryKernelStatus Status,
     ContractResultId? ResultId,
     string? EvidenceHash,
     IReadOnlyList<ExtrusionTopology> Topology,
@@ -68,7 +72,7 @@ public sealed record ExtrusionKernelResult(
         Diagnostics = Diagnostics?.ToArray() ??
             throw new ArgumentNullException(nameof(Diagnostics));
 
-        if (Status == AxisAlignedBoxSolidKernelStatus.Succeeded)
+        if (Status == GeometryKernelStatus.Succeeded)
         {
             if (ResultId is null || string.IsNullOrWhiteSpace(EvidenceHash))
                 throw new ArgumentException("Successful extrusion requires result and evidence identities.");

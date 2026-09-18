@@ -879,6 +879,245 @@ impl BRepSolid {
 }
 
 
+
+pub fn extrude_convex_planar_region(
+    region: PlanarRegion3,
+    depth: f64,
+    tolerance: Tolerance,
+) -> Result<BRepSolid, BRepError> {
+    region.validate(tolerance)?;
+    if !depth.is_finite() {
+        return Err(BRepError::NonFinite);
+    }
+
+    let scale = region.outer
+        .windows(2)
+        .map(|pair| pair[1].sub(pair[0]).length())
+        .fold(depth.abs(), f64::max)
+        .max(1.0);
+    let eps = tolerance.threshold(scale).map_err(|_| BRepError::InvalidTolerance)?;
+    if depth <= eps {
+        return Err(BRepError::Degenerate);
+    }
+    if !region.holes.is_empty() {
+        return Err(BRepError::UnsupportedBoolean);
+    }
+
+    let winding = signed_area2(&region.outer).signum();
+    if winding == 0.0 {
+        return Err(BRepError::Degenerate);
+    }
+
+    let base_points = region.outer_points_3d(tolerance)?;
+    let normal = region.u_dir.cross(region.v_dir);
+    let solid_normal = normal.scale(winding);
+    let extrusion = solid_normal.scale(depth);
+    let n = base_points.len();
+
+    let mut vertices = Vec::with_capacity(2 * n);
+    for (i, point) in base_points.iter().enumerate() {
+        vertices.push(BRepVertex {
+            id: format!("v_bottom_{i}"),
+            point: *point,
+        });
+    }
+    for (i, point) in base_points.iter().enumerate() {
+        vertices.push(BRepVertex {
+            id: format!("v_top_{i}"),
+            point: point.add(extrusion),
+        });
+    }
+
+    let mut edges = Vec::with_capacity(3 * n);
+    for i in 0..n {
+        let next = (i + 1) % n;
+        edges.push(BRepEdge {
+            id: format!("e_bottom_{i}"),
+            start_vertex: format!("v_bottom_{i}"),
+            end_vertex: format!("v_bottom_{next}"),
+        });
+    }
+    for i in 0..n {
+        let next = (i + 1) % n;
+        edges.push(BRepEdge {
+            id: format!("e_top_{i}"),
+            start_vertex: format!("v_top_{i}"),
+            end_vertex: format!("v_top_{next}"),
+        });
+    }
+    for i in 0..n {
+        edges.push(BRepEdge {
+            id: format!("e_vertical_{i}"),
+            start_vertex: format!("v_bottom_{i}"),
+            end_vertex: format!("v_top_{i}"),
+        });
+    }
+
+    let mut coedges = Vec::with_capacity(6 * n);
+    let mut wires = Vec::with_capacity(n + 2);
+    let mut faces = Vec::with_capacity(n + 2);
+
+    let bottom_coedges = (0..n)
+        .map(|i| format!("c_bottom_{i}"))
+        .collect::<Vec<_>>();
+    for i in 0..n {
+        coedges.push(BRepCoedge {
+            id: format!("c_bottom_{i}"),
+            edge: format!("e_bottom_{i}"),
+            wire: "w_bottom".into(),
+            face: "f_bottom".into(),
+            forward: false,
+        });
+    }
+    wires.push(BRepWire {
+        id: "w_bottom".into(),
+        coedges: bottom_coedges,
+        closed: true,
+    });
+    faces.push(BRepFace {
+        id: "f_bottom".into(),
+        outer_wire: "w_bottom".into(),
+        inner_wires: Vec::new(),
+        region: region.clone(),
+        orientation: false,
+    });
+
+    let top_origin = region.origin.add(extrusion);
+    let top_region = PlanarRegion3 {
+        origin: top_origin,
+        u_dir: region.u_dir,
+        v_dir: region.v_dir,
+        outer: region.outer.clone(),
+        holes: Vec::new(),
+    };
+    let top_coedges = (0..n)
+        .map(|i| format!("c_top_{i}"))
+        .collect::<Vec<_>>();
+    for i in 0..n {
+        coedges.push(BRepCoedge {
+            id: format!("c_top_{i}"),
+            edge: format!("e_top_{i}"),
+            wire: "w_top".into(),
+            face: "f_top".into(),
+            forward: true,
+        });
+    }
+    wires.push(BRepWire {
+        id: "w_top".into(),
+        coedges: top_coedges,
+        closed: true,
+    });
+    faces.push(BRepFace {
+        id: "f_top".into(),
+        outer_wire: "w_top".into(),
+        inner_wires: Vec::new(),
+        region: top_region,
+        orientation: true,
+    });
+
+    for i in 0..n {
+        let next = (i + 1) % n;
+        let p0 = base_points[i];
+        let p1 = base_points[next];
+        let edge = p1.sub(p0);
+        let length = edge.length();
+        if !length.is_finite() || length <= eps {
+            return Err(BRepError::Degenerate);
+        }
+
+        let u = edge.scale(1.0 / length);
+        let side_id = format!("side_{i}");
+        let face_id = format!("f_side_{i}");
+        let wire_id = format!("w_side_{i}");
+
+        let side_coedges = vec![
+            format!("c_side_bottom_{i}"),
+            format!("c_side_vertical_{next}"),
+            format!("c_side_top_{i}"),
+            format!("c_side_vertical_{i}"),
+        ];
+
+        coedges.push(BRepCoedge {
+            id: side_coedges[0].clone(),
+            edge: format!("e_bottom_{i}"),
+            wire: wire_id.clone(),
+            face: face_id.clone(),
+            forward: true,
+        });
+        coedges.push(BRepCoedge {
+            id: side_coedges[1].clone(),
+            edge: format!("e_vertical_{next}"),
+            wire: wire_id.clone(),
+            face: face_id.clone(),
+            forward: true,
+        });
+        coedges.push(BRepCoedge {
+            id: side_coedges[2].clone(),
+            edge: format!("e_top_{i}"),
+            wire: wire_id.clone(),
+            face: face_id.clone(),
+            forward: false,
+        });
+        coedges.push(BRepCoedge {
+            id: side_coedges[3].clone(),
+            edge: format!("e_vertical_{i}"),
+            wire: wire_id.clone(),
+            face: face_id.clone(),
+            forward: false,
+        });
+
+        wires.push(BRepWire {
+            id: wire_id.clone(),
+            coedges: side_coedges,
+            closed: true,
+        });
+
+        faces.push(BRepFace {
+            id: face_id.clone(),
+            outer_wire: wire_id,
+            inner_wires: Vec::new(),
+            region: PlanarRegion3 {
+                origin: p0,
+                u_dir: u,
+                v_dir: solid_normal,
+                outer: vec![
+                    Vec2::new(0.0, 0.0),
+                    Vec2::new(length, 0.0),
+                    Vec2::new(length, depth),
+                    Vec2::new(0.0, depth),
+                ],
+                holes: Vec::new(),
+            },
+            orientation: true,
+        });
+
+        let _ = side_id;
+    }
+
+    let solid = BRepSolid {
+        vertices,
+        edges,
+        coedges,
+        wires,
+        faces,
+        shells: vec![BRepShell {
+            id: "shell_0".into(),
+            faces: (0..n + 2)
+                .map(|i| if i == 0 {
+                    "f_bottom".into()
+                } else if i == 1 {
+                    "f_top".into()
+                } else {
+                    format!("f_side_{}", i - 2)
+                })
+                .collect(),
+        }],
+    };
+
+    solid.validate(tolerance)?;
+    Ok(solid)
+}
+
 pub fn build_axis_aligned_box_solid(
     bounds: AxisAlignedBox,
     tolerance: Tolerance,

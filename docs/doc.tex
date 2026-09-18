@@ -70,7 +70,7 @@
 \vspace{6mm}
 {\large Audited against the exact repository state immediately before this document revision:\par}
 \vspace{2mm}
-{\ttfamily 2451b765eb1e1e3177b965ffa5ab23aa35a51995\par}
+{\ttfamily 3943653171af8524e25ed928c19026d595e081ba\par}
 \vfill
 {\large The repository is the source of truth.\par}
 {\large This document distinguishes implemented code from target architecture.\par}
@@ -183,11 +183,216 @@ Container / subsystem & Responsibility \\
 \pathref{tests/e2e} & System-level process/wire gate and red-team harness. \\
 \pathref{viewer} & Presentation boundary. The current repository proves the viewer package manifest and demo integration assumptions; implementation details that are not present on the exact \texttt{main} tree are not claimed here as implemented. \\
 \bottomrule
+
 \end{tabularx}
+
+\chapter{C4 Level 3 - System-CAD Components}
+
+The System-CAD target is decomposed into stable semantic responsibilities. The current repository may combine several responsibilities inside the existing Framework surface; the decomposition is architectural and does not require premature project fragmentation.
+
+\begin{center}
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,minimum width=42mm,minimum height=9mm,font=\scriptsize},
+  >=Latex
+]
+\node[box,fill=blue!7] (spec) {Specification / Design Intent};
+\node[box,fill=orange!8,right=of spec] (ref) {Reference / Publication Resolution};
+\node[box,fill=orange!8,right=of ref] (dep) {Dependency Graph};
+\node[box,fill=orange!8,below=of spec] (plan) {Evaluation Planner};
+\node[box,fill=orange!8,right=of plan] (eval) {Evaluation Engine};
+\node[box,fill=orange!8,right=of eval] (cache) {Cache / Invalidation};
+\node[box,fill=green!8,below=of eval] (contract) {Kernel Contract Factory};
+\node[box,fill=green!8,right=of contract] (client) {Kernel Client / Native Boundary};
+\node[box,fill=green!8,left=of contract] (math) {Rust Mathematical Authority};
+\node[box,fill=gray!10,below=of contract] (result) {Authoritative Result Integration};
+\node[box,fill=gray!10,right=of result] (topo) {Topology / Provenance};
+\node[box,fill=gray!10,right=of topo] (repr) {Derived Representation};
+\draw[->] (spec)--(ref);
+\draw[->] (ref)--(dep);
+\draw[->] (dep)--(eval);
+\draw[->] (eval)--(cache);
+\draw[->] (eval)--(contract);
+\draw[->] (contract)--(client);
+\draw[->] (client)--(result);
+\draw[->] (result)--(topo);
+\draw[->] (result)--(repr);
+\draw[->] (math)--(contract);
+\draw[->] (plan)--(eval);
+\draw[->] (dep)--(plan);
+\end{tikzpicture}
+\end{center}
+
+The components have distinct responsibility:
+
+\begin{itemize}
+\item \textbf{Specification}: immutable engineering intent, parameters, constraints, references, configuration, templates, components, product structure, and domain definitions.
+\item \textbf{Reference resolver}: resolves producer/result/topology/frame/publication semantics and returns explicit Resolved, Missing, Ambiguous, Indeterminate, or Unsupported states.
+\item \textbf{Dependency graph}: records explicit semantic dependencies and deterministic evaluation order; cycles are invalid.
+\item \textbf{Evaluation planner}: computes dependency closure, cache eligibility, required evaluator and required mathematical contract.
+\item \textbf{Evaluation engine}: orchestrates the semantic computation and integrates authoritative results without owning mathematical algorithms.
+\item \textbf{Kernel contract/client}: constructs and transports explicit backend-neutral mathematical requests and validates response schema, identity, status, completeness and cancellation semantics.
+\item \textbf{Result integration}: maps mathematical evidence into an authoritative System-CAD result without losing identity, frame, provenance or status.
+\item \textbf{Topology/provenance}: preserves semantic topology bindings and evolution evidence; topology array order is never identity.
+\item \textbf{Representation}: creates viewer, SVG, drawing, manufacturing and simulation display artifacts downstream of authoritative results.
+\end{itemize}
+
+\chapter{C4 Level 4 - Critical Runtime Paths}
+
+\section{Feature evaluation}
+
+\begin{lstlisting}
+Feature Specification
+ -> resolve references
+ -> resolve frames/configuration
+ -> close dependency graph
+ -> construct deterministic evaluation identity
+ -> select evaluator
+ -> create mathematical contract
+ -> invoke kernel authority
+ -> validate authoritative result
+ -> integrate topology/provenance
+ -> update cache/invalidation
+ -> derive representation
+\end{lstlisting}
+
+\section{Sketch attached to a face}
+
+\begin{lstlisting}
+Authoritative Face Publication
+ -> semantic FaceReference
+ -> derive Sketch frame from face semantics
+ -> create sketch geometry/constraints
+ -> solve through explicit mathematical contract
+ -> authoritative Sketch result
+ -> validate profile
+ -> consume result in feature evaluation
+\end{lstlisting}
+
+Viewer camera state never supplies feature orientation or sketch-frame truth.
+
+\section{Product / Assembly / BOM}
+
+\begin{lstlisting}
+Part Definition
+ -> Assembly Occurrence
+ -> occurrence transform/context
+ -> Product Structure
+ -> derived BOM
+ -> Drawing / CAM / PLM consumers
+\end{lstlisting}
+
+An occurrence transform places an instance; it does not mutate the source Part definition. BOM remains derived from Product Structure.
+
+\section{Drawing / PMI}
+
+\begin{lstlisting}
+Authoritative CAD/Product state
+ -> Drawing Definition
+ -> Sheet
+ -> View / Projection / Section / Detail
+ -> Dimension / Tolerance / GD&T / PMI
+ -> derived drawing graphics
+\end{lstlisting}
+
+Drawing objects remain semantically traceable to authoritative CAD/product state.
+
+\section{CAM}
+
+\begin{lstlisting}
+Authoritative CAD/Product/BOM
+ -> Manufacturing Definition
+ -> Setup / Coordinate System
+ -> Operation / Strategy
+ -> Toolpath
+ -> Postprocessor
+ -> deterministic G-code / NC
+\end{lstlisting}
+
+A rendered toolpath is not machine-ready NC.
+
+\section{Phenomena simulation}
+
+\begin{lstlisting}
+Engineering domain
+ -> Phenomena Simulation Service
+ -> provider / adaptor
+ -> simulation implementation or application
+ -> verified simulation result
+ -> engineering consumer
+\end{lstlisting}
+
+The adaptor is a phenomena-service boundary, not an application-semantic boundary. It may use multiple interchangeable simulation implementations, including remote or external applications. CAM may consume this service for process/physical validation.
+
+\chapter{Mandatory Early System-CAD Vertical Slice}
+
+The first system-level CAD proof is intentionally narrow and architectural:
+
+\begin{lstlisting}
+Create Cube
+ -> select Face semantically
+ -> Sketch on Face
+ -> Circle A + Circle B
+ -> solve/validate supported constraints
+ -> Feature A along +FaceNormal
+ -> Feature B along -FaceNormal
+ -> recompute
+ -> authoritative B-Rep / result
+ -> topology + reference provenance
+ -> derived representation
+ -> viewer semantic selection
+\end{lstlisting}
+
+The slice proves the semantic path rather than merely a visual result. It must establish semantic intent, reference resolution, frame correctness, dependency planning, explicit kernel contract use, authoritative result integration, topology provenance and representation derivation.
+
+Exact circular geometry must not be replaced by a polygon solely to make the workflow executable. When a required exact circular-profile solid or Boolean topology operation is not certified by the mathematical authority, that boundary remains explicitly unsupported until a new mathematical contract is established.
+
+\chapter{C4 Domain Boundaries and Dependency Direction}
+
+The System-CAD domain graph is:
+
+\begin{lstlisting}
+Platform Foundation
+      ->
+Mathematics
+      ->
+Science
+      ->
+CAD Engineering Core / Product Structure
+      ->
+Engineering Resource Model
+      ->
+Specialized Engineering Domains
+      ->
+Application / Workflow / Presentation
+\end{lstlisting}
+
+Science exposes reusable material/physical facts and a provider-neutral Phenomena Simulation Service. Engineering Resources owns Machine, Tool, Fixture, Process and Capability facts. Specialized domains consume these contracts; they do not acquire one another's private state.
+
+\begin{center}
+\begin{tabularx}{\textwidth}{@{}p{0.24\textwidth}X@{}}
+\toprule
+Domain & Architectural responsibility \\
+\midrule
+CAD Core / Product Structure & Product, Part, Body, Sketch, Feature, Assembly, Occurrence, references, publications, frames, dependencies, evaluation, authoritative results, topology provenance, configuration, templates/components and product composition. \\
+Science & Material/physical properties, quantities, phenomena semantics, assumptions and reusable scientific services. \\
+Engineering Resources & Machine, Tool, Fixture, Process and Capability facts. \\
+Sheet Metal & Thickness, bend/flange/relief, folding/unfolding, flat pattern and related design/manufacturing semantics. \\
+CAM & Manufacturing definition, setups, operations, strategies, toolpaths, simulation-service consumption, postprocessing and deterministic G-code/NC. \\
+Drawing / PMI & Sheets, views, projections, sections, details, dimensions, tolerances, GD\&T, PMI and BOM views. \\
+Kinematics & Motion/behavior semantics over Product/Assembly structure and mathematical authority. \\
+Knowledge / Configuration & Parameters, expressions, rules, checks, reactions, variants and reusable templates. \\
+Lifecycle / PLM / Integration & Revision, release, workflow, collaboration and external product/document integration. \\
+Viewer / Presentation & Derived representation, semantic inspection and interaction only. \\
+\bottomrule
+\end{tabularx}
+\end{center}
+
+No specialized domain creates a hidden second solver or geometry kernel. External implementations enter through stable contracts and adapters.
+
 
 \chapter{System-CAD Domain Architecture}
 
-The long-lived System-CAD architecture is organized around meaning rather than a list of applications.
+The long-lived System-CAD architecture is organized around meaning rather than a list of applications. The normative architecture, C4 Level 1--4 decomposition, canonical evaluation path, domain boundaries, template/component/sheet semantics, phenomena-simulation adapter boundary, and mandatory early vertical slice are maintained in \pathref{docs/SYSTEM_CAD_ARCHITECTURE.md}. The sections below summarize those rules for the handbook.
 
 \section{Core semantic ownership}
 
@@ -857,109 +1062,13 @@ Incremental evaluation is not a second semantics. It is an optimized execution o
 
 Representation regeneration must be driven by authoritative semantic changes rather than viewer refresh state.
 
-\chapter{Target System-CAD Domain Contracts}
+\chapter{Active System-CAD Architecture Reference}
 
-The following contracts describe the target System-CAD architecture. Their presence here does not claim that every corresponding .NET project already exists on the current \texttt{main} tree.
+The complete and authoritative System-CAD architecture is maintained in \pathref{docs/SYSTEM_CAD_ARCHITECTURE.md}. It is the single source for the detailed C4 Level 1--4 decomposition, canonical evaluation components, runtime paths, domain ownership, simulation-adaptor boundary, Product Structure/BOM, Drawing/PMI, CAM, templates/components/sheets, and the mandatory early vertical slice.
 
-\section{Science}
-Science owns material/physical properties and reusable scientific services.
+This handbook intentionally summarizes those rules in its C4 and domain sections above rather than maintaining a second detailed target-domain specification here. Any future architectural change must update the active architecture document first and then keep this handbook synchronized.
 
-\section{Phenomena Simulation Service}
-The provider-neutral boundary is:
-
-\begin{lstlisting}
-Engineering Consumer
-        ->
-IPhenomenaSimulationService
-        ->
-IPhenomenaSimulationProvider
-        ->
-Simulation Implementation
-\end{lstlisting}
-
-The consumer must not depend on a particular provider unless provider identity is explicitly semantic input.
-
-\section{Engineering Resources}
-Engineering Resources owns:
-
-\begin{lstlisting}
-Machine
-Tool
-Fixture
-Process
-Capability
-\end{lstlisting}
-
-A capability is a declarative fact about supported operations/materials/processes. It is not itself an instruction to execute.
-
-\section{Sheet Metal}
-Sheet Metal owns sheet thickness, bends, flanges, relief, unfolding/folding, flat-pattern, and related design semantics as those contracts are established. It consumes CAD, Science, and Engineering Resource contracts.
-
-\section{CAM}
-CAM owns manufacturing definitions, operations, strategies, toolpaths, postprocessors, and machine-ready output. The chain is:
-
-\begin{lstlisting}
-Authoritative CAD/Product state
-        ->
-Manufacturing Definition
-        ->
-Toolpath
-        ->
-Postprocessor
-        ->
-Deterministic G-code / NC
-\end{lstlisting}
-
-CAM may consume BOM, resources, material/process information, Sheet Metal outputs, and the Phenomena Simulation Service. It must not create an alternative CAD authority.
-
-\section{Product Structure and BOM}
-Product Structure owns Product/Part/Assembly/Occurrence composition. BOM is derived from that authoritative product state:
-
-\begin{lstlisting}
-CAD Product Structure
-        ->
-BOM
-        ->
-Drawing / CAM / PLM
-\end{lstlisting}
-
-Quantity, configuration, occurrence identity, and product references remain traceable to their authoritative source.
-
-\section{Drawing and PMI}
-Drawing consumes authoritative CAD/product semantics. It owns sheets, views, projections, sections, details, dimensions, annotations, tolerances, GD\&T, PMI, and standards as these contracts are implemented. Drawing does not reconstruct authoritative geometry from meshes.
-
-\section{PLM}
-PLM owns lifecycle, revision, release, workflow, collaboration, and product/document integration semantics. It references authoritative product/engineering state and does not become geometry authority.
-
-\chapter{Target Domain Dependency Model}
-
-The stable relationship model is:
-
-\begin{center}
-\begin{tikzpicture}[
-  node distance=7mm and 10mm,
-  box/.style={draw,rounded corners,align=center,minimum width=36mm,minimum height=10mm,font=\small},
-  >=Latex
-]
-\node[box,fill=green!8] (science) {Science\\Material / Physical Properties\\Phenomena Simulation Service};
-\node[box,fill=orange!8,right=of science] (resources) {Engineering Resources\\Machine / Tool / Fixture\\Process / Capabilities};
-\node[box,fill=blue!7,below=of science] (sheet) {Sheet Metal};
-\node[box,fill=blue!7,below=of resources] (cam) {CAM\\Toolpath / Postprocessor\\Deterministic G-code / NC};
-\node[box,fill=gray!10,below=15mm of $(sheet)!0.5!(cam)$] (product) {CAD Product Structure};
-\node[box,fill=gray!10,below=of product] (bom) {BOM};
-\node[box,fill=gray!10,below=of bom,minimum width=75mm] (consumer) {Drawing / CAM / PLM};
-\draw[<->] (science)--(resources);
-\draw[->] (resources)--(sheet);
-\draw[->] (resources)--(cam);
-\draw[->] (science)--(sheet);
-\draw[->] (science)--(cam);
-\draw[->] (product)--(bom);
-\draw[->] (bom)--(consumer);
-\draw[->] (product)--(consumer);
-\end{tikzpicture}
-\end{center}
-
-These are consumption/authority relationships. They are not inheritance claims and do not prescribe implementation order.
+The target architecture does not claim that every named domain is already implemented on \texttt{main}.
 
 \chapter{CATIA Capability Traceability}
 
@@ -1013,6 +1122,7 @@ The following paths are verified current or are explicit target-contract referen
 \item \pathref{docs/UMLCAD_V7_MAIN_BRANCH_DEVELOPMENT_PROMPT.md}
 \item \pathref{docs/MATH_AUTHORITY_ROADMAP.md}
 \item \pathref{docs/CONTINUATION_HANDOFF.md}
+\item \pathref{docs/SYSTEM_CAD_ARCHITECTURE.md}
 \item \pathref{kernel/math/GAP_MATRIX.md}
 \end{itemize}
 
@@ -1253,7 +1363,7 @@ Never substitute a percentage for a gate.
 \item Metal hardware validation does not make Metal an authoritative f64 geometry backend.
 \item CUDA hardware validation remains unclaimed without an actual NVIDIA runner execution record.
 \item Representation and tessellation are derived/approximate domains and never replace semantic truth.
-\item This handbook intentionally does not define a fixed comprehensive implementation sequence. Current repository milestone/gap documents determine the next increment.
+\item This handbook does not define a competing feature sequence. \pathref{docs/SYSTEM_CAD_ARCHITECTURE.md} defines the intended architecture; the continuation/gap state at the exact 	exttt{main} head determines the next implementation increment.
 \end{enumerate}
 
 \chapter{Final Architectural Invariants}
@@ -1281,7 +1391,7 @@ Never substitute a percentage for a gate.
 \item Drawing consumes authoritative CAD/product state and does not reconstruct semantic truth from presentation geometry.
 \item PLM owns lifecycle/product integration without becoming geometry authority.
 \item The viewer is presentation only.
-\item The repository's current milestone/gap documents, not this handbook, determine what is implemented next.
+\item The active System-CAD architecture document determines ownership and dependency direction; the exact 	exttt{main} continuation/gap state determines what is implemented next.
 \end{enumerate}
 
 \chapter*{Revision Note}

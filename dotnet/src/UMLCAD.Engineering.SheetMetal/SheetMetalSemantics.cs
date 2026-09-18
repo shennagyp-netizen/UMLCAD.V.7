@@ -71,9 +71,12 @@ public static class SheetMetalValidator
         }
 
         if (machine is not null && tool is not null &&
-            !MachineToolCompatibility.IsCompatible(machine, tool))
+            !MachineToolCompatibility.IsCompatible(
+                machine,
+                tool,
+                ManufacturingProcessKind.SheetMetalBending))
         {
-            diagnostics.Add("Tool interface is incompatible with the selected machine.");
+            diagnostics.Add("Tool is incompatible with the selected sheet-metal bending machine/process.");
         }
 
         return new SheetMetalValidationResult(diagnostics.Count == 0, diagnostics);

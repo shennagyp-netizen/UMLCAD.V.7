@@ -4,7 +4,7 @@ use umlcad_kernel_rust::functions::{
     gpu::{compare_candidate_pairs, BackendKind},
     geometry::{Arc, Circle, Geometry, Line, Point},
     intersections::{
-        circle_circle_2d, line_circle_2d, line_line_2d, Circle as _, IntersectionKind, Line2,
+        circle_circle_2d, line_circle_2d, line_line_2d, IntersectionKind, Line2,
     },
     nurbs3d::{NurbsCurve3D, Point3},
     solver::scaled_damped_qr,

@@ -46,6 +46,7 @@ public enum KernelOperationKind
     BuildWire,
     BuildSurface,
     BuildSolid,
+    ExtrudeConvexPlanarProfile,
     Boolean,
     Tessellate,
     SolveConstraints,

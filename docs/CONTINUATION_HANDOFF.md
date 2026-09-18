@@ -364,7 +364,7 @@ Next implementation boundary after infrastructure recovery:
 
 ## System-CAD S1 production adapter progress
 
-The current system-CAD implementation head is `c0c22cb590195c9fc95bc317cd6102923b5dbe91`.
+The current system-CAD implementation head is `6bc7641f2a7b2f6997e134c3469e8841e876181e`.
 
 The .NET system-CAD boundary now contains a production `ICadKernelEvaluator` implementation and a separate CAD-owned semantic reference resolver:
 - `dotnet/src/UMLCAD.Kernel.Client/RustCadKernelEvaluator.cs`
@@ -411,6 +411,18 @@ The oriented `CadFrame` contract now provides deterministic local/world point an
 
 A prior implementation pass incorrectly broadened the Rust/native transport with additional face-evidence fields and corresponding kernel-host/test changes. That violated the current system-CAD instruction that the existing Rust mathematical authority remain unchanged during .NET system development.
 
-Those changes were reverted from the system branch. The branch is now restored to `c0c22cb590195c9fc95bc317cd6102923b5dbe91`, immediately before that incorrect pass. The existing Rust commits already present in the branch before that point are retained; no new mathematical algorithm or Rust semantic authority was introduced by the correction.
+Those changes were reverted from the system branch. The code branch is restored to `c0c22cb590195c9fc95bc317cd6102923b5dbe91`, with the correction documentation committed at `6bc7641f2a7b2f6997e134c3469e8841e876181e`. The existing Rust commits already present in the branch before that point are retained; no new mathematical algorithm or Rust semantic authority was introduced by the correction.
 
 The next implementation work must remain in the .NET semantic/evaluation/application layers unless a narrowly scoped transport exposure of an already-existing Rust capability is demonstrably required by an explicit contract.
+## System-CAD runtime composition correction
+
+A follow-on experiment briefly composed the new CAD Engine directly inside `projects/demo/Program.cs` and added a dedicated Python E2E invocation. This was also reverted because `projects/demo` remains the legacy/demo application composition root and is not yet the normative Application Host boundary defined by the C4 architecture.
+
+No runtime composition changes from that experiment remain on the branch.
+
+The correct current state is therefore:
+- `UMLCAD.Cad.Engine` remains the system-CAD orchestration layer.
+- `UMLCAD.Kernel.Client` remains the outward adapter to explicit kernel contracts, with its documented transitional Framework dependency.
+- `UMLCAD.Framework` / `projects/demo` remains the legacy application path until a deliberate application-host migration milestone establishes the replacement root.
+- S1 production execution is still incomplete beyond the certified box operation.
+- No new Rust kernel/math change was introduced by the current correction work.

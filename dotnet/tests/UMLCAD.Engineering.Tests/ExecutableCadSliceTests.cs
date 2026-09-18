@@ -152,3 +152,80 @@ public sealed class ExecutableCadSliceTests
         }
     }
 }
+
+
+public sealed class ExtrusionSemanticTests
+{
+    [Fact]
+    public async Task ExtrusionSpecificationProducesAuthoritativeSolidResult()
+    {
+        var featureId = new SemanticId(Guid.Parse("abababab-abab-abab-abab-abababababab"));
+        var partId = new SemanticId(Guid.Parse("cdcdcdcd-cdcd-cdcd-cdcd-cdcdcdcdcdcd"));
+        var profileId = new SemanticId(Guid.Parse("efefefef-efef-efef-efef-efefefefefef"));
+
+        var profile = new ConvexSketchProfileDefinition(
+            profileId,
+            partId,
+            "Rectangle Profile",
+            new SemanticVector3(1d, 2d, 3d),
+            new SemanticVector3(1d, 0d, 0d),
+            new SemanticVector3(0d, 1d, 0d),
+            new[]
+            {
+                new SketchProfilePoint(0d, 0d),
+                new SketchProfilePoint(4d, 0d),
+                new SketchProfilePoint(4d, 5d),
+                new SketchProfilePoint(0d, 5d),
+            });
+
+        var specification = new ExtrusionFeatureSpecification(
+            featureId,
+            partId,
+            "Pad",
+            Array.Empty<SemanticId>(),
+            profile,
+            6d);
+
+        Assert.Contains(profileId, specification.Dependencies);
+        Assert.Equal("PartDesign.ExtrudeConvexPlanarProfile", specification.OperationKind);
+        Assert.Contains("depth=6", specification.CanonicalDefinition, StringComparison.Ordinal);
+
+        var service = new FakeExtrusionService(
+            new ExtrusionKernelResult(
+                GeometryKernelStatus.Succeeded,
+                new ContractResultId("solid:pad-001"),
+                "evidence:pad",
+                new[]
+                {
+                    new ExtrusionTopology("Face", "f_bottom"),
+                    new ExtrusionTopology("Face", "f_top"),
+                    new ExtrusionTopology("Face", "f_side_0"),
+                    new ExtrusionTopology("Face", "f_side_1"),
+                    new ExtrusionTopology("Face", "f_side_2"),
+                    new ExtrusionTopology("Face", "f_side_3"),
+                },
+                120d,
+                148d,
+                new KernelVector3(3d, 4.5d, 6d),
+                Array.Empty<string>()));
+
+        var evaluator = new ConvexProfileExtrusionEvaluator(service);
+
+        var result = await evaluator.EvaluateAsync(specification);
+
+        Assert.Equal(featureId, result.ProducingSemanticId);
+        Assert.Equal(AuthoritativeResultKind.Solid, result.Kind);
+        Assert.Equal(AuthoritativeResultStatus.Succeeded, result.Status);
+        Assert.Equal(6, result.TopologyBindings.Count);
+        Assert.Equal(ExtrusionRequest.ContractId, result.Evidence.ContractId);
+    }
+
+    private sealed class FakeExtrusionService(
+        ExtrusionKernelResult result) : IExtrusionGeometryService
+    {
+        public Task<ExtrusionKernelResult> ExtrudeConvexPlanarProfileAsync(
+            ExtrusionRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(result);
+    }
+}

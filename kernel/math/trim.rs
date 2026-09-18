@@ -92,19 +92,22 @@ impl TrimCurve2 {
         }
     }
 
-    pub fn signed_area_contribution(&self) -> Result<f64, TrimError> {
+    fn signed_area_contribution_about(&self, reference: Point) -> Result<f64, TrimError> {
         self.validate()?;
         let area = match self {
-            Self::Line { start, end } => 0.5 * (start.x * end.y - start.y * end.x),
+            Self::Line { start, end } => {
+                0.5 * start.sub(reference).cross(end.sub(reference))
+            }
             Self::Arc(arc) => {
                 let t0 = arc.start_angle;
                 let t1 = arc.end_angle;
-                let p0 = arc.start_point();
-                let p1 = arc.end_point();
+                let p0 = arc.start_point().sub(reference);
+                let p1 = arc.end_point().sub(reference);
+                let center = arc.center.sub(reference);
                 0.5
                     * (arc.radius * arc.radius * (t1 - t0)
-                        + arc.center.x * (p1.y - p0.y)
-                        - arc.center.y * (p1.x - p0.x))
+                        + center.x * (p1.y - p0.y)
+                        - center.y * (p1.x - p0.x))
             }
         };
         if area.is_finite() {
@@ -112,6 +115,10 @@ impl TrimCurve2 {
         } else {
             Err(TrimError::NonFinite)
         }
+    }
+
+    pub fn signed_area_contribution(&self) -> Result<f64, TrimError> {
+        self.signed_area_contribution_about(Point { x: 0.0, y: 0.0 })
     }
 }
 
@@ -147,9 +154,10 @@ impl TrimLoop2 {
 
     pub fn signed_area(&self, tolerance: f64) -> Result<f64, TrimError> {
         self.validate(tolerance)?;
+        let reference = self.curves[0].start();
         let mut area = 0.0;
         for curve in &self.curves {
-            area += curve.signed_area_contribution()?;
+            area += curve.signed_area_contribution_about(reference)?;
             if !area.is_finite() {
                 return Err(TrimError::NonFinite);
             }
@@ -435,6 +443,8 @@ mod tests {
         };
         assert_eq!(local.orientation(1.0e-12).unwrap(), Tri::True);
         assert_eq!(shifted.orientation(1.0e-12).unwrap(), Tri::True);
+        assert!((local.signed_area(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-9);
+        assert!((shifted.signed_area(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-6);
     }
 
     #[test]

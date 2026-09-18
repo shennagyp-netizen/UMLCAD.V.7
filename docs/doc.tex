@@ -298,3 +298,239 @@ CAD Product Structure
         -> BOM
         -> Drawing / CAM / PLM
 \end{lstlisting}
+
+BOM must not be a competing source of truth. Quantities, variants, configuration, occurrence identity, and product references remain traceable to the authoritative product state.
+
+\section{Drawing and PMI}
+
+Drawing consumes authoritative CAD and product semantics. It may derive geometry, sections, dimensions, annotations, and BOM views for documentation, but it must not reconstruct engineering truth from presentation meshes. Drawing details are mapped against the declared external capability set; the viewer remains downstream.
+
+\section{PLM}
+PLM consumes authoritative product, revision, lifecycle, configuration, and related engineering metadata. It may own lifecycle/workflow records but does not become geometric authority.
+
+\chapter{Specification - Evaluation - Result - Representation}
+
+A central invariant is:
+
+\begin{center}
+\begin{tikzpicture}[node distance=11mm and 9mm,box/.style={draw,rounded corners,align=center,minimum width=30mm,minimum height=10mm,font=\scriptsize},>=Latex]
+\node[box,fill=blue!7] (s) {Specification\\Design intent};
+\node[box,fill=orange!8,right=of s] (e) {Evaluation\\Dependency-aware execution};
+\node[box,fill=green!8,right=of e] (r) {Authoritative Result\\Identity / evidence / provenance};
+\node[box,fill=gray!10,right=of r] (p) {Representation\\Derived consumer asset};
+\draw[->] (s)--(e);\draw[->] (e)--(r);\draw[->] (r)--(p);
+\end{tikzpicture}
+\end{center}
+
+\section{Specification}
+Specification stores intent: definitions, parameters, constraints, references, configuration, declared relationships, and source identity. It should not store hidden mutable evaluation state.
+
+\section{Evaluation}
+Evaluation resolves dependencies, constructs deterministic requests, calls the canonical evaluator/adapter, integrates authoritative results, and computes derived assets when required.
+
+\section{Authoritative Result}
+An authoritative result is trusted semantic evidence. It must identify what was evaluated, under which inputs and configuration, with which authority, status, and provenance. Topology and reference correspondence are evidence, not guesses.
+
+\section{Representation}
+Representation is disposable consumer data. It may be regenerated without changing semantic truth. Rendering may use approximations that are unacceptable as authoritative geometry.
+
+\chapter{References, Topology, Frames, and Identity}
+
+\section{Reference semantics}
+A reference is semantic. It is not an accidental array index. The system must be able to state the producer, expected result identity, semantic target, frame requirements, and selector restrictions.
+
+Required resolution states are:
+\begin{lstlisting}
+Resolved
+Missing
+Ambiguous
+Indeterminate
+Unsupported
+\end{lstlisting}
+Arbitrary fallback is forbidden.
+
+\section{Topology provenance}
+When topology changes, a downstream consumer must have explicit correspondence/evolution evidence. Topology array order is never semantic identity.
+
+The mathematical layer contains explicit topology support for vertices, edges, coedges, wires, faces, shells, incidence, orientation, closure, shell connectivity, and certified planar/solid domains. Broader curved-face sewing and unrestricted topology construction remain separate contracts.
+
+\section{Coordinate-frame semantics}
+Where applicable, distinguish World, Document, Part, Body, Sketch, Face, Occurrence, Drawing View, and Simulation frames. Feature direction is an oriented semantic value, not an interpretation of viewer camera state.
+
+\section{Deterministic identities}
+The current .NET Framework canonicalization is explicit:
+\begin{enumerate}
+\item validate required IDs and definitions;
+\item sort configuration and semantic collections by ordinal identity;
+\item serialize canonical semantic content using camel-case JSON without indentation;
+\item compute SHA-256 over canonical bytes;
+\item attach the resulting lowercase hexadecimal value as \texttt{BuildIdentity}.
+\end{enumerate}
+The canonical semantic schema is \texttt{uml-cad-semantic/1.2.0}; the current bridge package is \texttt{uml-cad-build-package/1.0.0}; the compiled model schema is \texttt{uml-cad-compiled-model/1.1.0}.
+
+\chapter{Current .NET Framework}
+
+\section{Application builder}
+\pathref{dotnet/src/UMLCAD.Framework/CadApplication.cs} defines the current public application builder.
+
+\begin{tabularx}{\textwidth}{@{}p{0.29\textwidth}X@{}}
+\toprule
+API / concept & Current behavior \\
+\midrule
+\texttt{CadApplication.CreateBuilder()} & Creates the application builder. \\
+\texttt{ApplicationId} & Non-whitespace identifier; default \texttt{uml-cad-application}. \\
+\texttt{Version} & Non-whitespace identifier; default \texttt{1.0.0}. \\
+\texttt{AddPart} & Adds a part definition with parameters, geometry descriptors, constraints, references, components, and metadata. \\
+\texttt{AddAssembly} & Adds an assembly definition with typed occurrences and nested assemblies. \\
+\texttt{AddDrawing} & Adds a drawing with sheets, part references, and settings. \\
+\texttt{Build()} & Validates definitions, builds DI, canonicalizes state, computes SHA-256 identity, creates the semantic snapshot, records history, and returns the application. \\
+\texttt{CreateBuildPackage()} & Produces the current package used by the existing kernel-client boundary. \\
+\texttt{CreateCompiledModelManifest()} & Compiles semantic application state into a deterministic graph manifest. \\
+\bottomrule
+\end{tabularx}
+
+\section{Builder validation}
+The current builder rejects empty/whitespace required values, duplicate definition IDs across parts and assemblies, duplicate occurrence IDs within an assembly, references to unknown definitions, and circular assembly references.
+
+\section{Part semantics}
+A part contains sorted parameters, geometry descriptors, constraints, references, components, part type, name, and structured metadata. Metadata supports part number, description, material, manufacturer, vendor, revision, lifecycle state, author, document code, and custom properties.
+
+The current Framework geometry/constraint descriptors are semantic descriptions. They are not the Rust mathematical geometry types. This is the intended separation between system meaning and mathematical execution.
+
+\section{Assembly semantics}
+Assemblies contain occurrences. Each occurrence has definition identity/type, stable name/ID, transform, metadata, optional configuration, quantity, BOM structure, visibility/suppression, grounded state, and flexibility state. Nested assemblies are recursively represented.
+
+\section{Drawing semantics}
+A drawing contains stable sheets, part references, and settings. Sheets contain IDs, names, drawing references, and settings.
+
+\section{Build history}
+\pathref{dotnet/src/UMLCAD.Framework/Semantics/BuildHistory.cs} stores build snapshots in a synchronized in-memory history. Sequence numbers identify history entries and are deliberately not used as semantic build identity.
+
+\chapter{Compiled Model Contract}
+
+\pathref{dotnet/src/UMLCAD.Framework/Semantics/CompiledModel.cs} defines the current compiled-result graph.
+
+\section{Package}
+\texttt{CompiledModelPackage} contains schema, application identity, build identity, manifest, optional render artifact, and diagnostics.
+
+\section{Manifest}
+\texttt{CompiledModelManifest} contains root node IDs, nodes, relationships, representations, topology bindings, source bindings, diagnostics, and repeated application/build identity.
+
+\section{Nodes and relationships}
+\texttt{CompiledNode} carries ID, name, kind, parent/children, metadata, relationship IDs, representation IDs, capabilities, optional source, and state. \texttt{CompiledRelationship} carries a stable relationship ID, source ID, target IDs, kind, and metadata.
+
+\section{Representations and provenance}
+\texttt{CompiledRepresentation} identifies a consumer artifact, render node, bounds, capabilities, and selectable sub-targets. \texttt{CompiledTopologyBinding} bridges a semantic node to a render primitive and includes topology kind, artifact identity, naming/nomenclature, optional number, bounds, and metadata. This bridge never becomes geometry authority.
+
+\section{Graph construction}
+The compiler:
+\begin{enumerate}
+\item emits parts and assemblies in stable ordinal ID order;
+\item creates URI-encoded definition IDs;
+\item creates deterministic occurrence IDs;
+\item recursively emits nested assembly and part children;
+\item emits explicit constraint-reference relationships;
+\item identifies root definitions not referenced by another assembly;
+\item validates parent/child consistency and relationship resolution;
+\item rejects duplicate node IDs.
+\end{enumerate}
+URI encoding prevents colons/slashes in user identifiers from causing structural collisions.
+
+\chapter{Kernel Client Boundary}
+
+\pathref{dotnet/src/UMLCAD.Kernel.Client/RustKernelService.cs} is the current .NET HTTP adapter.
+
+\section{Configuration}
+\begin{tabularx}{\textwidth}{@{}p{0.36\textwidth}X@{}}
+\toprule
+Setting & Current behavior \\
+\midrule
+\texttt{BaseAddress} & Default \texttt{http://localhost:8080/}; must be absolute HTTP(S). \\
+\texttt{EvaluatePath} & Default \texttt{v1/build/evaluate}; must remain relative. \\
+\texttt{RequestTimeout} & Default two minutes; must be greater than zero and no more than one hour. \\
+\texttt{MaxResponseBytes} & Default 256 MiB; must be greater than zero and no more than 2 GiB. \\
+\bottomrule
+\end{tabularx}
+
+\section{Failure mapping}
+Stable diagnostics include \texttt{KERNEL\_RESPONSE\_TOO\_LARGE}, \texttt{KERNEL\_HTTP}, \texttt{KERNEL\_EMPTY\_RESPONSE}, \texttt{KERNEL\_TRANSPORT}, \texttt{KERNEL\_TIMEOUT}, \texttt{KERNEL\_INVALID\_JSON}, \texttt{KERNEL\_CLIENT}, and \texttt{KERNEL\_INVALID\_RESULT}.
+
+Caller cancellation is propagated. A response body is size-limited while streaming, not merely after deserialization.
+
+\section{Result validation}
+The client validates submitted build identity, manifest identity, application identity/version, unique node IDs, root resolution, relationship source/target resolution, and render-artifact build identity. Therefore valid JSON is not equivalent to a valid result.
+
+\chapter{Rust Kernel Public API}
+
+\pathref{kernel/native/src/api/mod.rs} defines a compact typed Rust request/response surface. The current request operations are:
+
+\begin{tabularx}{\textwidth}{@{}p{0.30\textwidth}X@{}}
+\toprule
+Operation & Purpose \\
+\midrule
+\texttt{Validate} & Validate a semantic snapshot and report diagnostics. \\
+\texttt{AnalyzeLinearSystem} & Analyze/solve a Jacobian-residual linear system under damping and rank tolerance. \\
+\texttt{Solve} & Solve supported constraint/relation equations with typed options. \\
+\texttt{Analyze} & Produce constraint/relation analysis. \\
+\texttt{EngineeringEvidence} & Produce engineering structural/reference/spatial/export evidence. \\
+\texttt{Dimensions} & Evaluate declared dimensions. \\
+\texttt{ExportDxf} & Produce DXF output. \\
+\bottomrule
+\end{tabularx}
+
+\section{Native dispatch}
+\pathref{kernel/native/src/services/engine.rs} dispatches each typed request to the corresponding mathematical service. The public surface is intentionally much smaller than the internal mathematical module tree.
+
+\chapter{Rust Snapshot and Constraint Semantics}
+
+\pathref{kernel/math/snapshot.rs} defines the data structure consumed by the native mathematical API.
+
+\section{Geometry}
+Current exact semantic geometry includes points/lines/circles/arcs represented in the Rust mathematical geometry module. Geometry items have stable semantic IDs and parameter dependencies.
+
+\section{Constraints}
+The current constraint families include horizontal, vertical, coincident, fixed, and distance constraints.
+
+\section{Relations}
+The relation system includes parallel, perpendicular, equal-length, angle, collinear, concentric, equal-radius, radius, diameter, tangent, midpoint, point-on-line, point-on-circle, distance-points, symmetry, and related declared families.
+
+\section{Solver authority}
+The production solver uses analytic Jacobian rows for the supported equation set. Finite differences remain an independent verification mechanism and are not the production Jacobian authority.
+
+\chapter{Mathematical Authority - M0 to M16}
+
+The mathematical roadmap is closed for the explicit certified domains recorded in \pathref{docs/MATH_AUTHORITY_ROADMAP.md} and \pathref{kernel/math/GAP_MATRIX.md}. Closure must not be interpreted as universal coverage of every possible CAD operation.
+
+\begin{longtable}{@{}p{0.07\textwidth}p{0.31\textwidth}p{0.49\textwidth}@{}}
+\toprule
+ID & Family & Certified / recorded state \\
+\midrule
+M0 & Audit and baseline & Repository/math inventory and authority baseline. \\
+M1 & Scalars, constants, tolerance & Finite-safe scalar foundation, constants, explicit tolerance policy. \\
+M2 & Vectors, matrices, quaternion, transform & Vec2/Vec3/Vec4, matrices, quaternion, affine/rigid transforms. \\
+M3 & Analytic geometry and predicates & Analytic primitives and scale/degeneracy predicates. \\
+M4 & Polynomial and interval & Polynomial/root and interval foundations; not universal algebraic certification. \\
+M5 & Curves & Bezier, B-spline, NURBS, and differential foundations. \\
+M6 & Surfaces and NURBS & Parametric/NURBS surface and differential/trim foundations. \\
+M7 & Distance/projection/intersection & Declared primitive and bounded distance/projection/intersection families. \\
+M8 & Construction mathematics & Certified convex/analytic construction families: offset, extrusion, revolution, loft, pipe, blend, frame/twist, bounded fillet/chamfer, shell. \\
+M9 & B-Rep and solids & Certified explicit planar topology/solid mathematics and bounded AABB Boolean/split/imprint operations. \\
+M10 & Constraints/Jacobian/solver & Supported analytic equations, damped SVD/least-squares, rank/conditioning/terminal authority and adversarial scale evidence. \\
+M11 & Tessellation/spatial & Adaptive curves/surfaces, certified convex line/arc trim-aware tessellation, AABB/sphere/subdivision/BVH. \\
+M12 & GPU abstraction & Capability/selection/batching/dispatch/executor/conformance contracts. \\
+M13 & Metal & Real Apple Silicon conservative AABB candidate generation; hardware-validated. \\
+M14 & CUDA & Real device-native-f64 AABB candidate generation; hardware validation not yet recorded. \\
+M15 & Cross-backend conformance & Common AABB candidate-set conformance; CPU/Metal hardware evidence; CUDA hardware unvalidated. \\
+M16 & Performance/final red team & Release performance evidence and final cross-family adversarial matrix; roadmap closure. \\
+\bottomrule
+\end{longtable}
+
+\section{Mathematical non-claims}
+General concave/holed/freeform trimmed-surface filling, unrestricted curved-face sewing, universal B-Rep Boolean construction, arbitrary edge filleting/chamfering, universal closest-point/intersection engines, and broad accelerator equivalence outside declared contracts are not silently included.
+
+\section{Numerical policy}
+CPU \texttt{f64} is the normative reference. GPU implementations accelerate explicit workloads. Tolerances are explicit inputs. Unsupported, ambiguous, singular, degenerate, non-finite, or indeterminate states fail closed.
+
+\section{Solver detail}
+\texttt{SolveOptions} currently defaults to maximum 100 iterations, residual tolerance \texttt{1e-8}, step tolerance \texttt{1e-10}, and initial damping \texttt{1e-3}. The finite-difference step remains for API compatibility and independent verification; it is not used to generate production Jacobians.
+

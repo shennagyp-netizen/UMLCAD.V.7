@@ -153,6 +153,15 @@ public sealed record MachineDefinition(
 
 public static class MachineToolCompatibility
 {
-    public static bool IsCompatible(MachineDefinition machine, ToolDefinition tool) =>
-        string.Equals(machine.ToolInterfaceId, tool.InterfaceId, StringComparison.Ordinal);
+    public static bool IsCompatible(
+        MachineDefinition machine,
+        ToolDefinition tool,
+        ManufacturingProcessKind process)
+    {
+        ArgumentNullException.ThrowIfNull(machine);
+        ArgumentNullException.ThrowIfNull(tool);
+
+        return string.Equals(machine.ToolInterfaceId, tool.InterfaceId, StringComparison.Ordinal) &&
+            ToolProcessCompatibility.IsCompatible(process, tool.Kind);
+    }
 }

@@ -107,15 +107,15 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 3. After post-merge green, begin M11 tessellation/spatial mathematics from the updated main head.
 3. Keep GPU work deferred until the CPU mathematical families are closed; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 
-## M11 work-in-progress boundary
+## M11 completion boundary
 
-M11 is active from `main` commit `59b8f7849bd5d094b31088631006505e2eda61b6`. Current branch head `1421628a80a5b1bb3b46b62aa0d8ea3209ae0485` contains adaptive surface tessellation, certified line/arc trim-boundary sampling, convex trimmed-surface interior filling, conservative bounding spheres, deterministic parameter-space bounds, 8-way AABB subdivision, deterministic octree query structure with per-resident AABB filtering, and BVH node-pair candidate traversal with brute-force equivalence coverage. The tessellation source was reconstructed from the intact 781 baseline after CI exposed the earlier malformed write; the convex trim certificate permits collinear adaptive edge samples.
+M11 is now documented as `Implemented / Tested` for its declared certified domain. Current branch head `0db7d42694465b9d7146c90b99ba1c62c51fdc11` records the closure in `kernel/math/GAP_MATRIX.md`.
 
-Trimmed-surface hardening history: `5d8fc8bfc3cd423eb887109da4f03061db1412a8` replaced the invalid boundary-vertex fan with a deterministic arithmetic-mean interior seed after adaptive collinear samples produced zero-area triangles. `7dc02c73dab978c4abf228f3d75fc398d5f699b5` added midpoint sampling/refinement; `abd9681d813dd88897086303696bb0b3e7d98b76` corrected its chord metric; `791cc625772f55718ae252e9146a00986ecb4f55` replaced four-way subdivision with longest-edge bisection to control branch growth. The success fixture uses the established 0.05-radian angular regime and requires preservation of every adaptive boundary UV sample.
+The certified scope is adaptive curve/surface tessellation; convex line/arc trim-aware outer-loop tessellation with preserved UV boundary samples, explicit interior classification, deterministic refinement, and chord/angular/parameter metadata; conservative AABB/bounding-sphere volumes; deterministic parameter-space bounds and 8-way spatial subdivision; and deterministic BVH query/candidate traversal with brute-force equivalence coverage.
 
-Commit `b012be5f97a3c91050b5396f180efa2e6a508fdd` corrected trimmed-surface error metadata so only emitted leaf-triangle errors contribute to reported maxima. Exact-head Rust and comprehensive E2E/red-team validation on `44a7b4c34f18d66c4480e27e29c4ba99093b2d81` were both green. Commit `efd138b490711d6912abe03b9604d89e02f05277` added a deterministic translation-invariance regression; its exact-equality metric assertion exposed legitimate ulp-level coordinate-rounding differences. Commit `1421628a80a5b1bb3b46b62aa0d8ea3209ae0485` changes that test to use topology/parameter/normal exactness and a tight numerical bound for translated point/chord errors.
+The closure deliberately excludes general concave/holed/freeform trim filling, exact curvature-bound certification, and OBB as a semantic requirement. OBB is deferred because the current certified acceleration workload has no measured need that justifies another numerical authority.
 
-The current head is awaiting exact-head Rust and comprehensive E2E/red-team validation.
+Before merging, exact-head Rust and comprehensive E2E/red-team validation must pass on `0db7d42694465b9d7146c90b99ba1c62c51fdc11`. The immediately preceding head `f585dddc83471556fc8950e9138cd53f05bb6261` was already green in both authoritative gates.
 
 ## M9 completion boundary
 

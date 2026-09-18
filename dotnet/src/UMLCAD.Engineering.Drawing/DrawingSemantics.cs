@@ -154,7 +154,7 @@ public sealed record DrawingCapabilityMatrix(
     IReadOnlySet<DressUpKind> DressUpKinds);
 
 
-public static class CatiaDraftingCapabilityProfile
+public static class MechanicalDraftingCapabilityProfile
 {
     public static DrawingCapabilityMatrix Baseline(DrawingStandard standard)
     {

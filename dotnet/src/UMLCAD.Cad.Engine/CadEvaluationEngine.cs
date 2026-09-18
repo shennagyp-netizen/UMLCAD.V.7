@@ -51,6 +51,23 @@ public sealed class SpecificationGraph
                     throw new InvalidOperationException($"Feature '{feature.Id}' cannot depend on itself.");
             }
 
+            if (feature is ExtrusionFeatureSpecification extrusion)
+            {
+                if (!features.TryGetValue(extrusion.ProfileSketchId, out var profileFeature))
+                    throw new InvalidOperationException(
+                        $"Extrusion '{extrusion.Id}' references missing profile sketch '{extrusion.ProfileSketchId}'.");
+
+                if (profileFeature is not SketchFeatureSpecification sketch)
+                    throw new InvalidOperationException(
+                        $"Extrusion '{extrusion.Id}' profile target '{extrusion.ProfileSketchId}' is not a sketch.");
+
+                if (!sketch.Circles.Any(circle => circle.Id == extrusion.ProfileGeometryId))
+                {
+                    throw new InvalidOperationException(
+                        $"Extrusion '{extrusion.Id}' profile geometry '{extrusion.ProfileGeometryId}' is not owned by sketch '{extrusion.ProfileSketchId}'.");
+                }
+            }
+
             dependencies[feature.Id] = ids.Distinct()
                 .OrderBy(x => x.Value, StringComparer.Ordinal)
                 .ToArray();
@@ -267,6 +284,7 @@ public static class EvaluationIdentity
                 Append(builder, "feature.kind", "extrusion");
                 Append(builder, "feature.id", extrusion.Id.Value);
                 Append(builder, "profileSketch", extrusion.ProfileSketchId.Value);
+                Append(builder, "profileGeometry", extrusion.ProfileGeometryId.Value);
                 AppendReference(builder, extrusion.Support);
                 Append(builder, "direction.x", extrusion.Direction.X);
                 Append(builder, "direction.y", extrusion.Direction.Y);

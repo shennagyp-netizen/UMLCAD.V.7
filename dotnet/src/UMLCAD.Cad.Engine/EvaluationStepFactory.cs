@@ -26,6 +26,13 @@ public static class EvaluationStepFactory
             new("part", specification.PartId.Value.ToString("D")),
         };
 
+        if (specification is ExtrusionFeatureSpecification extrusion)
+        {
+            inputs.Add(new EvaluationInputIdentity(
+                "profile",
+                extrusion.Profile.ProfileId.Value.ToString("D")));
+        }
+
         if (additionalInputs is not null)
             inputs.AddRange(additionalInputs);
 

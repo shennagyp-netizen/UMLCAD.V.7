@@ -96,6 +96,40 @@ public sealed record ToolDefinition(
         diameterMm <= MaximumDiameterMm;
 }
 
+public static class MachineProcessCompatibility
+{
+    public static bool IsCompatible(MachineKind machine, ManufacturingProcessKind process) =>
+        machine switch
+        {
+            MachineKind.MachiningCenter => process == ManufacturingProcessKind.Milling,
+            MachineKind.Lathe => process == ManufacturingProcessKind.Turning,
+            MachineKind.WireEdm => process == ManufacturingProcessKind.WireEdmCutting,
+            MachineKind.PressBrake => process == ManufacturingProcessKind.SheetMetalBending,
+            MachineKind.LaserCutter => process == ManufacturingProcessKind.LaserCutting,
+            MachineKind.Waterjet => process == ManufacturingProcessKind.WaterjetCutting,
+            MachineKind.GrindingMachine => process == ManufacturingProcessKind.Grinding,
+            _ => false,
+        };
+}
+
+public static class ToolProcessCompatibility
+{
+    public static bool IsCompatible(ManufacturingProcessKind process, ToolKind tool) =>
+        process switch
+        {
+            ManufacturingProcessKind.Milling =>
+                tool is ToolKind.EndMill or ToolKind.Drill or ToolKind.Reamer,
+            ManufacturingProcessKind.Turning => false,
+            ManufacturingProcessKind.WireEdmCutting => tool == ToolKind.WireElectrode,
+            ManufacturingProcessKind.SheetMetalBending =>
+                tool is ToolKind.PressBrakePunch or ToolKind.PressBrakeDie,
+            ManufacturingProcessKind.LaserCutting => tool == ToolKind.LaserNozzle,
+            ManufacturingProcessKind.WaterjetCutting => tool == ToolKind.WaterjetNozzle,
+            ManufacturingProcessKind.Grinding => tool == ToolKind.GrindingWheel,
+            _ => false,
+        };
+}
+
 public sealed record MachineDefinition(
     string MachineId,
     MachineKind Kind,

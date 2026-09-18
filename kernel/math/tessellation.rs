@@ -1182,7 +1182,7 @@ mod trimmed_surface_tests {
             chord_error: 1.0e-3,
             angular_error: 1.0e-3,
             parameter_chord_error: 1.0e-3,
-            max_depth: 6,
+            max_depth: 10,
         };
         let result = tessellate_trimmed_surface3(
             &square_trim(),

@@ -1,82 +1,126 @@
 namespace UMLCAD.Cad.Contracts;
 
-public sealed record SketchKernelCircle(
-    string Id,
-    double X,
-    double Y,
-    double Radius)
+public sealed record SketchKernelCircle
 {
-    public SketchKernelCircle
+    public string Id { get; }
+    public double X { get; }
+    public double Y { get; }
+    public double Radius { get; }
+
+    public SketchKernelCircle(string id, double x, double y, double radius)
     {
-        if (string.IsNullOrWhiteSpace(Id))
-            throw new ArgumentException("Sketch circle ID is required.", nameof(Id));
-        if (!double.IsFinite(X) || !double.IsFinite(Y) ||
-            !double.IsFinite(Radius) || Radius <= 0d)
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentException(
+                "Sketch circle ID is required.",
+                nameof(id));
+
+        if (!double.IsFinite(x) ||
+            !double.IsFinite(y) ||
+            !double.IsFinite(radius) ||
+            radius <= 0d)
             throw new ArgumentException(
                 "Sketch circle coordinates and radius must be finite; radius must be positive.",
-                nameof(Radius));
+                nameof(radius));
+
+        Id = id;
+        X = x;
+        Y = y;
+        Radius = radius;
     }
 }
 
-public sealed record SketchKernelFixedConstraint(
-    string Id,
-    string GeometryId)
+public sealed record SketchKernelFixedConstraint
 {
-    public SketchKernelFixedConstraint
+    public string Id { get; }
+    public string GeometryId { get; }
+
+    public SketchKernelFixedConstraint(string id, string geometryId)
     {
-        if (string.IsNullOrWhiteSpace(Id))
-            throw new ArgumentException("Sketch constraint ID is required.", nameof(Id));
-        if (string.IsNullOrWhiteSpace(GeometryId))
-            throw new ArgumentException("Sketch constraint geometry ID is required.", nameof(GeometryId));
+        if (string.IsNullOrWhiteSpace(id))
+            throw new ArgumentException(
+                "Sketch constraint ID is required.",
+                nameof(id));
+        if (string.IsNullOrWhiteSpace(geometryId))
+            throw new ArgumentException(
+                "Sketch constraint geometry ID is required.",
+                nameof(geometryId));
+
+        Id = id;
+        GeometryId = geometryId;
     }
 }
 
-public sealed record KernelSolveOptions(
-    int MaxIterations,
-    double ResidualTolerance,
-    double StepTolerance,
-    double InitialDamping)
+public sealed record KernelSolveOptions
 {
-    public KernelSolveOptions
+    public int MaxIterations { get; }
+    public double ResidualTolerance { get; }
+    public double StepTolerance { get; }
+    public double InitialDamping { get; }
+
+    public KernelSolveOptions(
+        int maxIterations,
+        double residualTolerance,
+        double stepTolerance,
+        double initialDamping)
     {
-        if (MaxIterations <= 0)
-            throw new ArgumentOutOfRangeException(nameof(MaxIterations));
-        if (!double.IsFinite(ResidualTolerance) || ResidualTolerance < 0d)
-            throw new ArgumentOutOfRangeException(nameof(ResidualTolerance));
-        if (!double.IsFinite(StepTolerance) || StepTolerance < 0d)
-            throw new ArgumentOutOfRangeException(nameof(StepTolerance));
-        if (!double.IsFinite(InitialDamping) || InitialDamping < 0d)
-            throw new ArgumentOutOfRangeException(nameof(InitialDamping));
+        if (maxIterations <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxIterations));
+
+        if (!double.IsFinite(residualTolerance) || residualTolerance < 0d)
+            throw new ArgumentOutOfRangeException(nameof(residualTolerance));
+
+        if (!double.IsFinite(stepTolerance) || stepTolerance < 0d)
+            throw new ArgumentOutOfRangeException(nameof(stepTolerance));
+
+        if (!double.IsFinite(initialDamping) || initialDamping < 0d)
+            throw new ArgumentOutOfRangeException(nameof(initialDamping));
+
+        MaxIterations = maxIterations;
+        ResidualTolerance = residualTolerance;
+        StepTolerance = stepTolerance;
+        InitialDamping = initialDamping;
     }
 
     public static KernelSolveOptions Default { get; } =
         new(100, 1e-8, 1e-10, 1e-3);
 }
 
-public sealed record SketchSolveRequest(
-    string OperationIdentity,
-    IReadOnlyList<SketchKernelCircle> Circles,
-    IReadOnlyList<SketchKernelFixedConstraint> FixedConstraints,
-    KernelTolerance Tolerance,
-    KernelSolveOptions Options)
+public sealed record SketchSolveRequest
 {
+    public string OperationIdentity { get; }
+    public IReadOnlyList<SketchKernelCircle> Circles { get; }
+    public IReadOnlyList<SketchKernelFixedConstraint> FixedConstraints { get; }
+    public KernelTolerance Tolerance { get; }
+    public KernelSolveOptions Options { get; }
+
     public const string ContractId = "UMLCAD.Geometry.SketchSolve";
     public const string ContractSchema = "uml-cad-sketch-solve/1.0.0";
 
-    public SketchSolveRequest
+    public SketchSolveRequest(
+        string operationIdentity,
+        IReadOnlyList<SketchKernelCircle> circles,
+        IReadOnlyList<SketchKernelFixedConstraint> fixedConstraints,
+        KernelTolerance tolerance,
+        KernelSolveOptions options)
     {
-        if (string.IsNullOrWhiteSpace(OperationIdentity))
-            throw new ArgumentException("OperationIdentity is required.", nameof(OperationIdentity));
+        if (string.IsNullOrWhiteSpace(operationIdentity))
+            throw new ArgumentException(
+                "OperationIdentity is required.",
+                nameof(operationIdentity));
 
-        Circles = Circles?.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray()
-            ?? throw new ArgumentNullException(nameof(Circles));
-        FixedConstraints = FixedConstraints?.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray()
-            ?? throw new ArgumentNullException(nameof(FixedConstraints));
+        Circles = circles?.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray()
+            ?? throw new ArgumentNullException(nameof(circles));
+        FixedConstraints = fixedConstraints?.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray()
+            ?? throw new ArgumentNullException(nameof(fixedConstraints));
 
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var circle in Circles)
+        {
             if (!ids.Add(circle.Id))
-                throw new ArgumentException($"Duplicate sketch circle '{circle.Id}'.", nameof(Circles));
+                throw new ArgumentException(
+                    $"Duplicate sketch circle '{circle.Id}'.",
+                    nameof(circles));
+        }
 
         var constraintIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var constraint in FixedConstraints)
@@ -84,16 +128,22 @@ public sealed record SketchSolveRequest(
             if (!constraintIds.Add(constraint.Id))
                 throw new ArgumentException(
                     $"Duplicate sketch constraint '{constraint.Id}'.",
-                    nameof(FixedConstraints));
+                    nameof(fixedConstraints));
 
             if (!ids.Contains(constraint.GeometryId))
                 throw new ArgumentException(
                     $"Sketch constraint '{constraint.Id}' references missing circle '{constraint.GeometryId}'.",
-                    nameof(FixedConstraints));
+                    nameof(fixedConstraints));
         }
 
         if (Circles.Count == 0)
-            throw new ArgumentException("At least one sketch circle is required.", nameof(Circles));
+            throw new ArgumentException(
+                "At least one sketch circle is required.",
+                nameof(circles));
+
+        OperationIdentity = operationIdentity;
+        Tolerance = tolerance;
+        Options = options;
     }
 }
 
@@ -103,48 +153,86 @@ public sealed record SketchSolvedCircle(
     double Y,
     double Radius);
 
-public sealed record SketchSolveKernelResult(
-    GeometryKernelStatus Status,
-    bool Succeeded,
-    string Reason,
-    int Iterations,
-    double InitialResidualNorm,
-    double FinalResidualNorm,
-    double InitialScaledResidualNorm,
-    double FinalScaledResidualNorm,
-    double FinalStepNorm,
-    int VariableCount,
-    int EquationCount,
-    int Rank,
-    int DegreesOfFreedom,
-    double ConditionEstimate,
-    IReadOnlyList<SketchSolvedCircle> Geometry,
-    IReadOnlyList<string> Diagnostics)
+public sealed record SketchSolveKernelResult
 {
-    public SketchSolveKernelResult
+    public GeometryKernelStatus Status { get; }
+    public bool Succeeded { get; }
+    public string Reason { get; }
+    public int Iterations { get; }
+    public double InitialResidualNorm { get; }
+    public double FinalResidualNorm { get; }
+    public double InitialScaledResidualNorm { get; }
+    public double FinalScaledResidualNorm { get; }
+    public double FinalStepNorm { get; }
+    public int VariableCount { get; }
+    public int EquationCount { get; }
+    public int Rank { get; }
+    public int DegreesOfFreedom { get; }
+    public double ConditionEstimate { get; }
+    public IReadOnlyList<SketchSolvedCircle> Geometry { get; }
+    public IReadOnlyList<string> Diagnostics { get; }
+
+    public SketchSolveKernelResult(
+        GeometryKernelStatus status,
+        bool succeeded,
+        string reason,
+        int iterations,
+        double initialResidualNorm,
+        double finalResidualNorm,
+        double initialScaledResidualNorm,
+        double finalScaledResidualNorm,
+        double finalStepNorm,
+        int variableCount,
+        int equationCount,
+        int rank,
+        int degreesOfFreedom,
+        double conditionEstimate,
+        IReadOnlyList<SketchSolvedCircle> geometry,
+        IReadOnlyList<string> diagnostics)
     {
-        Geometry = Geometry?.ToArray()
-            ?? throw new ArgumentNullException(nameof(Geometry));
-        Diagnostics = Diagnostics?.ToArray()
-            ?? throw new ArgumentNullException(nameof(Diagnostics));
+        Geometry = geometry?.ToArray()
+            ?? throw new ArgumentNullException(nameof(geometry));
+        Diagnostics = diagnostics?.ToArray()
+            ?? throw new ArgumentNullException(nameof(diagnostics));
 
-        if (!Enum.IsDefined(Status) || string.IsNullOrWhiteSpace(Reason))
-            throw new ArgumentException("Sketch solver result status/reason is invalid.");
+        if (!Enum.IsDefined(status) ||
+            string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException(
+                "Sketch solver result status/reason is invalid.");
 
-        var expectedSuccess = Status == GeometryKernelStatus.Succeeded;
-        if (Succeeded != expectedSuccess)
+        var expectedSuccess = status == GeometryKernelStatus.Succeeded;
+        if (succeeded != expectedSuccess)
             throw new ArgumentException(
                 "Sketch solver status is inconsistent with succeeded.");
 
-        if (Iterations < 0 || VariableCount < 0 || EquationCount < 0 ||
-            Rank < 0 || DegreesOfFreedom < 0 ||
-            !double.IsFinite(InitialResidualNorm) ||
-            !double.IsFinite(FinalResidualNorm) ||
-            !double.IsFinite(InitialScaledResidualNorm) ||
-            !double.IsFinite(FinalScaledResidualNorm) ||
-            !double.IsFinite(FinalStepNorm) ||
-            !double.IsFinite(ConditionEstimate))
-            throw new ArgumentException("Sketch solver diagnostics are invalid.");
+        if (iterations < 0 ||
+            variableCount < 0 ||
+            equationCount < 0 ||
+            rank < 0 ||
+            degreesOfFreedom < 0 ||
+            !double.IsFinite(initialResidualNorm) ||
+            !double.IsFinite(finalResidualNorm) ||
+            !double.IsFinite(initialScaledResidualNorm) ||
+            !double.IsFinite(finalScaledResidualNorm) ||
+            !double.IsFinite(finalStepNorm) ||
+            !double.IsFinite(conditionEstimate))
+            throw new ArgumentException(
+                "Sketch solver diagnostics are invalid.");
+
+        Status = status;
+        Succeeded = succeeded;
+        Reason = reason;
+        Iterations = iterations;
+        InitialResidualNorm = initialResidualNorm;
+        FinalResidualNorm = finalResidualNorm;
+        InitialScaledResidualNorm = initialScaledResidualNorm;
+        FinalScaledResidualNorm = finalScaledResidualNorm;
+        FinalStepNorm = finalStepNorm;
+        VariableCount = variableCount;
+        EquationCount = equationCount;
+        Rank = rank;
+        DegreesOfFreedom = degreesOfFreedom;
+        ConditionEstimate = conditionEstimate;
     }
 }
 

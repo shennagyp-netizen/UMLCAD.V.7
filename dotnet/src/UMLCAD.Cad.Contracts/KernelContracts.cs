@@ -1,39 +1,63 @@
 namespace UMLCAD.Cad.Contracts;
 
-public readonly record struct ContractVersion(string Value)
+public readonly record struct ContractVersion
 {
-    public ContractVersion
+    public string Value { get; }
+
+    public ContractVersion(string value)
     {
-        if (string.IsNullOrWhiteSpace(Value))
-            throw new ArgumentException("Contract version is required.", nameof(Value));
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException(
+                "Contract version is required.",
+                nameof(value));
+
+        Value = value;
     }
 
     public override string ToString() => Value;
 }
 
-public readonly record struct ContractResultId(string Value)
+public readonly record struct ContractResultId
 {
-    public ContractResultId
+    public string Value { get; }
+
+    public ContractResultId(string value)
     {
-        if (string.IsNullOrWhiteSpace(Value))
-            throw new ArgumentException("Result identity is required.", nameof(Value));
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException(
+                "Result identity is required.",
+                nameof(value));
+
+        Value = value;
     }
 
     public override string ToString() => Value;
 }
 
-public readonly record struct ContractTopologyId(
-    ContractResultId ResultId,
-    string TopologyKind,
-    string TopologyKey)
+public readonly record struct ContractTopologyId
 {
-    public ContractTopologyId
-    {
-        if (string.IsNullOrWhiteSpace(TopologyKind))
-            throw new ArgumentException("TopologyKind is required.", nameof(TopologyKind));
+    public ContractResultId ResultId { get; }
+    public string TopologyKind { get; }
+    public string TopologyKey { get; }
 
-        if (string.IsNullOrWhiteSpace(TopologyKey))
-            throw new ArgumentException("TopologyKey is required.", nameof(TopologyKey));
+    public ContractTopologyId(
+        ContractResultId resultId,
+        string topologyKind,
+        string topologyKey)
+    {
+        if (string.IsNullOrWhiteSpace(topologyKind))
+            throw new ArgumentException(
+                "TopologyKind is required.",
+                nameof(topologyKind));
+
+        if (string.IsNullOrWhiteSpace(topologyKey))
+            throw new ArgumentException(
+                "TopologyKey is required.",
+                nameof(topologyKey));
+
+        ResultId = resultId;
+        TopologyKind = topologyKind;
+        TopologyKey = topologyKey;
     }
 }
 
@@ -52,56 +76,87 @@ public enum KernelOperationKind
     SolveConstraints,
 }
 
-public sealed record KernelInputBinding(
-    string Role,
-    ContractResultId? ResultId,
-    ContractTopologyId? TopologyId,
-    string GeometryContractKey)
+public sealed record KernelInputBinding
 {
-    public KernelInputBinding
+    public string Role { get; }
+    public ContractResultId? ResultId { get; }
+    public ContractTopologyId? TopologyId { get; }
+    public string GeometryContractKey { get; }
+
+    public KernelInputBinding(
+        string role,
+        ContractResultId? resultId,
+        ContractTopologyId? topologyId,
+        string geometryContractKey)
     {
-        if (string.IsNullOrWhiteSpace(Role))
-            throw new ArgumentException("Role is required.", nameof(Role));
+        if (string.IsNullOrWhiteSpace(role))
+            throw new ArgumentException(
+                "Role is required.",
+                nameof(role));
 
-        if (string.IsNullOrWhiteSpace(GeometryContractKey))
-            throw new ArgumentException("GeometryContractKey is required.", nameof(GeometryContractKey));
+        if (string.IsNullOrWhiteSpace(geometryContractKey))
+            throw new ArgumentException(
+                "GeometryContractKey is required.",
+                nameof(geometryContractKey));
 
-        if (ResultId is null && TopologyId is null)
+        if (resultId is null && topologyId is null)
             throw new ArgumentException(
                 "A kernel input binding must reference a result or topology identity.",
-                nameof(ResultId));
+                nameof(resultId));
 
-        if (ResultId is not null && TopologyId is not null &&
-            TopologyId.Value.ResultId != ResultId.Value)
-        {
+        if (resultId is not null &&
+            topologyId is not null &&
+            topologyId.Value.ResultId != resultId.Value)
             throw new ArgumentException(
                 "TopologyId must belong to the supplied ResultId.",
-                nameof(TopologyId));
-        }
+                nameof(topologyId));
+
+        Role = role;
+        ResultId = resultId;
+        TopologyId = topologyId;
+        GeometryContractKey = geometryContractKey;
     }
 }
 
-public sealed record KernelRequest(
-    string ContractId,
-    ContractVersion ContractVersion,
-    KernelOperationKind Operation,
-    string OperationIdentity,
-    IReadOnlyList<KernelInputBinding> Inputs,
-    string CanonicalParameters)
+public sealed record KernelRequest
 {
-    public KernelRequest
+    public string ContractId { get; }
+    public ContractVersion ContractVersion { get; }
+    public KernelOperationKind Operation { get; }
+    public string OperationIdentity { get; }
+    public IReadOnlyList<KernelInputBinding> Inputs { get; }
+    public string CanonicalParameters { get; }
+
+    public KernelRequest(
+        string contractId,
+        ContractVersion contractVersion,
+        KernelOperationKind operation,
+        string operationIdentity,
+        IReadOnlyList<KernelInputBinding> inputs,
+        string canonicalParameters)
     {
-        if (string.IsNullOrWhiteSpace(ContractId))
-            throw new ArgumentException("ContractId is required.", nameof(ContractId));
+        if (string.IsNullOrWhiteSpace(contractId))
+            throw new ArgumentException(
+                "ContractId is required.",
+                nameof(contractId));
 
-        if (string.IsNullOrWhiteSpace(OperationIdentity))
-            throw new ArgumentException("OperationIdentity is required.", nameof(OperationIdentity));
+        if (string.IsNullOrWhiteSpace(operationIdentity))
+            throw new ArgumentException(
+                "OperationIdentity is required.",
+                nameof(operationIdentity));
 
-        if (string.IsNullOrWhiteSpace(CanonicalParameters))
-            throw new ArgumentException("CanonicalParameters is required.", nameof(CanonicalParameters));
+        if (string.IsNullOrWhiteSpace(canonicalParameters))
+            throw new ArgumentException(
+                "CanonicalParameters is required.",
+                nameof(canonicalParameters));
 
-        Inputs = Inputs?.ToArray() ??
-            throw new ArgumentNullException(nameof(Inputs));
+        ContractId = contractId;
+        ContractVersion = contractVersion;
+        Operation = operation;
+        OperationIdentity = operationIdentity;
+        Inputs = inputs?.ToArray()
+            ?? throw new ArgumentNullException(nameof(inputs));
+        CanonicalParameters = canonicalParameters;
     }
 }
 
@@ -114,26 +169,37 @@ public enum KernelResultStatus
     Indeterminate,
 }
 
-public sealed record KernelResult(
-    ContractResultId? ResultId,
-    KernelResultStatus Status,
-    IReadOnlyList<ContractTopologyId> Topology,
-    string EvidenceHash,
-    IReadOnlyList<string> Diagnostics)
+public sealed record KernelResult
 {
-    public KernelResult
+    public ContractResultId? ResultId { get; }
+    public KernelResultStatus Status { get; }
+    public IReadOnlyList<ContractTopologyId> Topology { get; }
+    public string EvidenceHash { get; }
+    public IReadOnlyList<string> Diagnostics { get; }
+
+    public KernelResult(
+        ContractResultId? resultId,
+        KernelResultStatus status,
+        IReadOnlyList<ContractTopologyId> topology,
+        string evidenceHash,
+        IReadOnlyList<string> diagnostics)
     {
-        if (Status == KernelResultStatus.Succeeded && ResultId is null)
+        if (status == KernelResultStatus.Succeeded && resultId is null)
             throw new ArgumentException(
                 "A successful kernel result requires a result identity.",
-                nameof(ResultId));
+                nameof(resultId));
 
-        if (string.IsNullOrWhiteSpace(EvidenceHash))
-            throw new ArgumentException("EvidenceHash is required.", nameof(EvidenceHash));
+        if (string.IsNullOrWhiteSpace(evidenceHash))
+            throw new ArgumentException(
+                "EvidenceHash is required.",
+                nameof(evidenceHash));
 
-        Topology = Topology?.ToArray() ??
-            throw new ArgumentNullException(nameof(Topology));
-        Diagnostics = Diagnostics?.ToArray() ??
-            throw new ArgumentNullException(nameof(Diagnostics));
+        ResultId = resultId;
+        Status = status;
+        Topology = topology?.ToArray()
+            ?? throw new ArgumentNullException(nameof(topology));
+        EvidenceHash = evidenceHash;
+        Diagnostics = diagnostics?.ToArray()
+            ?? throw new ArgumentNullException(nameof(diagnostics));
     }
 }

@@ -13,7 +13,7 @@ public sealed class BoxSolidBoundaryTests
     public void BoxSolidResultIntegrationPreservesSixFaceTopology()
     {
         var result = new AxisAlignedBoxSolidKernelResult(
-            AxisAlignedBoxSolidKernelStatus.Succeeded,
+            GeometryKernelStatus.Succeeded,
             new ContractResultId("solid:001"),
             "evidence-001",
             new[]
@@ -44,7 +44,7 @@ public sealed class BoxSolidBoundaryTests
     {
         Assert.Throws<ArgumentException>(() =>
             new AxisAlignedBoxSolidKernelResult(
-                AxisAlignedBoxSolidKernelStatus.Succeeded,
+                GeometryKernelStatus.Succeeded,
                 new ContractResultId("solid:002"),
                 "evidence-002",
                 new[]
@@ -102,7 +102,7 @@ public sealed class BoxSolidBoundaryTests
                 new KernelTolerance(1e-9, 1e-9),
                 new ContractVersion("1.0")));
 
-        Assert.Equal(AxisAlignedBoxSolidKernelStatus.Succeeded, result.Status);
+        Assert.Equal(GeometryKernelStatus.Succeeded, result.Status);
         Assert.Equal(new ContractResultId("solid:http-001"), result.ResultId);
         Assert.Equal(6, result.Topology.Count);
         Assert.Equal(24d, result.Volume);

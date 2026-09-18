@@ -248,6 +248,81 @@ def status_and_body(response: bytes) -> tuple[int, bytes]:
     return int(head.splitlines()[0].decode("ascii").split()[1]), body
 
 
+
+def box_solid_geometry_checks(runner: Runner) -> bool:
+    checks = [
+        (
+            "valid bounded box solid",
+            {
+                "schema": "uml-cad-axis-aligned-box-solid/1.0.0",
+                "operationIdentity": "python-box-seed-001",
+                "min": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "max": {"x": 2.0, "y": 3.0, "z": 4.0},
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            },
+            True,
+        ),
+        (
+            "degenerate box solid",
+            {
+                "schema": "uml-cad-axis-aligned-box-solid/1.0.0",
+                "operationIdentity": "python-box-invalid-001",
+                "min": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "max": {"x": 0.0, "y": 3.0, "z": 4.0},
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            },
+            False,
+        ),
+    ]
+
+    passed = True
+    for name, payload, expected_success in checks:
+        body = json.dumps(payload).encode()
+        request = (
+            "POST /v1/geometry/box-solid HTTP/1.1\\r\\n"
+            "Host: localhost\\r\\n"
+            "Content-Type: application/json\\r\\n"
+            f"Content-Length: {len(body)}\\r\\n"
+            "Connection: close\\r\\n\\r\\n"
+        )
+        try:
+            status, response_body = status_and_body(http_request(body, request))
+            value = json.loads(response_body.decode("utf-8"))
+            actual_success = value.get("succeeded") is True
+            if expected_success:
+                ok = (
+                    status == 200
+                    and actual_success
+                    and value.get("volume") == 24.0
+                    and value.get("surfaceArea") == 52.0
+                    and len(value.get("topology", [])) == 6
+                    and value.get("centroid") == {"x": 1.0, "y": 1.5, "z": 2.0}
+                )
+            else:
+                ok = (
+                    status == 200
+                    and not actual_success
+                    and bool(value.get("diagnostics"))
+                )
+        except Exception as exc:
+            ok = False
+            response_body = str(exc).encode()
+
+        runner.results.append(
+            Result(
+                f"python-box-solid/{name}",
+                ["raw-socket-http-probe", name],
+                0 if ok else 1,
+                0.0,
+                response_body.decode("utf-8", errors="replace")[-2000:],
+            )
+        )
+        runner.log(("PASS" if ok else "FAIL") + f" python-box-solid/{name}")
+        passed &= ok
+
+    return passed
+
+
 def raw_redteam_checks(runner: Runner) -> bool:
     checks = [
         (
@@ -406,6 +481,7 @@ def main() -> int:
             900,
         )
         runner.start_kernel()
+        passed &= box_solid_geometry_checks(runner)
         passed &= raw_redteam_checks(runner)
     except Exception as exc:
         runner.log(f"HARNESS ERROR: {exc}")

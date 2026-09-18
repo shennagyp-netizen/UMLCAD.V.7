@@ -99,6 +99,28 @@ fn loop_boundary_contains(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> 
     })
 }
 
+fn is_convex_loop(loop_points: &[Vec2], tolerance: f64) -> bool {
+    if loop_points.len() < 3 {
+        return false;
+    }
+    let area = signed_area2(loop_points);
+    if !area.is_finite() || area == 0.0 {
+        return false;
+    }
+    let sign = area.signum();
+    for i in 0..loop_points.len() {
+        let a = loop_points[i];
+        let b = loop_points[(i + 1) % loop_points.len()];
+        let d = loop_points[(i + 2) % loop_points.len()];
+        let value = b.sub(a).cross(d.sub(b));
+        let eps = tolerance * (b.sub(a).length() + d.sub(b).length() + 1.0);
+        if !value.is_finite() || !eps.is_finite() || value * sign <= eps {
+            return false;
+        }
+    }
+    true
+}
+
 fn point_in_convex_loop(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> bool {
     let area = signed_area2(loop_points);
     let sign = area.signum();
@@ -173,6 +195,9 @@ impl PlanarRegion3 {
         if !outer_area.is_finite() || outer_area.abs() <= eps * eps {
             return Err(BRepError::Degenerate);
         }
+        if !is_convex_loop(&self.outer, eps) {
+            return Err(BRepError::InvalidRegion);
+        }
         for i in 0..self.outer.len() {
             let a = self.outer[i];
             let b = self.outer[(i + 1) % self.outer.len()];
@@ -197,6 +222,9 @@ impl PlanarRegion3 {
             let hole_area = signed_area2(hole);
             if !hole_area.is_finite() || hole_area.abs() <= eps * eps {
                 return Err(BRepError::Degenerate);
+            }
+            if !is_convex_loop(hole, eps) {
+                return Err(BRepError::InvalidRegion);
             }
             if !point_in_convex_loop(hole[0], &self.outer, eps) {
                 return Err(BRepError::InvalidRegion);
@@ -537,6 +565,16 @@ impl BRepSolid {
             if incident_faces.len() < 3 {
                 return Err(BRepError::NonManifoldVertex);
             }
+        }
+
+        // Exact solid moments below triangulate convex outer face loops. A
+        // planar face with an inner loop requires a certified polygon-with-hole
+        // decomposition that is not yet part of this authority. Reject it here
+        // rather than silently counting the hole as material.
+        if self.faces.iter().any(|face| {
+            !face.inner_wires.is_empty() || !face.region.holes.is_empty()
+        }) {
+            return Err(BRepError::UnsupportedBoolean);
         }
 
         let volume = self.moments(tolerance)?.signed_volume;
@@ -1140,6 +1178,40 @@ mod tests {
     }
 
     #[test]
+    fn planar_region_rejects_nonconvex_certification_and_marks_hole_boundary() {
+        let nonconvex = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0), Vec2::new(4.0,0.0),
+                Vec2::new(2.0,1.0), Vec2::new(4.0,4.0),
+                Vec2::new(0.0,4.0),
+            ],
+            holes: vec![],
+        };
+        assert_eq!(nonconvex.validate(tol()), Err(BRepError::InvalidRegion));
+
+        let region = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0),Vec2::new(10.0,0.0),
+                Vec2::new(10.0,10.0),Vec2::new(0.0,10.0),
+            ],
+            holes: vec![vec![
+                Vec2::new(3.0,3.0),Vec2::new(7.0,3.0),
+                Vec2::new(7.0,7.0),Vec2::new(3.0,7.0),
+            ]],
+        };
+        assert_eq!(
+            region.classify_point(Vec3::new(3.0,5.0,0.0), tol()).unwrap(),
+            RegionClass::OnBoundary
+        );
+    }
+
+    #[test]
     fn planar_region_with_hole_preserves_area_and_classifies_hole_region() {
         let region = PlanarRegion3 {
             origin: Vec3::new(0.0, 0.0, 0.0),
@@ -1195,6 +1267,15 @@ mod tests {
         let pieces = box_union(a, touching, tol()).unwrap();
         let total: f64 = pieces.iter().map(|p| p.volume(tol()).unwrap()).sum();
         assert!((total - 12000.0).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn solid_moment_domain_rejects_holed_faces_until_exact_decomposition_exists() {
+        let mut solid = tetra_brep();
+        solid.faces[0].region.holes.push(vec![
+            Vec2::new(0.2,0.1), Vec2::new(0.3,0.1), Vec2::new(0.3,0.2), Vec2::new(0.2,0.2),
+        ]);
+        assert_eq!(solid.validate(tol()), Err(BRepError::UnsupportedBoolean));
     }
 
     #[test]

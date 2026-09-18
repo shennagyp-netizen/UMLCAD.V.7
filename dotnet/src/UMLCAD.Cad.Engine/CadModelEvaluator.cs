@@ -51,9 +51,35 @@ public sealed class CadModelEvaluator
         }
     }
 
-    public async Task<CadEvaluationSnapshot> EvaluateAsync(
+    public Task<CadEvaluationSnapshot> EvaluateAsync(
         IEnumerable<FeatureSpecification> specifications,
         FeatureEvaluationOptions options,
+        CancellationToken cancellationToken = default) =>
+        EvaluateInternalAsync(
+            specifications,
+            options,
+            cache: null,
+            changeSet: CadChangeSet.Full(),
+            cancellationToken);
+
+    public Task<CadEvaluationSnapshot> EvaluateAsync(
+        IEnumerable<FeatureSpecification> specifications,
+        FeatureEvaluationOptions options,
+        IEvaluationCache cache,
+        CadChangeSet changeSet,
+        CancellationToken cancellationToken = default) =>
+        EvaluateInternalAsync(
+            specifications,
+            options,
+            cache,
+            changeSet,
+            cancellationToken);
+
+    private async Task<CadEvaluationSnapshot> EvaluateInternalAsync(
+        IEnumerable<FeatureSpecification> specifications,
+        FeatureEvaluationOptions options,
+        IEvaluationCache? cache,
+        CadChangeSet changeSet,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(specifications);
@@ -84,8 +110,12 @@ public sealed class CadModelEvaluator
             _evaluators,
             options);
 
+        var executionPlan = IncrementalEvaluationPlanner.Create(plan, changeSet);
+
         var outcomes = await new AsyncEvaluationEngine(executors).EvaluateAsync(
             plan,
+            cache,
+            executionPlan.RecomputeStepIds,
             cancellationToken);
 
         return new CadEvaluationSnapshot(plan, outcomes);

@@ -5,8 +5,6 @@
 //! produce false positives but, for finite valid boxes, never omit overlapping
 //! leaf boxes.
 
-use std::collections::BTreeMap;
-
 use super::vec::Vec3;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -126,6 +124,199 @@ pub fn subdivide_aabb8(bounds: Aabb3) -> [Aabb3; 8] {
         Aabb3 { min: Vec3::new(min.x, center.y, center.z), max: Vec3::new(center.x, max.y, max.z) },
         Aabb3 { min: center, max },
     ]
+}
+
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SpatialSubdivisionNode {
+    pub bounds: Aabb3,
+    pub items: Vec<usize>,
+    pub children: Vec<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct SpatialSubdivision3 {
+    pub nodes: Vec<SpatialSubdivisionNode>,
+    pub root: usize,
+    pub max_depth: u32,
+    pub max_items_per_leaf: usize,
+}
+
+fn contains_aabb(container: Aabb3, item: Aabb3) -> bool {
+    item.min.x >= container.min.x
+        && item.max.x <= container.max.x
+        && item.min.y >= container.min.y
+        && item.max.y <= container.max.y
+        && item.min.z >= container.min.z
+        && item.max.z <= container.max.z
+}
+
+fn can_subdivide(bounds: Aabb3) -> bool {
+    let center = bounds.center();
+    center.is_finite()
+        && center.x > bounds.min.x && center.x < bounds.max.x
+        && center.y > bounds.min.y && center.y < bounds.max.y
+        && center.z > bounds.min.z && center.z < bounds.max.z
+}
+
+impl SpatialSubdivision3 {
+    pub fn build(
+        items: &[(usize, Aabb3)],
+        max_depth: u32,
+        max_items_per_leaf: usize,
+    ) -> Result<Self, BvhError> {
+        if items.is_empty() {
+            return Err(BvhError::Empty);
+        }
+        if max_items_per_leaf == 0 {
+            return Err(BvhError::InvalidBounds);
+        }
+
+        let mut ids = items.iter().map(|(id, _)| *id).collect::<Vec<_>>();
+        ids.sort_unstable();
+        if ids.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(BvhError::DuplicateItemId);
+        }
+
+        let mut root_bounds = items[0].1;
+        for (id, bounds) in items {
+            if !bounds.min.is_finite()
+                || !bounds.max.is_finite()
+                || bounds.min.x > bounds.max.x
+                || bounds.min.y > bounds.max.y
+                || bounds.min.z > bounds.max.z
+            {
+                return Err(BvhError::InvalidBounds);
+            }
+            let _ = id;
+            root_bounds = root_bounds.union(*bounds);
+        }
+
+        let mut nodes = Vec::new();
+        let root = Self::build_node(
+            root_bounds,
+            items.to_vec(),
+            0,
+            max_depth,
+            max_items_per_leaf,
+            &mut nodes,
+        );
+        Ok(Self {
+            nodes,
+            root,
+            max_depth,
+            max_items_per_leaf,
+        })
+    }
+
+    fn build_node(
+        bounds: Aabb3,
+        items: Vec<(usize, Aabb3)>,
+        depth: u32,
+        max_depth: u32,
+        max_items_per_leaf: usize,
+        nodes: &mut Vec<SpatialSubdivisionNode>,
+    ) -> usize {
+        if depth >= max_depth || items.len() <= max_items_per_leaf || !can_subdivide(bounds) {
+            let index = nodes.len();
+            let mut ids = items.into_iter().map(|(id, _)| id).collect::<Vec<_>>();
+            ids.sort_unstable();
+            nodes.push(SpatialSubdivisionNode {
+                bounds,
+                items: ids,
+                children: Vec::new(),
+            });
+            return index;
+        }
+
+        let child_bounds = subdivide_aabb8(bounds);
+        let mut child_items: [Vec<(usize, Aabb3)>; 8] = std::array::from_fn(|_| Vec::new());
+        let mut resident = Vec::new();
+
+        for (id, item_bounds) in items {
+            let mut containing_child = None;
+            for (child_index, child_bounds) in child_bounds.iter().enumerate() {
+                if contains_aabb(*child_bounds, item_bounds) {
+                    if containing_child.is_some() {
+                        containing_child = None;
+                        break;
+                    }
+                    containing_child = Some(child_index);
+                }
+            }
+            if let Some(child_index) = containing_child {
+                child_items[child_index].push((id, item_bounds));
+            } else {
+                resident.push((id, item_bounds));
+            }
+        }
+
+        if child_items.iter().all(|items| items.is_empty()) {
+            let index = nodes.len();
+            let mut ids = resident.into_iter().map(|(id, _)| id).collect::<Vec<_>>();
+            ids.sort_unstable();
+            nodes.push(SpatialSubdivisionNode {
+                bounds,
+                items: ids,
+                children: Vec::new(),
+            });
+            return index;
+        }
+
+        let index = nodes.len();
+        nodes.push(SpatialSubdivisionNode {
+            bounds,
+            items: resident.into_iter().map(|(id, _)| id).collect(),
+            children: Vec::new(),
+        });
+
+        let mut children = Vec::new();
+        for child_index in 0..8 {
+            if child_items[child_index].is_empty() {
+                continue;
+            }
+            let child = Self::build_node(
+                child_bounds[child_index],
+                std::mem::take(&mut child_items[child_index]),
+                depth + 1,
+                max_depth,
+                max_items_per_leaf,
+                nodes,
+            );
+            children.push(child);
+        }
+        nodes[index].children = children;
+        index
+    }
+
+    pub fn query_aabb(&self, query: Aabb3, tolerance: f64) -> Vec<usize> {
+        if !query.min.is_finite()
+            || !query.max.is_finite()
+            || query.min.x > query.max.x
+            || query.min.y > query.max.y
+            || query.min.z > query.max.z
+            || !tolerance.is_finite()
+            || tolerance < 0.0
+        {
+            return Vec::new();
+        }
+
+        let mut out = Vec::new();
+        let mut stack = vec![self.root];
+        while let Some(index) = stack.pop() {
+            let node = &self.nodes[index];
+            if !node.bounds.intersects(query, tolerance) {
+                continue;
+            }
+            for item_id in &node.items {
+                out.push(*item_id);
+            }
+            stack.extend(node.children.iter().copied().rev());
+        }
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -501,6 +692,49 @@ mod tests {
             BoundingSphere3::new(Vec3::new(f64::NAN, 0.0, 0.0), 1.0),
             Err(BvhError::NonFinite)
         );
+    }
+
+    #[test]
+    fn spatial_subdivision_preserves_cross_boundary_items() {
+        let items = vec![
+            (0, Aabb3::new(
+                Vec3::new(0.0, 0.0, 0.0),
+                Vec3::new(0.25, 0.25, 0.25),
+            ).unwrap()),
+            (1, Aabb3::new(
+                Vec3::new(0.75, 0.75, 0.75),
+                Vec3::new(1.0, 1.0, 1.0),
+            ).unwrap()),
+            (2, Aabb3::new(
+                Vec3::new(0.25, 0.25, 0.25),
+                Vec3::new(0.75, 0.75, 0.75),
+            ).unwrap()),
+        ];
+        let tree = SpatialSubdivision3::build(&items, 6, 1).unwrap();
+        assert!(tree.nodes.len() > 1);
+        assert_eq!(tree.query_aabb(
+            Aabb3::new(
+                Vec3::new(0.2, 0.2, 0.2),
+                Vec3::new(0.8, 0.8, 0.8),
+            ).unwrap(),
+            0.0,
+        ), vec![0, 1, 2]);
+        let boundary_node = tree.nodes.iter().find(|node| node.items.contains(&2))
+            .expect("cross-boundary item remains resident at a parent");
+        assert!(boundary_node.children.len() > 0 || boundary_node.items.contains(&2));
+    }
+
+    #[test]
+    fn spatial_subdivision_is_deterministic() {
+        let items = vec![
+            (2, box3(2.0, 2.0, 2.0)),
+            (0, box3(0.0, 0.0, 0.0)),
+            (1, box3(1.0, 1.0, 1.0)),
+        ];
+        let a = SpatialSubdivision3::build(&items, 4, 1).unwrap();
+        let b = SpatialSubdivision3::build(&items, 4, 1).unwrap();
+        assert_eq!(a, b);
+        assert_eq!(a.query_aabb(box3(1.0, 1.0, 1.0), 0.0), vec![1, 2]);
     }
 
     #[test]

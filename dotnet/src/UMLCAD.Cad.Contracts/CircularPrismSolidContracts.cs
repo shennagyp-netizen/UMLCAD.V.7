@@ -1,35 +1,61 @@
 namespace UMLCAD.Cad.Contracts;
 
-public sealed record CircularPrismSolidRequest(
-    string OperationIdentity,
-    KernelVector3 Origin,
-    KernelVector3 Axis,
-    double Radius,
-    double Depth,
-    KernelTolerance Tolerance,
-    ContractVersion ContractVersion)
+public sealed record CircularPrismSolidRequest
 {
+    public string OperationIdentity { get; }
+    public KernelVector3 Origin { get; }
+    public KernelVector3 Axis { get; }
+    public double Radius { get; }
+    public double Depth { get; }
+    public KernelTolerance Tolerance { get; }
+    public ContractVersion ContractVersion { get; }
+
     public const string ContractId = "UMLCAD.Geometry.CircularPrismSolid";
     public const string ContractSchema = "uml-cad-circular-prism-solid/1.0.0";
 
-    public CircularPrismSolidRequest
+    public CircularPrismSolidRequest(
+        string operationIdentity,
+        KernelVector3 origin,
+        KernelVector3 axis,
+        double radius,
+        double depth,
+        KernelTolerance tolerance,
+        ContractVersion contractVersion)
     {
-        if (string.IsNullOrWhiteSpace(OperationIdentity))
-            throw new ArgumentException("OperationIdentity is required.", nameof(OperationIdentity));
+        if (string.IsNullOrWhiteSpace(operationIdentity))
+            throw new ArgumentException(
+                "OperationIdentity is required.",
+                nameof(operationIdentity));
 
-        if (!Origin.IsFinite)
-            throw new ArgumentException("Origin must be finite.", nameof(Origin));
+        if (!origin.IsFinite)
+            throw new ArgumentException(
+                "Origin must be finite.",
+                nameof(origin));
 
-        Axis = Axis.Normalize(nameof(Axis));
+        axis = axis.Normalize(nameof(axis));
 
-        if (!double.IsFinite(Radius) || Radius <= 0d)
-            throw new ArgumentException("Radius must be finite and positive.", nameof(Radius));
+        if (!double.IsFinite(radius) || radius <= 0d)
+            throw new ArgumentException(
+                "Radius must be finite and positive.",
+                nameof(radius));
 
-        if (!double.IsFinite(Depth) || Depth <= 0d)
-            throw new ArgumentException("Depth must be finite and positive.", nameof(Depth));
+        if (!double.IsFinite(depth) || depth <= 0d)
+            throw new ArgumentException(
+                "Depth must be finite and positive.",
+                nameof(depth));
 
-        if (ContractVersion.Value != "1.0")
-            throw new ArgumentException("Unsupported circular-prism contract version.", nameof(ContractVersion));
+        if (contractVersion.Value != "1.0")
+            throw new ArgumentException(
+                "Unsupported circular-prism contract version.",
+                nameof(contractVersion));
+
+        OperationIdentity = operationIdentity;
+        Origin = origin;
+        Axis = axis;
+        Radius = radius;
+        Depth = depth;
+        Tolerance = tolerance;
+        ContractVersion = contractVersion;
     }
 }
 
@@ -37,56 +63,96 @@ public sealed record CircularPrismKernelTopology(
     string Kind,
     string Key);
 
-public sealed record CircularPrismSolidKernelResult(
-    GeometryKernelStatus Status,
-    bool Succeeded,
-    ContractResultId? ResultId,
-    string? EvidenceHash,
-    KernelVector3 Origin,
-    KernelVector3 Axis,
-    double Radius,
-    double Depth,
-    double? Volume,
-    double? SurfaceArea,
-    KernelVector3? Centroid,
-    CadBoundingBox3? Bounds,
-    IReadOnlyList<CircularPrismKernelTopology> Topology,
-    IReadOnlyList<string> Diagnostics)
+public sealed record CircularPrismSolidKernelResult
 {
-    public CircularPrismSolidKernelResult
-    {
-        Topology = Topology?.ToArray()
-            ?? throw new ArgumentNullException(nameof(Topology));
-        Diagnostics = Diagnostics?.ToArray()
-            ?? throw new ArgumentNullException(nameof(Diagnostics));
+    public GeometryKernelStatus Status { get; }
+    public bool Succeeded { get; }
+    public ContractResultId? ResultId { get; }
+    public string? EvidenceHash { get; }
+    public KernelVector3 Origin { get; }
+    public KernelVector3 Axis { get; }
+    public double Radius { get; }
+    public double Depth { get; }
+    public double? Volume { get; }
+    public double? SurfaceArea { get; }
+    public KernelVector3? Centroid { get; }
+    public CadBoundingBox3? Bounds { get; }
+    public IReadOnlyList<CircularPrismKernelTopology> Topology { get; }
+    public IReadOnlyList<string> Diagnostics { get; }
 
-        if (!Enum.IsDefined(Status))
+    public CircularPrismSolidKernelResult(
+        GeometryKernelStatus status,
+        bool succeeded,
+        ContractResultId? resultId,
+        string? evidenceHash,
+        KernelVector3 origin,
+        KernelVector3 axis,
+        double radius,
+        double depth,
+        double? volume,
+        double? surfaceArea,
+        KernelVector3? centroid,
+        CadBoundingBox3? bounds,
+        IReadOnlyList<CircularPrismKernelTopology> topology,
+        IReadOnlyList<string> diagnostics)
+    {
+        Topology = topology?.ToArray()
+            ?? throw new ArgumentNullException(nameof(topology));
+        Diagnostics = diagnostics?.ToArray()
+            ?? throw new ArgumentNullException(nameof(diagnostics));
+
+        if (!Enum.IsDefined(status))
             throw new ArgumentException("Circular-prism status is invalid.");
 
-        if (Succeeded != (Status == GeometryKernelStatus.Succeeded))
+        if (succeeded != (status == GeometryKernelStatus.Succeeded))
             throw new ArgumentException(
                 "Circular-prism status is inconsistent with succeeded.");
 
-        if (Succeeded &&
-            (ResultId is null || string.IsNullOrWhiteSpace(EvidenceHash) ||
-             Volume is null || SurfaceArea is null || Centroid is null || Bounds is null))
+        if (succeeded &&
+            (resultId is null ||
+             string.IsNullOrWhiteSpace(evidenceHash) ||
+             volume is null ||
+             surfaceArea is null ||
+             centroid is null ||
+             bounds is null))
             throw new ArgumentException(
                 "Successful circular-prism result is incomplete.");
 
-        if (!double.IsFinite(Radius) || Radius <= 0d ||
-            !double.IsFinite(Depth) || Depth <= 0d)
-            throw new ArgumentException("Circular-prism dimensions are invalid.");
+        if (!double.IsFinite(radius) ||
+            radius <= 0d ||
+            !double.IsFinite(depth) ||
+            depth <= 0d)
+            throw new ArgumentException(
+                "Circular-prism dimensions are invalid.");
 
-        if (Succeeded)
+        if (succeeded)
         {
-            if (Volume < 0d || !double.IsFinite(Volume.Value) ||
-                SurfaceArea < 0d || !double.IsFinite(SurfaceArea.Value))
-                throw new ArgumentException("Circular-prism measures are invalid.");
+            if (volume < 0d ||
+                !double.IsFinite(volume.Value) ||
+                surfaceArea < 0d ||
+                !double.IsFinite(surfaceArea.Value))
+                throw new ArgumentException(
+                    "Circular-prism measures are invalid.");
 
-            Bounds!.Validate();
-            if (!Centroid!.Value.IsFinite)
-                throw new ArgumentException("Circular-prism centroid must be finite.");
+            bounds!.Validate();
+
+            if (!centroid!.Value.IsFinite)
+                throw new ArgumentException(
+                    "Circular-prism centroid must be finite.");
         }
+
+        Status = status;
+        Succeeded = succeeded;
+        ResultId = resultId;
+        EvidenceHash = evidenceHash;
+        Origin = origin;
+        Axis = axis;
+        Radius = radius;
+        Depth = depth;
+        Volume = volume;
+        SurfaceArea = surfaceArea;
+        Centroid = centroid;
+        Bounds = bounds;
     }
 }
 

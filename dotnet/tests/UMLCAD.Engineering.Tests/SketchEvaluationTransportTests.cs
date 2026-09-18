@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using System.Net.Http.Json;
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Kernel.Client;
 
@@ -115,6 +117,15 @@ public sealed class SketchEvaluationTransportTests
         {
             Assert.Equal(HttpMethod.Post, request.Method);
             Assert.Equal("http://kernel.test/v1/sketch/solve", request.RequestUri!.ToString());
+
+            var payload = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            Assert.Equal(SketchSolveRequest.ContractSchema, payload.GetProperty("schema").GetString());
+            Assert.Equal("sketch-eval-001", payload.GetProperty("operationIdentity").GetString());
+            Assert.Equal("sketch-001", payload.GetProperty("sketchId").GetString());
+            Assert.Equal("circle-a", payload.GetProperty("circles")[0].GetProperty("id").GetString());
+            Assert.Equal("circle-b", payload.GetProperty("circles")[1].GetProperty("id").GetString());
+            Assert.Equal("fixed", payload.GetProperty("constraints")[0].GetProperty("kind").GetString());
+            Assert.Equal(1e-9, payload.GetProperty("tolerance").GetProperty("absolute").GetDouble());
 
             return Task.FromResult(
                 new HttpResponseMessage(HttpStatusCode.OK)

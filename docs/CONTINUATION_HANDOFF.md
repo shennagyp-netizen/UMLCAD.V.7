@@ -109,7 +109,7 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 
 ## M11 work-in-progress boundary
 
-M11 is active from `main` commit `59b8f7849bd5d094b31088631006505e2eda61b6`. Head `84bf81b10ac48b12b768876d4c4d8dd61947dab5` contains adaptive surface tessellation, certified line/arc trim-boundary sampling, conservative bounding spheres, deterministic parameter-space bounds, 8-way AABB subdivision, and deterministic octree query structure with corrected regression coverage. It is not yet M11-complete and is awaiting exact-head CI validation.
+M11 is active from `main` commit `59b8f7849bd5d094b31088631006505e2eda61b6`. Head `19f896e4d4eb2491b3c1e04fad8514434484ac3e` contains adaptive surface tessellation, certified line/arc trim-boundary sampling, conservative bounding spheres, deterministic parameter-space bounds, 8-way AABB subdivision, and deterministic octree query structure with per-resident AABB filtering. It is not yet M11-complete and is awaiting exact-head CI validation.
 
 ## M9 completion boundary
 

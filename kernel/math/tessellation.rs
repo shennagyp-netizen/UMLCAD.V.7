@@ -958,6 +958,51 @@ fn classify_trim_centroid(
     }
 }
 
+fn sample_trim_parameter<F, G>(
+    trim: &TrimLoop2,
+    u: f64,
+    v: f64,
+    trim_tolerance: f64,
+    eval: &F,
+    normal: &G,
+) -> Result<SurfaceSample3, TessellationError>
+where
+    F: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+    G: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+{
+    let class = trim
+        .classify_point(super::geometry::Point { x: u, y: v }, trim_tolerance)
+        .map_err(|_| TessellationError::EvaluationFailed)?;
+    if class != RegionClass::Inside && class != RegionClass::OnBoundary {
+        return Err(TessellationError::EvaluationFailed);
+    }
+    let point = eval(u, v)?;
+    let normal = normal(u, v)?;
+    if !point.is_finite() || !normal.is_finite() {
+        return Err(TessellationError::NonFinite);
+    }
+    Ok(SurfaceSample3 {
+        parameter: (u, v),
+        point,
+        normal: normal
+            .normalized()
+            .map_err(|_| TessellationError::Degenerate)?,
+    })
+}
+
+fn midpoint_parameter(a: SurfaceSample3, b: SurfaceSample3) -> (f64, f64) {
+    (
+        a.parameter.0.mul_add(0.5, b.parameter.0 * 0.5),
+        a.parameter.1.mul_add(0.5, b.parameter.1 * 0.5),
+    )
+}
+
+fn midpoint_chord_error(a: SurfaceSample3, b: SurfaceSample3, m: SurfaceSample3) -> f64 {
+    m.point
+        .sub(a.point.scale(0.5).add(b.point.scale(0.5)))
+        .length()
+}
+
 fn refine_trim_triangle<F, G>(
     a: SurfaceSample3,
     b: SurfaceSample3,
@@ -974,34 +1019,60 @@ where
     F: Fn(f64, f64) -> Result<Vec3, TessellationError>,
     G: Fn(f64, f64) -> Result<Vec3, TessellationError>,
 {
-    let u = (a.parameter.0 / 3.0) + (b.parameter.0 / 3.0) + (c.parameter.0 / 3.0);
-    let v = (a.parameter.1 / 3.0) + (b.parameter.1 / 3.0) + (c.parameter.1 / 3.0);
+    let u = a.parameter.0 / 3.0 + b.parameter.0 / 3.0 + c.parameter.0 / 3.0;
+    let v = a.parameter.1 / 3.0 + b.parameter.1 / 3.0 + c.parameter.1 / 3.0;
     if !u.is_finite() || !v.is_finite() {
         return Err(TessellationError::NonFinite);
     }
     classify_trim_centroid(trim, u, v, trim_tolerance)?;
 
-    let point = eval(u, v)?;
-    let n = normal(u, v)?;
-    if !point.is_finite() || !n.is_finite() {
-        return Err(TessellationError::NonFinite);
-    }
-    let m = SurfaceSample3 {
-        parameter: (u, v),
-        point,
-        normal: n.normalized().map_err(|_| TessellationError::Degenerate)?,
+    let m = {
+        let point = eval(u, v)?;
+        let n = normal(u, v)?;
+        if !point.is_finite() || !n.is_finite() {
+            return Err(TessellationError::NonFinite);
+        }
+        SurfaceSample3 {
+            parameter: (u, v),
+            point,
+            normal: n.normalized().map_err(|_| TessellationError::Degenerate)?,
+        }
     };
 
-    let approximation = a.point.scale(1.0 / 3.0)
-        .add(b.point.scale(1.0 / 3.0))
-        .add(c.point.scale(1.0 / 3.0));
-    let chord_error = m.point.sub(approximation).length();
-    let angular_error = angle_between(a.normal, b.normal)?
-        .max(angle_between(a.normal, c.normal)?)
-        .max(angle_between(b.normal, c.normal)?)
-        .max(angle_between(a.normal, m.normal)?)
-        .max(angle_between(b.normal, m.normal)?)
-        .max(angle_between(c.normal, m.normal)?);
+    let chord_error = midpoint_chord_error(
+        SurfaceSample3 {
+            parameter: a.parameter,
+            point: a.point,
+            normal: a.normal,
+        },
+        SurfaceSample3 {
+            parameter: b.parameter,
+            point: b.point,
+            normal: b.normal,
+        },
+        m,
+    )
+    .max(midpoint_chord_error(a, c, m))
+    .max(midpoint_chord_error(b, c, m));
+
+    // Sample all three edge midpoints before accepting the triangle. This
+    // keeps the sampled angular/chord certificate sensitive to curvature along
+    // edges instead of relying on the centroid alone.
+    let (ab_u, ab_v) = midpoint_parameter(a, b);
+    let (bc_u, bc_v) = midpoint_parameter(b, c);
+    let (ca_u, ca_v) = midpoint_parameter(c, a);
+    let ab = sample_trim_parameter(trim, ab_u, ab_v, trim_tolerance, eval, normal)?;
+    let bc = sample_trim_parameter(trim, bc_u, bc_v, trim_tolerance, eval, normal)?;
+    let ca = sample_trim_parameter(trim, ca_u, ca_v, trim_tolerance, eval, normal)?;
+
+    let mut angular_error = 0.0f64;
+    let samples = [a, b, c, m, ab, bc, ca];
+    for i in 0..samples.len() {
+        for j in i + 1..samples.len() {
+            angular_error = angular_error.max(angle_between(samples[i].normal, samples[j].normal)?);
+        }
+    }
+
     if !chord_error.is_finite() || !angular_error.is_finite() {
         return Err(TessellationError::NonFinite);
     }
@@ -1015,20 +1086,41 @@ where
         return Err(TessellationError::MaxDepth);
     }
 
-    let (ab_chord, ab_angle) = refine_trim_triangle(
-        a, b, m, depth + 1, policy, eval, normal, trim, trim_tolerance, out
-    )?;
-    let (bc_chord, bc_angle) = refine_trim_triangle(
-        b, c, m, depth + 1, policy, eval, normal, trim, trim_tolerance, out
-    )?;
-    let (ca_chord, ca_angle) = refine_trim_triangle(
-        c, a, m, depth + 1, policy, eval, normal, trim, trim_tolerance, out
-    )?;
+    // Uniform four-way subdivision halves each edge span, reaching angular
+    // targets much more efficiently than repeated centroid-only three-way
+    // subdivision while retaining every boundary sample used by the mesh.
+    let (ab_u, ab_v) = midpoint_parameter(a, b);
+    let (bc_u, bc_v) = midpoint_parameter(b, c);
+    let (ca_u, ca_v) = midpoint_parameter(c, a);
+    let ab = sample_trim_parameter(trim, ab_u, ab_v, trim_tolerance, eval, normal)?;
+    let bc = sample_trim_parameter(trim, bc_u, bc_v, trim_tolerance, eval, normal)?;
+    let ca = sample_trim_parameter(trim, ca_u, ca_v, trim_tolerance, eval, normal)?;
 
-    Ok((
-        chord_error.max(ab_chord).max(bc_chord).max(ca_chord),
-        angular_error.max(ab_angle).max(bc_angle).max(ca_angle),
-    ))
+    let mut maximum_chord = chord_error;
+    let mut maximum_angular = angular_error;
+    for (x, y, z) in [
+        (a, ab, ca),
+        (ab, b, bc),
+        (ca, bc, c),
+        (ab, bc, ca),
+    ] {
+        let (child_chord, child_angular) = refine_trim_triangle(
+            x,
+            y,
+            z,
+            depth + 1,
+            policy,
+            eval,
+            normal,
+            trim,
+            trim_tolerance,
+            out,
+        )?;
+        maximum_chord = maximum_chord.max(child_chord);
+        maximum_angular = maximum_angular.max(child_angular);
+    }
+
+    Ok((maximum_chord, maximum_angular))
 }
 
 pub fn tessellate_trimmed_surface3<F, G>(

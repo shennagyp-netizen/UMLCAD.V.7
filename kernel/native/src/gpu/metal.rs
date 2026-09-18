@@ -14,7 +14,7 @@ use std::fmt;
 
 use crate::functions::{
     gpu::{
-        BackendCapability, BackendKind, ExecutionDeterminism, GpuOperation, Precision,
+        BackendCapability, BackendKind, ExecutionDeterminism, GpuOperation,
     },
     spatial_accel::Aabb3,
 };
@@ -80,10 +80,9 @@ mod imp {
     use objc2_foundation::{ns_string, NSString};
     use objc2_metal::{
         MTLBuffer, MTLCommandBuffer, MTLCommandQueue, MTLComputeCommandEncoder,
-        MTLComputePipelineState, MTLCreateSystemDefaultDevice, MTLDevice, MTLFunction,
+        MTLComputePipelineState, MTLCreateSystemDefaultDevice, MTLDevice,
         MTLLibrary, MTLResourceOptions, MTLSize,
     };
-    use std::ptr::NonNull;
 
     const SHADER: &str = r#"
 #include <metal_stdlib>
@@ -417,6 +416,7 @@ pub use imp::MetalBackend;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::functions::vec::Vec3;
 
     #[test]
     fn capability_is_explicitly_non_f64_for_metal() {

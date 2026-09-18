@@ -69,80 +69,139 @@ public enum DressUpKind
     MarkupArrow,
 }
 
-public sealed record DrawingSheet(
-    SemanticId SheetId,
-    string Name,
-    string Format,
-    double Scale)
+public sealed record DrawingSheet
 {
-    public DrawingSheet
+    public SemanticId SheetId { get; }
+    public string Name { get; }
+    public string Format { get; }
+    public double Scale { get; }
+
+    public DrawingSheet(
+        SemanticId sheetId,
+        string name,
+        string format,
+        double scale)
     {
-        if (SheetId.Value == Guid.Empty)
-            throw new ArgumentException("SheetId is required.", nameof(SheetId));
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Name is required.", nameof(Name));
-        if (string.IsNullOrWhiteSpace(Format))
-            throw new ArgumentException("Format is required.", nameof(Format));
-        if (!double.IsFinite(Scale) || Scale <= 0d)
-            throw new ArgumentOutOfRangeException(nameof(Scale));
+        if (sheetId.Value == Guid.Empty)
+            throw new ArgumentException("SheetId is required.", nameof(sheetId));
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Name is required.", nameof(name));
+        if (string.IsNullOrWhiteSpace(format))
+            throw new ArgumentException("Format is required.", nameof(format));
+        if (!double.IsFinite(scale) || scale <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(scale));
+
+        SheetId = sheetId;
+        Name = name;
+        Format = format;
+        Scale = scale;
     }
 }
 
-public sealed record DrawingView(
-    SemanticId ViewId,
-    DrawingViewKind Kind,
-    SemanticId SourceResultId,
-    Quantity Scale)
+public sealed record DrawingView
 {
-    public DrawingView
-    {
-        if (ViewId.Value == Guid.Empty)
-            throw new ArgumentException("ViewId is required.", nameof(ViewId));
-        if (SourceResultId.Value == Guid.Empty)
-            throw new ArgumentException("SourceResultId is required.", nameof(SourceResultId));
+    public SemanticId ViewId { get; }
+    public DrawingViewKind Kind { get; }
+    public SemanticId SourceResultId { get; }
+    public Quantity Scale { get; }
 
-        if (Scale.Dimension != QuantityDimension.Dimensionless)
-            throw new ArgumentException("Drawing view scale must be dimensionless.", nameof(Scale));
-        if (Scale.SiValue <= 0d)
-            throw new ArgumentOutOfRangeException(nameof(Scale));
+    public DrawingView(
+        SemanticId viewId,
+        DrawingViewKind kind,
+        SemanticId sourceResultId,
+        Quantity scale)
+    {
+        if (viewId.Value == Guid.Empty)
+            throw new ArgumentException("ViewId is required.", nameof(viewId));
+        if (sourceResultId.Value == Guid.Empty)
+            throw new ArgumentException(
+                "SourceResultId is required.",
+                nameof(sourceResultId));
+
+        if (scale.Dimension != QuantityDimension.Dimensionless)
+            throw new ArgumentException(
+                "Drawing view scale must be dimensionless.",
+                nameof(scale));
+        if (scale.SiValue <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(scale));
+
+        ViewId = viewId;
+        Kind = kind;
+        SourceResultId = sourceResultId;
+        Scale = scale;
     }
 }
 
-public sealed record DrawingDimension(
-    SemanticId DimensionId,
-    DimensionKind Kind,
-    SemanticId ReferenceA,
-    SemanticId? ReferenceB,
-    Quantity Value,
-    string ToleranceText)
+public sealed record DrawingDimension
 {
-    public DrawingDimension
+    public SemanticId DimensionId { get; }
+    public DimensionKind Kind { get; }
+    public SemanticId ReferenceA { get; }
+    public SemanticId? ReferenceB { get; }
+    public Quantity Value { get; }
+    public string ToleranceText { get; }
+
+    public DrawingDimension(
+        SemanticId dimensionId,
+        DimensionKind kind,
+        SemanticId referenceA,
+        SemanticId? referenceB,
+        Quantity value,
+        string toleranceText)
     {
-        if (DimensionId.Value == Guid.Empty)
-            throw new ArgumentException("DimensionId is required.", nameof(DimensionId));
-        if (ReferenceA.Value == Guid.Empty)
-            throw new ArgumentException("ReferenceA is required.", nameof(ReferenceA));
-        if (Kind is DimensionKind.Linear or DimensionKind.Angular or DimensionKind.Radius or DimensionKind.Diameter)
+        if (dimensionId.Value == Guid.Empty)
+            throw new ArgumentException(
+                "DimensionId is required.",
+                nameof(dimensionId));
+        if (referenceA.Value == Guid.Empty)
+            throw new ArgumentException(
+                "ReferenceA is required.",
+                nameof(referenceA));
+
+        if (kind is
+            DimensionKind.Linear or
+            DimensionKind.Angular or
+            DimensionKind.Radius or
+            DimensionKind.Diameter)
         {
-            if (Value.Dimension == QuantityDimension.Dimensionless)
-                throw new ArgumentException("Engineering dimensions require a physical quantity.", nameof(Value));
+            if (value.Dimension == QuantityDimension.Dimensionless)
+                throw new ArgumentException(
+                    "Engineering dimensions require a physical quantity.",
+                    nameof(value));
         }
 
-        ToleranceText ??= string.Empty;
+        DimensionId = dimensionId;
+        Kind = kind;
+        ReferenceA = referenceA;
+        ReferenceB = referenceB;
+        Value = value;
+        ToleranceText = toleranceText ?? string.Empty;
     }
 }
 
-public sealed record DrawingAnnotation(
-    SemanticId AnnotationId,
-    AnnotationKind Kind,
-    string Text)
+public sealed record DrawingAnnotation
 {
-    public DrawingAnnotation
+    public SemanticId AnnotationId { get; }
+    public AnnotationKind Kind { get; }
+    public string Text { get; }
+
+    public DrawingAnnotation(
+        SemanticId annotationId,
+        AnnotationKind kind,
+        string text)
     {
-        if (AnnotationId.Value == Guid.Empty)
-            throw new ArgumentException("AnnotationId is required.", nameof(AnnotationId));
-        if (string.IsNullOrWhiteSpace(Text))
-            throw new ArgumentException("Text is required.", nameof(Text));
+        if (annotationId.Value == Guid.Empty)
+            throw new ArgumentException(
+                "AnnotationId is required.",
+                nameof(annotationId));
+        if (string.IsNullOrWhiteSpace(text))
+            throw new ArgumentException(
+                "Text is required.",
+                nameof(text));
+
+        AnnotationId = annotationId;
+        Kind = kind;
+        Text = text;
     }
 }
 
@@ -152,7 +211,6 @@ public sealed record DrawingCapabilityMatrix(
     IReadOnlySet<DimensionKind> DimensionKinds,
     IReadOnlySet<AnnotationKind> AnnotationKinds,
     IReadOnlySet<DressUpKind> DressUpKinds);
-
 
 public static class MechanicalDraftingCapabilityProfile
 {

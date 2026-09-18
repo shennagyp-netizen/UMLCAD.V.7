@@ -273,3 +273,91 @@ Kernel.Client → Cad.Contracts
 The existing `Kernel.Client → Framework` dependency is retained only as an explicit transitional legacy edge until the later legacy-elimination milestone. No new CAD semantic/engine code may depend on Framework or Kernel.Client.
 
 M-S0 acceptance evidence is owned by `tests/e2e/architecture_contract.py` and the authoritative Python E2E runner.
+
+
+## System-CAD architecture and engineering foundation snapshot
+
+The system-CAD track now includes a normative abstraction/dependency architecture plus C4 documentation:
+
+- `docs/architecture/ABSTRACTION_AND_DEPENDENCY_MODEL.md`
+- `docs/architecture/architecture.json`
+- `docs/architecture/c4/01-system-context.md`
+- `docs/architecture/c4/02-containers.md`
+- `docs/architecture/c4/03-components.md`
+- `docs/architecture/c4/04-critical-flows.md`
+
+The governing abstraction is:
+
+```
+Platform Foundation
+    ↓
+Mathematics
+    ↓
+Science
+    ↓
+CAD Engineering Core
+    ↓
+Engineering Resource Model
+    ↓
+Specialized Engineering Domains
+    ↓
+Application / Workflow / Presentation
+```
+
+External technology is reached through outward provider/adapters. The architecture distinguishes semantic ownership, reusable service dependency, published result/data flow, and private implementation dependency.
+
+Key ownership decisions now recorded:
+- Science owns material identity/properties, physical models, quantities/units, and the Phenomena Simulation Service.
+- Phenomena Simulation is a reusable scientific service with multiple interchangeable providers, including external-application adapters. CAM may consume the service.
+- CAD Product Structure owns Product/Occurrence relationships and the BOM service/view.
+- Machine, Tool, Fixture, Process, and capability models are shared Engineering Resource semantics.
+- Sheet Metal is a bounded engineering domain and a strong independent library boundary.
+- CAM is a manufacturing domain and must terminate in deterministic machine-specific postprocessing to G-code/NC.
+- Drawing is a bounded drafting domain with associative views, sections/details/clipping, dimensions, GD&T/annotations, dress-up, BOM, standards, and related CATIA-mapped capability families.
+- The viewer and downstream representations are never semantic authorities.
+- Rust remains the mathematical authority only.
+
+Current implementation projects added on the system branch:
+```
+UMLCAD.Science
+UMLCAD.Engineering.Resources
+UMLCAD.Engineering.SheetMetal
+UMLCAD.Engineering.Cam
+UMLCAD.Engineering.Drawing
+UMLCAD.Integration.Simulation
+UMLCAD.Engineering.Tests
+```
+
+Implemented foundation slice:
+- immutable arithmetic expression AST and deterministic SHA-256 expression identity;
+- typed scientific Quantity/QuantityDimension and Material model;
+- provider-backed PhenomenaSimulationService with deterministic provider selection and result identity checks;
+- Machine/Tool/Process compatibility rules;
+- typed Product Structure and deterministic BOM grouping/order;
+- Sheet Metal material/machine/tool/process validation plus shared bend-allowance expression;
+- CAM toolpath and machine-aware deterministic G-code/NC generator with content hashing and fail-closed compatibility checks;
+- CAM use of the Phenomena Simulation Service;
+- Drawing capability enums/profile plus associative view state, display mode, occurrence filters, drawing BOM, and sheet presentation semantics;
+- outward SimulationApplicationProvider adapter boundary;
+- .NET engineering foundation tests executed by the authoritative E2E runner.
+
+Important CATIA drafting capability mapping is documented from the official Dassault Systèmes Generative Drafting and Interactive Drafting capability descriptions. The mapped surface includes associative 3D-to-2D drafting, front/side/top/isometric views, sections and aligned/offset sections, detail/circular/profiled detail views, clipping, associative dimensions, GD&T, annotations, BOM, assembly filtering, standards, and DXF/DWG interoperability.
+
+Current system-CAD branch:
+- branch: `milestone/cad-system-s0-boundaries`
+- current implementation head: `d26d7c5bc6bf04d0691a6307e4b0cb283b0868bb`
+- PR #38 remains open and unmerged.
+
+Validation status at this snapshot:
+- Logical architecture manifest validation found no upward dependency or logical dependency cycle.
+- Repository project references were inspected against the architecture projection.
+- Local container does not provide the .NET SDK, so local C# compilation could not be executed.
+- GitHub Actions for the branch repeatedly fail before any job step executes: jobs have zero steps, runner_id 0, and terminate within seconds. The job-log endpoint currently returns `BlobNotFound`. This is recorded as CI infrastructure/unavailable execution evidence, not as proof that the new C# code compiles.
+- Do not merge the PR or claim a green milestone until the authoritative Rust, comprehensive E2E, Metal, and performance workflows execute normally and pass on the exact head.
+
+Next implementation boundary after infrastructure recovery:
+1. Complete/validate the shared CAD reference/result contracts.
+2. Move the evaluation engine from architectural shell to executable Specification → Evaluation → Result flow.
+3. Integrate the first real Part/Sketch/Feature vertical slice with authoritative B-Rep/topology provenance.
+4. Then connect Sheet Metal/CAM/Drawing to actual CAD results rather than only their current typed domain foundations.
+5. Add machine-specific postprocessor contracts beyond the initial deterministic milling G-code implementation.

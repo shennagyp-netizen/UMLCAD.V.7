@@ -3,15 +3,17 @@
 ## Snapshot
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
-- Main head at handoff update: `8fea60633c4f95f0175d18faa54878e7af9f44a6` before this documentation commit
-- Latest completed roadmap family: M8 — CAD construction mathematics
+- Main head before PR #30 merge: `d267d9cb5d277da6d655fefd9d122c1c165e9a53`
+- Latest completed roadmap family after merge: M9 — B-Rep / solid mathematics (certified domains)
 - Latest merged M10 closure PR: #27, `math: complete solver result status authority`
 - PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
 - Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
 - PR #28 merge commit: `fdb34d5a1e03ed399f900848b6dbe96da71d1a13`
+- M9 closure PR: #30, `math: complete M8/M9 authority hardening`
+- PR #30 validated head: `5d8b77f1c00ae31a9b22abb1187c1710f267923e`
 
 ## Completed mathematical-authority state
-Main is post-merge green through the completed M8 and M10 families. M0-M16 remains active; M9 is now the next incomplete P0 family: B-Rep / solid mathematics.
+PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M11 is the next incomplete roadmap family after PR #30 post-merge verification.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -95,15 +97,18 @@ M10 family status: **Implemented / Tested / CPU-validated by authoritative CI**.
 
 M8 family status: **Implemented / Tested / CPU-validated by authoritative CI** for its declared certified construction domains.
 
+M9 family status at PR #30 head: **Implemented / Tested / CPU-validated by authoritative CI** for its declared certified B-Rep/solid domains. Exact-head Rust + E2E are green; post-merge main gates remain mandatory.
+
 The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, black-box HTTP, Demo, raw HTTP red-team, release-path, and ignored-test checks.
 
 ## Immediate continuation
-1. Expand numerical-boundary tests for rank transitions, conditioning, damping, stagnation, accepted-history behavior, mixed-unit scale consistency, and deterministic repeated solves.
-2. Audit every remaining supported constraint/relation family for explicit analytic Jacobian coverage; unsupported equations must fail explicitly rather than re-enter finite differences.
-3. Review the solver's non-convergence classification so rejected-trial, stagnation, singular, invalid-domain, and max-iteration states remain explicit and mathematically distinguishable.
-4. Harden solver-result rank/conditioning/DOF evidence against contradictory terminal states and numerical boundary transitions.
-5. Start M9 B-Rep/solid mathematics next: unified edge/face/wire/coedge incidence, orientation/closure/manifoldness, inside/outside classification, surface-region correspondence, exact volume/area/centroid/inertia, and Boolean-support intersection/union/difference/split/imprint mathematics.
-6. Keep GPU work deferred until the CPU mathematical families are closed; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+1. Verify PR #30's post-merge main Rust kernel gate and comprehensive E2E/red-team gate on the resulting main commit.
+2. After post-merge green, begin M11 tessellation/spatial mathematics from the updated main head.
+3. Keep GPU work deferred until the CPU mathematical families are closed; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+
+## M9 completion boundary
+
+M9 is closed for the certified explicit-topology planar-face/solid domains recorded in `kernel/math/GAP_MATRIX.md`. General curved-face sewing, unrestricted topology-aware Boolean construction, and exact holed-solid decomposition require separate mathematical contracts and are fail-closed where not certified.
 
 ## M8 completion boundary
 

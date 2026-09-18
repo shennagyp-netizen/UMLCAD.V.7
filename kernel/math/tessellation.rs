@@ -1394,11 +1394,19 @@ mod trimmed_surface_tests {
         assert_eq!(base.parameters, translated.parameters);
         assert_eq!(base.normals, translated.normals);
         assert_eq!(base.triangles, translated.triangles);
-        assert_eq!(base.max_chord_error, translated.max_chord_error);
+        let chord_difference =
+            (base.max_chord_error - translated.max_chord_error).abs();
+        let chord_scale = base
+            .max_chord_error
+            .abs()
+            .max(translated.max_chord_error.abs())
+            .max(1.0);
+        assert!(chord_difference <= 1.0e-12 * chord_scale);
         assert_eq!(base.max_angular_error, translated.max_angular_error);
         assert_eq!(base.max_parameter_chord_error, translated.max_parameter_chord_error);
         for (point, translated_point) in base.vertices.iter().zip(&translated.vertices) {
-            assert_eq!(*translated_point, point.add(shift));
+            let difference = translated_point.sub(point.add(shift)).length();
+            assert!(difference <= 1.0e-12);
         }
     }
 

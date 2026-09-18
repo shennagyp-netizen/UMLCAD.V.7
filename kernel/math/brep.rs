@@ -85,6 +85,20 @@ fn polygon_centroid2(loop_points: &[Vec2], area: f64) -> Result<Vec2, BRepError>
     if result.is_finite() { Ok(result) } else { Err(BRepError::Overflow) }
 }
 
+fn loop_boundary_contains(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> bool {
+    loop_points.iter().enumerate().any(|(i, a)| {
+        let b = loop_points[(i + 1) % loop_points.len()];
+        let edge = b.sub(*a);
+        let rel = point.sub(*a);
+        let cross = edge.cross(rel);
+        cross.is_finite() && cross.abs() <= tolerance * (edge.length() + rel.length() + 1.0)
+            && point.x >= a.x.min(b.x) - tolerance
+            && point.x <= a.x.max(b.x) + tolerance
+            && point.y >= a.y.min(b.y) - tolerance
+            && point.y <= a.y.max(b.y) + tolerance
+    })
+}
+
 fn point_in_convex_loop(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> bool {
     let area = signed_area2(loop_points);
     let sign = area.signum();
@@ -248,15 +262,26 @@ impl PlanarRegion3 {
         let u = d.dot(self.u_dir);
         let v = d.dot(self.v_dir);
         let uv = Vec2::new(u, v);
+        if loop_boundary_contains(uv, &self.outer, band) {
+            return Ok(RegionClass::OnBoundary);
+        }
         if !point_in_convex_loop(uv, &self.outer, band) {
             return Ok(RegionClass::Outside);
+        }
+        for hole in &self.holes {
+            if loop_boundary_contains(uv, hole, band) {
+                return Ok(RegionClass::OnBoundary);
+            }
         }
         for hole in &self.holes {
             if point_in_convex_loop(uv, hole, band) {
                 return Ok(RegionClass::InsideHole);
             }
         }
-        let point_on_segment = |a: Vec2, b: Vec2| {
+        Ok(RegionClass::Inside)
+    }
+
+    pub fn point_from_uv
             let edge = b.sub(a);
             let rel = uv.sub(a);
             let cross = edge.cross(rel);

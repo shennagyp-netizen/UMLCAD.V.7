@@ -108,8 +108,9 @@ As of branch head `5d8b77f1c00ae31a9b22abb1187c1710f267923e`, the M9 mathematica
 - exact closed, single-shell, planar-face solid volume, centroid, surface area, and inertia mathematics;
 - fail-closed rejection of holed solid moments/point classification until a certified polygon-with-hole decomposition exists;
 - exact bounded AABB intersection/union/difference, split, and imprint partition mathematics;
-- translation/scale stability regressions for planar regions, trims, and solid moments.
+- translation/scale stability regressions for planar regions, trims, solid moments, and bounded AABB operations.
+- bounded AABB tolerance scales use actual geometric extent, including sub-unit and large-translation regression coverage.
 
 The CPU mathematical layer remains authoritative. OCCT and future GPU backends are not used to define M9 semantics. General curved-face B-Rep sewing, unrestricted topology-aware Boolean construction, and arbitrary curved/holed exact solid decomposition remain outside the certified M9 domain.
 
-M9 status is therefore `Implemented / Tested` for the declared certified domains. Exact-head Rust and comprehensive E2E/red-team gates are green on `5d8b77f1...`. Post-merge main verification is still required before this closure becomes final.
+M9 status is therefore `Implemented / Tested` for the declared certified domains. Exact-head Rust and comprehensive E2E/red-team gates are green on `9d04c05f...`. Post-merge main verification is still required before this closure becomes final.

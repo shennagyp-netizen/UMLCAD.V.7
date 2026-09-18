@@ -5,9 +5,7 @@ on:
 
 jobs:
   cuda:
-    runs-on:
-      group: cuda-gpu
-      labels: cuda
+    runs-on: [self-hosted, linux, x64, cuda]
     steps:
       - name: Checkout
         uses: actions/checkout@v4

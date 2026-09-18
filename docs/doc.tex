@@ -534,3 +534,354 @@ CPU \texttt{f64} is the normative reference. GPU implementations accelerate expl
 \section{Solver detail}
 \texttt{SolveOptions} currently defaults to maximum 100 iterations, residual tolerance \texttt{1e-8}, step tolerance \texttt{1e-10}, and initial damping \texttt{1e-3}. The finite-difference step remains for API compatibility and independent verification; it is not used to generate production Jacobians.
 
+
+\begin{itemize}
+\item empty deterministic builds;
+\item whitespace and malformed required values;
+\item global definition-ID uniqueness;
+\item duplicate occurrence IDs;
+\item unknown references;
+\item circular assembly definitions;
+\item nested assembly/product structure;
+\item metadata, parameters, geometry descriptors, constraints and drawings;
+\item compiled node/relationship identity;
+\item user-ID collision cases containing slashes and colons;
+\item stable kernel-client HTTP/error behavior;
+\item invalid JSON, oversized responses and invalid compiled results;
+\item real Rust kernel round trips.
+\end{itemize}
+
+\section{Black-box kernel integration}
+\pathref{dotnet/tests/UMLCAD.Kernel.Integration.Tests/KernelBlackBoxE2ETests.cs} verifies the production client against a real kernel process, including build identity preservation, graph identity, malformed/invalid geometry behavior, stale references, concurrency and protocol failures.
+
+\chapter{Python E2E and Red-Team Harness}
+
+\pathref{tests/e2e/run.py} is the authoritative system-level integration harness.
+
+\section{Single command}
+\begin{lstlisting}
+python3 tests/e2e/run.py
+python3 tests/e2e/run.py --release
+python3 tests/e2e/run.py --release --verbose
+\end{lstlisting}
+
+\section{Execution sequence}
+The harness:
+\begin{enumerate}
+\item resolves the repository root from its own file location;
+\item validates required Rust, .NET and demo paths;
+\item runs the complete Rust debug suite and rejects unintended ignored tests;
+\item runs the typed Rust kernel API E2E suite;
+\item optionally runs the complete Rust release suite;
+\item discovers Framework tests and verifies nonzero discovery plus the real-kernel E2E test class;
+\item starts the release kernel host and waits for the service socket;
+\item runs the complete Framework test suite;
+\item runs the black-box Kernel Integration suite;
+\item stops the kernel;
+\item runs Demo E2E;
+\item restarts the kernel for raw HTTP adversarial probes;
+\item writes an aggregate JSON report;
+\item terminates the kernel process group even on timeout/failure.
+\end{enumerate}
+
+The report schema is \texttt{uml-cad-e2e-report/1.0.0}.
+
+\section{System coverage}
+\pathref{tests/e2e/COVERAGE.md} records the deliberate multi-boundary strategy:
+\begin{itemize}
+\item typed Rust library API;
+\item .NET Framework contract/unit layer;
+\item production .NET HTTP boundary;
+\item process/wire boundary;
+\item Demo application path.
+\end{itemize}
+
+No single layer substitutes for the others.
+
+\section{Raw HTTP red team}
+Current raw probes include:
+\begin{tabularx}{\textwidth}{@{}p{0.30\textwidth}p{0.56\textwidth}@{}}
+\toprule
+Probe & Required behavior \\
+\midrule
+Unknown endpoint & Deterministic not-found response. \\
+Invalid JSON & Explicit invalid-JSON rejection. \\
+Wrong build schema & Schema rejection. \\
+Missing semantic payload & Schema rejection. \\
+Unsupported geometry & Explicit unsupported-geometry rejection. \\
+\bottomrule
+\end{tabularx}
+
+The harness also checks concurrency isolation and process cleanup.
+
+\chapter{CI and Hardware Validation}
+
+Current repository workflows include:
+
+\begin{longtable}{@{}p{0.30\textwidth}p{0.23\textwidth}p{0.36\textwidth}@{}}
+\toprule
+Workflow & Runner & Purpose \\
+\midrule
+\pathref{.github/workflows/rust-kernel.yml} & ubuntu-latest & Complete Rust kernel test suite. \\
+\pathref{.github/workflows/e2e.yml} & ubuntu-latest & Comprehensive release E2E/red-team gate. \\
+\pathref{.github/workflows/metal-hardware.yml} & macos-14 & Apple Silicon Metal validation. \\
+\pathref{.github/workflows/cuda-hardware.yml} & self-hosted NVIDIA & Explicit CUDA hardware validation. \\
+\pathref{.github/workflows/m16-performance.yml} & macos-14 & Release performance evidence. \\
+\bottomrule
+\end{longtable}
+
+\section{Hardware-status law}
+A hardware claim requires actual execution on the required hardware. The absence of a runner is not a product failure; it is \textit{Not validated}.
+
+\section{Current evidence}
+M16 records successful Rust, comprehensive E2E/red-team, Metal hardware, and performance validation on its final main merge. CUDA remains hardware-unvalidated because no confirmed NVIDIA execution record is recorded.
+
+\chapter{Red-Team and Failure-Closed Engineering}
+
+The architecture treats invalid state as a first-class engineering outcome.
+
+\section{Negative-state taxonomy}
+\begin{tabularx}{\textwidth}{@{}p{0.24\textwidth}X@{}}
+\toprule
+State & Meaning \\
+\midrule
+Invalid & The supplied data violates a declared contract. \\
+Unsupported & The system deliberately does not implement the requested domain. \\
+Ambiguous & Multiple semantic interpretations remain possible. \\
+Indeterminate & Available evidence cannot establish the required truth. \\
+Failed & An execution/provider/backend operation did not establish the result. \\
+Cancelled & Execution was deliberately stopped and must not be represented as success. \\
+\bottomrule
+\end{tabularx}
+
+\section{Adversarial classes}
+Every applicable new boundary should test malformed identifiers, non-finite numerical values, degenerate geometry, invalid frames, stale references, ambiguity, contradictory topology evidence, cache contamination, deterministic collisions, unexpected provider output, transport corruption, invalid schema, partial results, and repeated-evaluation divergence.
+
+\section{No silent success}
+A system must never turn:
+\begin{lstlisting}
+unsupported -> approximate success
+ambiguous   -> arbitrary selection
+failed      -> plausible geometry
+stale       -> cache hit
+cancelled   -> successful result
+\end{lstlisting}
+The absence of proof is itself information that must be preserved.
+
+\chapter{Deterministic Evaluation, Cache, and Recompute}
+
+The System-CAD target uses a canonical semantic evaluation model.
+
+\section{Evaluation identity}
+Every input that can change an authoritative result must participate in the relevant identity, including:
+\begin{itemize}
+\item definition and feature semantics;
+\item resolved reference identities;
+\item parameters and expressions;
+\item configuration/context;
+\item upstream result identities;
+\item tolerance/numerical policy where semantically relevant;
+\item provider/backend contract version where it changes the result;
+\item manufacturing resource/process/postprocessor identity where relevant.
+\end{itemize}
+
+\section{Incremental equivalence}
+For a given final semantic state:
+\begin{lstlisting}
+FullRecompute(state) == IncrementalRecompute(state)
+\end{lstlisting}
+The equality means equivalent authoritative semantic result, not identical execution trace.
+
+\section{Cache equivalence}
+For a stable evaluation identity:
+\begin{lstlisting}
+FreshEvaluation(identity) == CacheHit(identity)
+\end{lstlisting}
+
+\section{Invalidation}
+Invalidation is dependency-graph closure. It is not a collection of ad-hoc cache clears.
+
+\section{Representation delta}
+Derived render/manufacturing/document assets should be regenerated only when the authoritative semantic inputs that control them change.
+
+\chapter{Target Engineering Domain Contract Shape}
+
+The following are architectural contracts, not claims that the named projects currently exist on \texttt{main}.
+
+\section{Science}
+\textbf{Owns:} material and physical properties; scientific models; reusable scientific services.
+
+\textbf{Provides:} provider-neutral Phenomena Simulation Service.
+
+\section{Engineering Resources}
+\textbf{Owns:} machine, tool, fixture, process and capabilities.
+
+\textbf{Provides:} reusable resource definitions and capability queries.
+
+\section{Sheet Metal}
+\textbf{Owns:} sheet thickness, bends, flanges, relief, unfolding/folding and flat-pattern semantics as those capabilities become contracted.
+
+\textbf{Consumes:} CAD semantics, material facts, engineering resources, and applicable simulation results.
+
+\section{CAM}
+\textbf{Owns:} manufacturing definitions, operations, strategy, toolpath, postprocessor and deterministic machine output.
+
+\textbf{Consumes:} authoritative CAD, Product/BOM, Engineering Resources, Sheet Metal outputs, and applicable Science/Simulation services.
+
+\textbf{Produces:} deterministic G-code/NC at the postprocessor boundary.
+
+\section{Drawing and PMI}
+\textbf{Owns:} sheets, views, projections, sections, dimensions, annotations, tolerances, GD\&T, PMI and drafting standards as those contracts are implemented.
+
+\textbf{Consumes:} authoritative CAD/product semantics and derived measurements/results.
+
+\section{Product Structure and BOM}
+\textbf{Product Structure owns:} product definitions, assemblies, occurrences, configurations and composition.
+
+\textbf{BOM owns:} the derived product-structure presentation/analysis required by consumers.
+
+\textbf{Downstream consumers:} Drawing, CAM, PLM and other declared integrations.
+
+\section{PLM}
+\textbf{Owns:} lifecycle, revision, workflow, release and document/product integration semantics.
+
+It must reference authoritative product/engineering state rather than becoming a second CAD geometry authority.
+
+\chapter{CATIA Capability Traceability}
+
+CATIA is used as a capability reference, not as the internal architecture to reproduce.
+
+The functional traceability chain is:
+
+\begin{lstlisting}
+CATIA capability
+    -> UMLCAD semantic contract
+    -> domain/service implementation
+    -> mathematical contract when needed
+    -> authoritative result
+    -> derived representation
+    -> acceptance evidence
+\end{lstlisting}
+
+Major capability families that the System-CAD architecture is designed to accommodate include:
+
+\begin{longtable}{@{}p{0.28\textwidth}p{0.61\textwidth}@{}}
+\toprule
+Family & Functional scope \\
+\midrule
+Part Design & Sketch-driven solid features, datum/reference concepts, material removal/addition, patterning, shell/draft/fillet/chamfer and Boolean families. \\
+Sketch & Geometry, constraints, relations, support frames, solving, profile loops and publications. \\
+Hybrid / Freeform & Curves, surfaces, NURBS, continuity, trim and quality diagnostics. \\
+Assembly / Product & Product definitions, occurrences, transforms, constraints, configurations and BOM. \\
+Sheet Metal & Thickness, bend, flange, relief, fold/unfold and flat pattern. \\
+Kinematics & Constraint-driven motion and relations. \\
+Drawing / PMI & Views, sections, dimensions, tolerances, GD\&T, annotations and BOM integration. \\
+CAM & Manufacturing operations, toolpaths, simulation integration, postprocessing and deterministic NC/G-code. \\
+Knowledge / Configuration & Parameters, formulas, checks, reactions, reusable templates and variants. \\
+Lifecycle / Integration & Revision, release, collaboration, PLM/PDM/ERP and external-provider integration. \\
+\bottomrule
+\end{longtable}
+
+The table describes architectural capability coverage targets, not current implementation completion.
+
+\chapter{Current File-Level Reference}
+
+\section{Root and documentation}
+\begin{itemize}
+\item \pathref{README.md}
+\item \pathref{docs/doc.tex}
+\item \pathref{docs/UMLCAD_V7_MAIN_BRANCH_DEVELOPMENT_PROMPT.md}
+\item \pathref{docs/MATH_AUTHORITY_ROADMAP.md}
+\item \pathref{docs/CONTINUATION_HANDOFF.md}
+\item \pathref{kernel/math/GAP_MATRIX.md}
+\end{itemize}
+
+\section{Native kernel entry points}
+\begin{itemize}
+\item \pathref{kernel/native/Cargo.toml}
+\item \pathref{kernel/native/src/lib.rs}
+\item \pathref{kernel/native/src/api/mod.rs}
+\item \pathref{kernel/native/src/api/parity_contract.rs}
+\item \pathref{kernel/native/src/bin/kernel_host.rs}
+\item \pathref{kernel/native/src/services/engine.rs}
+\item \pathref{kernel/native/src/gpu/mod.rs}
+\item \pathref{kernel/native/src/gpu/metal.rs}
+\item \pathref{kernel/native/src/gpu/cuda.rs}
+\item \pathref{kernel/native/src/gpu/conformance.rs}
+\end{itemize}
+
+\section{Mathematical entry points}
+\begin{itemize}
+\item \pathref{kernel/math/mod.rs}
+\item \pathref{kernel/math/geometry.rs}
+\item \pathref{kernel/math/scalar.rs}
+\item \pathref{kernel/math/tolerance.rs}
+\item \pathref{kernel/math/vec.rs}
+\item \pathref{kernel/math/vec4.rs}
+\item \pathref{kernel/math/mat.rs}
+\item \pathref{kernel/math/quaternion.rs}
+\item \pathref{kernel/math/transform.rs}
+\item \pathref{kernel/math/linalg.rs}
+\item \pathref{kernel/math/predicates.rs}
+\item \pathref{kernel/math/analytic.rs}
+\item \pathref{kernel/math/intersections.rs}
+\item \pathref{kernel/math/polynomial.rs}
+\item \pathref{kernel/math/interval.rs}
+\item \pathref{kernel/math/bezier.rs}
+\item \pathref{kernel/math/bspline.rs}
+\item \pathref{kernel/math/nurbs.rs}
+\item \pathref{kernel/math/nurbs3d.rs}
+\item \pathref{kernel/math/nurbs_ops.rs}
+\item \pathref{kernel/math/surfaces.rs}
+\item \pathref{kernel/math/nurbs_surface.rs}
+\item \pathref{kernel/math/nurbs_surface_differential.rs}
+\item \pathref{kernel/math/nurbs_surface_ops.rs}
+\item \pathref{kernel/math/surface_differential.rs}
+\item \pathref{kernel/math/trim.rs}
+\item \pathref{kernel/math/distance.rs}
+\item \pathref{kernel/math/construction.rs}
+\item \pathref{kernel/math/offsets.rs}
+\item \pathref{kernel/math/sweeps.rs}
+\item \pathref{kernel/math/brep.rs}
+\item \pathref{kernel/math/topology.rs}
+\item \pathref{kernel/math/solid.rs}
+\item \pathref{kernel/math/spatial.rs}
+\item \pathref{kernel/math/spatial_accel.rs}
+\item \pathref{kernel/math/constraints.rs}
+\item \pathref{kernel/math/relations.rs}
+\item \pathref{kernel/math/jacobian.rs}
+\item \pathref{kernel/math/relation_jacobian.rs}
+\item \pathref{kernel/math/linearization.rs}
+\item \pathref{kernel/math/linear_consistency.rs}
+\item \pathref{kernel/math/conditioning.rs}
+\item \pathref{kernel/math/solver.rs}
+\item \pathref{kernel/math/solver_status.rs}
+\item \pathref{kernel/math/terminal_authority.rs}
+\item \pathref{kernel/math/convergence.rs}
+\item \pathref{kernel/math/tessellation.rs}
+\item \pathref{kernel/math/gpu.rs}
+\item \pathref{kernel/math/dimensions.rs}
+\item \pathref{kernel/math/diagnostics.rs}
+\item \pathref{kernel/math/validation.rs}
+\item \pathref{kernel/math/dxf.rs}
+\end{itemize}
+
+\section{Backend contracts}
+\begin{itemize}
+\item \pathref{kernel/contracts/crates/geometry-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/geometry-contract-tests/src/lib.rs}
+\item \pathref{kernel/contracts/crates/kernel-integration-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/topology-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/mesh-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/exchange-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/freeform-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/fillet-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/offset-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/sweep-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/shell-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/draft-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/reference-evolution-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/reference-migration-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/surface-operations-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/nurbs-surface-api/src/lib.rs}
+\end{itemize}

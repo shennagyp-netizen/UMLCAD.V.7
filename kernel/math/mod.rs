@@ -1,6 +1,7 @@
 pub mod analytic;
 pub mod analytic_surfaces;
 pub mod bezier;
+pub mod brep;
 pub mod bspline;
 pub mod constraints;
 pub mod conics3d;

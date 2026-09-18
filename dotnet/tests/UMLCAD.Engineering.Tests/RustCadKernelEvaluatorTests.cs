@@ -381,6 +381,185 @@ public sealed class RustCadKernelEvaluatorTests
             new CadResultId(result.Representation!.SourceResultId.Value));
     }
 
+
+    [Fact]
+    public async Task ProductionAdapterEvaluatesSketchThroughTypedSketchService()
+    {
+        var sketch = new RecordingSketchGeometryService(
+            new SketchKernelResult(
+                GeometryKernelStatus.Succeeded,
+                new ContractResultId("sketch:001"),
+                "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                new[]
+                {
+                    new SketchCircleResult("circle-a", 20d, 20d, 5d),
+                    new SketchCircleResult("circle-b", 70d, 30d, 4d)
+                },
+                true,
+                "Converged",
+                1,
+                0d,
+                0d,
+                0d,
+                0,
+                6,
+                6,
+                Array.Empty<string>()));
+
+        var evaluator = new RustCadKernelEvaluator(
+            new RecordingBoxGeometryService(
+                new AxisAlignedBoxSolidKernelResult(
+                    GeometryKernelStatus.Succeeded,
+                    new ContractResultId("solid:unused"),
+                    "evidence:unused",
+                    new[]
+                    {
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_bottom"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_top"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_back"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_front"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_left"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_right")
+                    },
+                    24d,
+                    52d,
+                    new KernelVector3(1d, 1.5d, 2d),
+                    Array.Empty<string>())),
+            sketch);
+
+        var specification = new SketchFeatureSpecification(
+            new CadId("sketch-001"),
+            new CadReference(
+                new CadId("support"),
+                ReferenceKind.Support,
+                new CadId("base"),
+                TopologySelector.PlanarFaceByNormalAndPoint(
+                    new CadVector3(0d, 0d, 1d),
+                    new CadVector3(1d, 1d, 10d)),
+                new ReferenceContext(CadFrameKind.Part, "default")),
+            new CadFrame(new CadId("sketch-frame"), CadFrameKind.Sketch, 0d, 0d, 10d),
+            new[]
+            {
+                new SketchCircle(new CadId("circle-a"), 20d, 20d, 5d),
+                new SketchCircle(new CadId("circle-b"), 70d, 30d, 4d)
+            },
+            new[]
+            {
+                new SketchConstraintSpecification(
+                    new CadId("fixed-a"),
+                    SketchConstraintKind.Fixed,
+                    new CadId("circle-a")),
+                new SketchConstraintSpecification(
+                    new CadId("fixed-b"),
+                    SketchConstraintKind.Fixed,
+                    new CadId("circle-b"))
+            });
+
+        var response = await evaluator.EvaluateAsync(
+            new KernelEvaluationRequest(
+                new CadId("sketch-evaluation-001"),
+                specification,
+                null,
+                Array.Empty<ReferenceResolution>(),
+                Array.Empty<CadFeatureEvaluationResult>())
+            {
+                Tolerance = new KernelTolerance(1e-9, 1e-9)
+            });
+
+        Assert.Equal(CadEvaluationStatus.Succeeded, response.Status);
+        Assert.Null(response.AuthoritativeResult);
+        Assert.NotNull(response.SketchResult);
+        Assert.Equal(new CadResultId("sketch:001"), response.SketchResult!.ResultId);
+        Assert.Equal(2, response.SketchResult.Circles.Count);
+        Assert.True(response.SketchResult.Converged);
+        Assert.Equal(0, response.SketchResult.DegreesOfFreedom);
+        Assert.Equal(new CadFrame(new CadId("sketch-frame"), CadFrameKind.Sketch, 0d, 0d, 10d), response.SketchResult.Frame);
+    }
+
+    [Fact]
+    public async Task ProductionAdapterFailsClosedOnSketchGeometryIdentityMismatch()
+    {
+        var sketch = new RecordingSketchGeometryService(
+            new SketchKernelResult(
+                GeometryKernelStatus.Succeeded,
+                new ContractResultId("sketch:bad"),
+                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                new[] { new SketchCircleResult("wrong-circle", 0d, 0d, 1d) },
+                true,
+                "Converged",
+                1,
+                0d,
+                0d,
+                0d,
+                0,
+                3,
+                3,
+                Array.Empty<string>()));
+
+        var evaluator = new RustCadKernelEvaluator(
+            new RecordingBoxGeometryService(
+                new AxisAlignedBoxSolidKernelResult(
+                    GeometryKernelStatus.Succeeded,
+                    new ContractResultId("solid:unused"),
+                    "evidence:unused",
+                    new[]
+                    {
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_bottom"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_top"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_back"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_front"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_left"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_right")
+                    },
+                    24d,
+                    52d,
+                    new KernelVector3(1d, 1.5d, 2d),
+                    Array.Empty<string>())),
+            sketch);
+
+        var specification = new SketchFeatureSpecification(
+            new CadId("sketch-001"),
+            new CadReference(
+                new CadId("support"),
+                ReferenceKind.Support,
+                new CadId("base"),
+                TopologySelector.PlanarFaceByNormalAndPoint(
+                    new CadVector3(0d, 0d, 1d),
+                    new CadVector3(1d, 1d, 10d)),
+                new ReferenceContext(CadFrameKind.Part, "default")),
+            new CadFrame(new CadId("sketch-frame"), CadFrameKind.Sketch, 0d, 0d, 10d),
+            new[] { new SketchCircle(new CadId("circle-a"), 20d, 20d, 5d) },
+            Array.Empty<SketchConstraintSpecification>());
+
+        var response = await evaluator.EvaluateAsync(
+            new KernelEvaluationRequest(
+                new CadId("sketch-evaluation-bad"),
+                specification,
+                null,
+                Array.Empty<ReferenceResolution>(),
+                Array.Empty<CadFeatureEvaluationResult>()));
+
+        Assert.Equal(CadEvaluationStatus.KernelFailure, response.Status);
+        Assert.Null(response.SketchResult);
+        Assert.Contains(response.Diagnostics, x => x.Code == "KERNEL_SKETCH_RESULT_IDENTITY_MISMATCH");
+    }
+
+
+    private sealed class RecordingSketchGeometryService(
+        SketchKernelResult result) : ISketchGeometryService
+    {
+        public SketchSolveRequest? LastRequest { get; private set; }
+
+        public Task<SketchKernelResult> SolveAsync(
+            SketchSolveRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            LastRequest = request;
+            return Task.FromResult(result);
+        }
+    }
+
     private sealed class RecordingHttpHandler(
         Func<HttpRequestMessage, Task<HttpResponseMessage>> responder) : HttpMessageHandler
     {

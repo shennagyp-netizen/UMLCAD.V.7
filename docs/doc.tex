@@ -1,0 +1,300 @@
+\documentclass[11pt,a4paper]{report}
+
+\usepackage[a4paper,margin=22mm,headheight=14pt]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{ragged2e}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,calc}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlist{leftmargin=*,itemsep=2pt,topsep=2pt}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.08}
+\setlength{\emergencystretch}{2em}
+\definecolor{codegray}{gray}{0.96}
+\definecolor{rulegray}{gray}{0.55}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codegray},
+  frame=single,
+  rulecolor=\color{rulegray},
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  xleftmargin=4pt,
+  xrightmargin=4pt
+}
+\newcommand{\pathref}[1]{\url{#1}}
+\newcommand{\status}[1]{\textbf{#1}}
+\newcommand{\current}{\textit{Current main implementation}}
+\newcommand{\target}{\textit{System-CAD target architecture}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{UMLCAD.V.7}
+\fancyhead[R]{System Architecture Handbook}
+\fancyfoot[C]{\thepage}
+
+\titleformat{\chapter}{\LARGE\bfseries}{\thechapter}{10pt}{}
+\titleformat{\section}{\Large\bfseries}{\thesection}{8pt}{}
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{6pt}{}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{18mm}
+{\Huge\bfseries UMLCAD.V.7\par}
+\vspace{5mm}
+{\LARGE System Architecture, Mathematical Authority, Engineering Domains, Contracts,\par}
+{\LARGE Runtime Boundaries, Validation, and Repository Reference\par}
+\vspace{15mm}
+{\large Comprehensive engineering handbook\par}
+\vspace{6mm}
+{\large Audited against the exact repository state immediately before this document revision:\par}
+\vspace{2mm}
+{\ttfamily 2451b765eb1e1e3177b965ffa5ab23aa35a51995\par}
+\vfill
+{\large The repository is the source of truth.\par}
+{\large This document distinguishes implemented code from target architecture.\par}
+\vspace{8mm}
+{\large September 19, 2026\par}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+\chapter{Document Purpose and Reading Rules}
+
+This handbook documents the architecture and engineering state of UMLCAD.V.7 as a whole. It is deliberately more precise than a marketing overview and more compact than a raw source dump. The document describes the repository as an engineering system: authority, ownership, contracts, state transitions, deterministic identity, mathematical guarantees, provider boundaries, testing, deployment shape, and known limits.
+
+There are two separate truths that must never be confused:
+
+\begin{tabularx}{\textwidth}{@{}p{0.23\textwidth}X@{}}
+\toprule
+Term & Meaning \\
+\midrule
+\current & Code and files verified to exist in the current \texttt{main} repository state. \\
+\target & Architectural direction expressed by the current development law and the architecture implied by the requested System-CAD model. It may not yet have an implementation on \texttt{main}. \\
+\bottomrule
+\end{tabularx}
+
+A class, interface, endpoint, test, or documentation statement is not by itself proof that a capability is complete. Completion requires the semantic path, authoritative behavior, failure semantics, determinism, required tests, and applicable end-to-end evidence.
+
+The mathematical roadmap M0-M16 is closed for its declared certified domains. That closure means the mathematical authority is treated as the existing foundation for the next system-CAD layer; it does not mean every possible CAD mathematical operation is implemented.
+
+\section{Repository fact at the audit point}
+At the audit point, the repository contains the mature Rust mathematical/native foundation, the existing \texttt{UMLCAD.Framework} and \texttt{UMLCAD.Kernel.Client} .NET surface, the legacy TypeScript kernel API, the OCCT backend/contracts, the demo/E2E harness, and the CI workflows described later. Some newer System-CAD domain projects described in earlier handbook text are not present on the exact current \texttt{main} tree and are therefore documented here as target architecture rather than current implementation.
+
+\chapter{Executive Architecture}
+
+The stable conceptual architecture is:
+
+\begin{center}
+\begin{tikzpicture}[
+  box/.style={draw,rounded corners,align=center,minimum width=43mm,minimum height=10mm,font=\small},
+  a/.style={box,fill=blue!6}, b/.style={box,fill=green!7}, c/.style={box,fill=orange!9}, d/.style={box,fill=gray!10},
+  >=Latex
+]
+\node[a] (platform) {Platform Foundation};
+\node[a,below=5mm of platform] (math) {Rust Mathematical Authority};
+\node[b,below=5mm of math] (science) {Science};
+\node[b,below=5mm of science] (cad) {CAD Core / Product Semantics};
+\node[c,below=5mm of cad] (resources) {Engineering Resources};
+\node[c,below=5mm of resources] (domains) {Specialized Engineering Domains};
+\node[d,below=5mm of domains] (app) {Application / Workflow / Presentation};
+\draw[->] (platform)--(math);
+\draw[->] (math)--(science);
+\draw[->] (science)--(cad);
+\draw[->] (cad)--(resources);
+\draw[->] (resources)--(domains);
+\draw[->] (domains)--(app);
+\end{tikzpicture}
+\end{center}
+
+The important point is not that every layer must be one project. The point is ownership and dependency direction.
+
+\section{Authority hierarchy}
+
+\begin{enumerate}
+\item \textbf{Rust mathematics}: normative numerical authority for the mathematical contracts it declares and certifies.
+\item \textbf{System-CAD semantics}: authoritative owner of CAD meaning, product meaning, engineering intent, references, evaluation orchestration, lifecycle state, and downstream domain composition.
+\item \textbf{Providers/adapters}: implementation mechanisms behind stable service contracts.
+\item \textbf{Representation/viewer}: derived consumer assets only; never authority.
+\end{enumerate}
+
+The Rust kernel is intentionally thin. The complete CAD system must not be compared with it as though they were equivalent architectural layers.
+
+\chapter{C4 Level 1 - System Context}
+
+\begin{center}
+\begin{tikzpicture}[
+  ext/.style={draw,rounded corners,align=center,minimum width=27mm,minimum height=9mm,font=\scriptsize,fill=gray!10},
+  sys/.style={draw,rounded corners,align=center,minimum width=38mm,minimum height=11mm,font=\scriptsize,fill=blue!8},
+  >=Latex
+]
+\node[ext] (engineer) {Engineer / System User};
+\node[sys,right=12mm of engineer] (cadapp) {UMLCAD.V.7\ System-CAD};
+\node[sys,below=11mm of cadapp] (kernel) {Rust Mathematical\ Kernel};
+\node[ext,right=12mm of cadapp] (providers) {Engineering / Scientific\ Providers};
+\node[ext,below=10mm of providers] (plm) {PLM / PDM / ERP};
+\node[ext,below=10mm of engineer] (machine) {Manufacturing Machine / Controller};
+\draw[->] (engineer)--node[above]{design / inspect} (cadapp);
+\draw[->] (cadapp)--node[right]{contracted mathematics} (kernel);
+\draw[<->] (cadapp)--node[above]{provider contracts} (providers);
+\draw[<->] (cadapp)--node[right]{lifecycle / product data} (plm);
+\draw[->] (cadapp)--node[left]{deterministic NC} (machine);
+\end{tikzpicture}
+\end{center}
+
+\target{} treats PLM, simulation, machine-control, and other external systems as integrations rather than hidden dependencies inside CAD semantics.
+
+\chapter{C4 Level 2 - Containers}
+
+\begin{tabularx}{\textwidth}{@{}p{0.24\textwidth}X@{}}
+\toprule
+Container / subsystem & Responsibility \\
+\midrule
+\pathref{kernel/math} & CPU mathematical authority: scalar, tolerance, vector/matrix, analytic geometry, curves/NURBS, surfaces, intersections, constraints/Jacobian/solver, B-Rep/solid math, tessellation, spatial acceleration, GPU contracts, and related diagnostics. \\
+\pathref{kernel/native} & Rust host and public kernel API. Dispatches typed requests to mathematical services and owns native GPU integration. \\
+\pathref{kernel/contracts} & Backend-neutral Rust contracts for geometry, topology, mesh, exchange, surface operations, references, construction, and kernel lifecycle/integration behavior. \\
+\pathref{kernel/occt} & OCCT-backed implementation/oracle layer. It may realize or challenge contracts but is not semantic authority. \\
+\pathref{kernel/api} & Legacy TypeScript API/application surface. Useful for compatibility/history; it is not the long-term semantic authority. \\
+\pathref{dotnet/src/UMLCAD.Framework} & Current .NET semantic/build framework: application builder, product-like definitions, assemblies, drawings/sheets, metadata, configuration, deterministic build identity, build history, package creation, and compiled model manifest generation. \\
+\pathref{dotnet/src/UMLCAD.Kernel.Client} & Current .NET transport adapter to the Rust kernel. Handles timeout, response limits, JSON, stable diagnostics, cancellation, and compiled-result validation. \\
+\pathref{projects/demo} & Executable demonstration and integrated runtime path. The E2E mode starts the kernel and validates the compiled model without opening the viewer. \\
+\pathref{tests/e2e} & System-level process/wire gate and red-team harness. \\
+\pathref{viewer} & Presentation boundary. The current repository proves the viewer package manifest and demo integration assumptions; implementation details that are not present on the exact \texttt{main} tree are not claimed here as implemented. \\
+\bottomrule
+\end{tabularx}
+
+\chapter{System-CAD Domain Architecture}
+
+The long-lived System-CAD architecture is organized around meaning rather than a list of applications.
+
+\section{Core semantic ownership}
+
+CAD Core owns, where applicable:
+
+\begin{itemize}
+\item Product, Part, Body, Sketch, Feature, Assembly, Occurrence, and product-structure semantics.
+\item Design intent, parameters, constraints, references, publications, and configuration/context.
+\item Coordinate-frame semantics and transforms.
+\item Evaluation planning and dependency closure.
+\item Deterministic semantic/evaluation/result identity.
+\item Cache and invalidation semantics.
+\item Authoritative results, provenance, topology evolution, and diagnostics.
+\item Drawing and PMI meaning.
+\item Product Structure and BOM semantics.
+\item Integration contracts consumed by Sheet Metal, CAM, Simulation, and PLM.
+\end{itemize}
+
+The mathematical kernel supplies computations, not these meanings.
+
+\section{Stable relationship model}
+
+The requested relationship is an architecture invariant:
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=7mm and 13mm,
+  box/.style={draw,rounded corners,align=center,minimum width=37mm,minimum height=9mm,font=\small},
+  >=Latex
+]
+\node[box,fill=green!8] (science) {Science\\Material / physical properties\\Phenomena Simulation Service};
+\node[box,fill=orange!8,right=of science] (resources) {Engineering Resources\\Machine / Tool / Fixture\\Process / Capabilities};
+\node[box,fill=blue!7,below=of science] (sheet) {Sheet Metal};
+\node[box,fill=blue!7,below=of resources] (cam) {CAM\\Toolpath / Postprocessor\\Deterministic G-code / NC};
+\node[box,fill=gray!10,below=15mm of $(sheet)!0.5!(cam)$] (product) {CAD Product Structure};
+\node[box,fill=gray!10,below=of product] (bom) {BOM};
+\node[box,fill=gray!10,below=of bom,minimum width=75mm] (consumers) {Drawing / CAM / PLM};
+\draw[<->] (science)--(resources);
+\draw[->] (resources)--(sheet);
+\draw[->] (resources)--(cam);
+\draw[->] (science)--(cam);
+\draw[->] (science)--(sheet);
+\draw[->] (product)--(bom);
+\draw[->] (bom)--(consumers);
+\draw[->] (product)--(consumers);
+\end{tikzpicture}
+\end{center}
+
+The crossing arrows above express consumption relationships, not inheritance and not ownership transfer.
+
+\section{Science}
+Science owns scientific facts and services that can be reused by multiple engineering domains. Material and physical properties belong here. The Phenomena Simulation Service is an abstract, provider-neutral service boundary.
+
+\section{Phenomena Simulation Service}
+
+The stable boundary is:
+
+\begin{lstlisting}
+Engineering Consumer
+        -> IPhenomenaSimulationService
+        -> IPhenomenaSimulationProvider
+        -> Simulation Implementation
+\end{lstlisting}
+
+The service does not encode whether the provider is internal, external, CPU-based, GPU-based, specialized, or remote. Provider identity, execution detail, and transport belong behind the contract unless the service explicitly makes them semantic inputs.
+
+A simulation result must carry enough identity, inputs, assumptions, and provenance for the consumer to decide whether the result is applicable. A visually plausible scalar without provenance is not an authoritative engineering result.
+
+\section{Engineering Resources}
+
+Engineering Resources own reusable manufacturing/engineering facts and capability declarations:
+
+\begin{itemize}
+\item Machine.
+\item Tool.
+\item Fixture.
+\item Process.
+\item Capabilities.
+\end{itemize}
+
+CAM and Sheet Metal consume these resources; the resource model must not become hidden CAM state.
+
+\section{Sheet Metal}
+
+Sheet Metal owns sheet-metal design semantics. It consumes engineering resources and applicable science/simulation contracts. Material/machine/process feasibility validation is a cross-domain responsibility implemented through explicit contracts, not by allowing Sheet Metal or CAM to become a second CAD kernel.
+
+\section{CAM}
+
+CAM consumes authoritative CAD semantics, product structure/BOM, engineering resources, material/process information, applicable Sheet Metal outputs, and the Phenomena Simulation Service where needed.
+
+The manufacturing chain is:
+
+\begin{lstlisting}
+Manufacturing Definition
+        -> Toolpath
+        -> Postprocessor
+        -> Deterministic G-code / NC
+\end{lstlisting}
+
+The postprocessor is a semantic boundary. Machine configuration, tool, fixture, process, coordinate system, operation order, postprocessor version/configuration, and other declared deterministic inputs must participate in the relevant identity. A renderable toolpath is not itself machine-ready NC.
+
+\section{CAD Product Structure and BOM}
+
+Product Structure owns product composition. BOM is a derived semantic view:
+
+\begin{lstlisting}
+CAD Product Structure
+        -> BOM
+        -> Drawing / CAM / PLM
+\end{lstlisting}

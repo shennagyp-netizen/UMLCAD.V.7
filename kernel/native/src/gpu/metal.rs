@@ -25,7 +25,9 @@ const OPS: &[GpuOperation] = &[GpuOperation::CandidatePairBatch];
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MetalCandidateTiming {
     pub host_prepare: Duration,
-    pub gpu_round_trip: Duration,
+    pub buffer_upload_setup: Duration,
+    pub device_execution: Duration,
+    pub buffer_readback: Duration,
     pub cpu_postprocess: Duration,
 }
 

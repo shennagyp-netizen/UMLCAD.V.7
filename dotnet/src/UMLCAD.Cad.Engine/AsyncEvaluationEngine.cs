@@ -41,6 +41,17 @@ public sealed class AsyncEvaluationEngine
 
     public async Task<IReadOnlyList<EvaluationOutcome>> EvaluateAsync(
         EvaluationPlan plan,
+        CancellationToken cancellationToken = default) =>
+        await EvaluateAsync(
+            plan,
+            cache: null,
+            recomputeStepIds: null,
+            cancellationToken);
+
+    public async Task<IReadOnlyList<EvaluationOutcome>> EvaluateAsync(
+        EvaluationPlan plan,
+        IEvaluationCache? cache,
+        IReadOnlySet<SemanticId>? recomputeStepIds,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -82,6 +93,29 @@ public sealed class AsyncEvaluationEngine
             }
 
             var identity = EvaluationIdentityBuilder.Build(step);
+
+            if (!recompute.Contains(step.StepId) &&
+                cache is not null &&
+                cache.TryGet(identity, out var cachedOutcome))
+            {
+                if (cachedOutcome.StepId != step.StepId ||
+                    cachedOutcome.Identity != identity)
+                {
+                    throw new InvalidOperationException(
+                        $"Cache entry for step '{step.StepId}' contains a mismatched step identity.");
+                }
+
+                if (cachedOutcome.Status == EvaluationOutcomeStatus.Succeeded &&
+                    cachedOutcome.Result is null)
+                {
+                    throw new InvalidOperationException(
+                        $"Cache entry for successful step '{step.StepId}' is missing its authoritative result.");
+                }
+
+                outcomes.Add(step.StepId, cachedOutcome);
+                continue;
+            }
+
             var outcome = await executor.ExecuteAsync(
                 step,
                 identity,
@@ -113,6 +147,8 @@ public sealed class AsyncEvaluationEngine
             }
 
             outcomes.Add(step.StepId, outcome);
+
+            cache?.Put(identity, outcome);
 
             if (outcome.Status != EvaluationOutcomeStatus.Succeeded)
                 break;

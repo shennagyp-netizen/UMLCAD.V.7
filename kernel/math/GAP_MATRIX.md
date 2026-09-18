@@ -39,7 +39,7 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | CUDA | `kernel/native/src/gpu/cuda.rs` real CUDA compute backend for batched AABB candidate generation using device-native f64 | CPU f64 overlap oracle; repeated-run determinism; extreme-coordinate fixture; fail-closed false-negative check; no-driver capability behavior | CUDA hardware execution is not available in the current standard CI fleet; hardware status remains explicitly unvalidated until an NVIDIA runner executes the feature-gated tests | GPU abstraction | High | P0 | Implemented / Tested / Not yet hardware-validated (declared AABB domain) |
 | Cross-backend conformance | `CandidatePairConformanceReport` plus shared CPU/accelerator fixture for conservative AABB candidate generation | False-negative/false-positive classification; deterministic repeat comparison; identical fixture on CPU/Metal/CUDA paths | Current hardware evidence validates CPU/Metal; CUDA path is implemented and testable but lacks a confirmed NVIDIA hardware run | Metal + CUDA backends | High | P0 | Implemented / Tested / Hardware-validated (CPU/Metal; CUDA not yet hardware-validated; declared AABB domain) |
 | Cross-backend conformance | None authoritative yet | None | CPU/Metal/CUDA comparison harness | All GPU backends | High | P0 | Missing |
-| Final scale/red-team matrix | Existing scattered tests | Good but incomplete | Standardized 1e-12 … 1e12 and pathological fixture families across all P0 operations | All P0 math | Medium | P0 | Partial |
+| Final scale/red-team matrix | `kernel/native/tests/m16_final_red_team.rs` plus existing red-team suite | Scale family 1e-12…1e12; tangent/near-parallel; coincident; non-finite; extreme NURBS weights/domains; rank-deficient solver; malformed GPU ordering; deterministic repeated evaluation | Full P0 authority surface remains covered by accumulated focused tests; M16 adds a single final cross-family adversarial matrix and explicit GPU ordering checks | All P0 math | Medium | P0 | Implemented / Tested / CPU-validated; Metal hardware-validated for GPU path |
 
 ## M11 closure record
 
@@ -165,3 +165,23 @@ M15 is closed for the declared common AABB candidate-generation workload.
 - The same adversarial fixture is shared by CPU, Metal, and CUDA test paths.
 - Metal hardware validation passes against the CPU f64 reference.
 - CUDA integration is ready behind `cuda-hardware`, but hardware execution remains unvalidated.
+
+## M16 closure record
+
+## M16 closure record
+
+M16 is implemented and repository-validated for the final performance and red-team boundary. The release-mode Apple Silicon benchmark records CPU/Metal median latency, pair throughput, host preparation, buffer setup/upload, device execution, readback, CPU post-processing, transfer/setup overhead, and batch efficiency. No CPU/Metal crossover occurred in the tested 32, 64, 128, 256, and 512-item batches; that is a measured result, not a performance failure. CUDA remains explicitly hardware-unverified because no NVIDIA runner execution was available.
+
+### M16 Apple Silicon performance evidence
+
+| Batch | CPU median µs | Metal median µs | CPU Mpair/s | Metal Mpair/s | transfer/setup % | batch efficiency |
+|---:|---:|---:|---:|---:|---:|---:|
+| 32 | 1.25 | 745.79 | 396.8000 | 0.6651 | 13.16% | 4.15% |
+| 64 | 4.79 | 1260.67 | 420.7012 | 1.5992 | 11.37% | 9.97% |
+| 128 | 17.33 | 1136.58 | 468.9321 | 7.1513 | 7.41% | 44.59% |
+| 256 | 61.88 | 2035.33 | 527.5152 | 16.0367 | 6.23% | 100.00% |
+| 512 | 229.75 | 10602.17 | 569.3841 | 12.3386 | 2.08% | 76.94% |
+
+The measured workload uses the certified conservative AABB candidate-generation path. Metal remains an accelerator only; CPU f64 remains authoritative. No benchmark result is promoted into mathematical semantics or used to weaken correctness contracts.
+
+M0-M16 mathematical-authority roadmap closure remains bounded by the accumulated certified domains and this final M16 evidence. CUDA hardware validation, where unavailable, is recorded as unverified rather than inferred.

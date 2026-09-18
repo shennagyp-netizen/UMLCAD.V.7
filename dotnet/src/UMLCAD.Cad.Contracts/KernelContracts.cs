@@ -24,10 +24,14 @@ public readonly record struct ContractResultId(string Value)
 
 public readonly record struct ContractTopologyId(
     ContractResultId ResultId,
+    string TopologyKind,
     string TopologyKey)
 {
     public ContractTopologyId
     {
+        if (string.IsNullOrWhiteSpace(TopologyKind))
+            throw new ArgumentException("TopologyKind is required.", nameof(TopologyKind));
+
         if (string.IsNullOrWhiteSpace(TopologyKey))
             throw new ArgumentException("TopologyKey is required.", nameof(TopologyKey));
     }

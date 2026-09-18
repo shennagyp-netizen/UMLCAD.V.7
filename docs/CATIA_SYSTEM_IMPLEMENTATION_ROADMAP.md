@@ -215,155 +215,110 @@ what a reference resolves to
 
 ---
 
-# 3. The layer model
+# 3. Abstraction and dependency model
 
-The system must be understood as six layers.
+The system architecture is a directed acyclic graph of abstraction levels and reusable services.
 
-```text
-L5  Client / Viewer / UI
+The principal semantic direction is:
+
+⟦BT⟧
+Platform Foundation
         ↓
-L4  Derived representations
+Mathematics
         ↓
-L3  CAD domain semantics + evaluation engine
+Science
         ↓
-L2  Shared expressions / references / semantic foundation
+CAD Engineering Core
         ↓
-L1  Kernel contracts and numerical boundary
+Engineering Resource Model
         ↓
-L0  Rust mathematical authority
-```
+Specialized Engineering Domains
+        ↓
+Application / Workflow / Presentation
+⟦BT⟧
 
-The layer meanings are fixed.
+This is an abstraction model, not a requirement that every row become one .NET project.
 
-## L0 — Mathematical authority
+Science provides reusable facts and services. CAD Core provides shared engineering meaning. Specialized domains consume those services and add domain meaning.
 
-Rust implementation of certified mathematical operations.
+External technologies are reached through outward adapters:
 
-## L1 — Mathematical contracts
+⟦BT⟧
+UMLCAD-owned contract/service
+        ↓
+adapter/provider
+        ↓
+external application/controller/system
+⟦BT⟧
 
-Typed, versioned requests/results that describe what the mathematical authority is being asked to calculate and what evidence it returns.
+C4 terminology is separate from project terminology. A C4 Container is a major runtime/deployment/data boundary; it is not automatically a .NET assembly.
 
-The contract is the abstraction boundary; the domain module does not know whether the result came from a specific internal algorithm.
+The normative details are in:
+- ⟦BT⟧docs/architecture/ABSTRACTION_AND_DEPENDENCY_MODEL.md⟦BT⟧
+- ⟦BT⟧docs/architecture/c4/⟦BT⟧
+- ⟦BT⟧docs/architecture/architecture.json⟦BT⟧
 
-## L2 — Shared CAD foundation
-
-Common concepts required by every domain:
-
-```text
-identity
-units
-dimensions
-expressions
-coordinates
-references
-publications
-semantic provenance
-diagnostics
-configuration context
-```
-
-## L3 — CAD semantics and Engine
-
-The actual engineering system:
-
-```text
-Part Design
-Sketch
-Hybrid / Surface
-Freeform
-Sheet Metal
-Assembly/Product
-Kinematics
-Simulation mapping
-Drawing
-PMI
-Knowledge
-Configurations
-Templates
-Design Review
-Manufacturing contracts
-```
-
-The Engine is the cross-domain execution plane.
-
-## L4 — Derived representations
-
-```text
-B-Rep result
-lightweight shape
-render mesh
-simulation mesh
-projected drawing geometry
-PMI graphics
-review snapshots
-```
-
-These are derived from semantic/result state.
-
-## L5 — Client/viewer
-
-Presentation, interaction, navigation, and editing orchestration only.
-
----
-
+B-Rep is authoritative when produced by a certified operation. Render meshes, drawing graphics, simulation meshes, and other consumer assets are derived representations.
 # 4. Project and library boundaries
 
-Do not create a giant `UMLCAD_semanticCore` containing every concern.
+Project boundaries must follow stable dependency responsibilities rather than the current feature list.
 
-Do not create dozens of one-class assemblies simply because the roadmap contains many subjects.
+The current .NET foundation remains:
 
-Start with these stable technical boundaries:
-
-```text
+⟦BT⟧
 UMLCAD.Cad.Expressions
 UMLCAD.Cad.Semantics
 UMLCAD.Cad.Contracts
 UMLCAD.Cad.Engine
-```
+⟦BT⟧
 
-Then organize the domain model internally into explicit modules/namespaces:
+These are an implementation projection of the larger architecture, not its permanent shape.
 
-```text
-Cad.Semantics/
-  Core/
-  Documents/
-  Expressions/
-  Coordinates/
-  References/
-  Parts/
-  Sketching/
-  PartDesign/
-  HybridGeometry/
-  Freeform/
-  SheetMetal/
-  Assemblies/
-  Kinematics/
-  Simulation/
-  Materials/
-  Appearance/
-  Drawings/
-  PMI/
-  Knowledge/
-  Configurations/
-  Templates/
-  DesignReview/
-  Manufacturing/
-```
+Do not create a giant semantic-core assembly containing every domain.
 
-A subject becomes a separate assembly only when at least one of these is true:
+Do not create dozens of one-class assemblies without a genuine boundary.
 
-```text
-it has an independent public dependency boundary;
-it must be consumed without the rest of Cad.Semantics;
-it requires a separately versioned contract;
-it creates a dependency cycle unless extracted;
-it has a clear deployment/test ownership boundary.
-```
+A subject should become a separate library when it has an independent public/dependency boundary, requires separate versioning or test ownership, breaks a dependency cycle, or is a substantial bounded engineering discipline.
 
-The default is **module first, assembly later**.
+### Sheet Metal
 
----
+Sheet Metal is explicitly a strong candidate for a separate engineering library because it owns a coherent manufacturing-specific semantic system:
 
+⟦BT⟧
+Thickness
+Bend
+Flange
+Relief
+BendTable
+KFactor
+BendAllowance
+Fold/Unfold
+FlatPattern
+material/process compatibility
+machine/tool constraints
+⟦BT⟧
+
+Its exact placement is governed by the architecture manifest, not by arbitrary project minimization.
+
+A separate ⟦BT⟧UMLCAD.Engineering.SheetMetal⟦BT⟧ library is preferred once implementation begins, unless a demonstrated boundary analysis shows that keeping it within a broader project is architecturally cleaner.
+
+The Sheet Metal library must consume shared Science, CAD Core, Engineering Resource, expression, and applicable Phenomena Simulation services. It must not become a private geometry kernel or a direct concrete Rust client.
+
+### Other domains
+
+The same rule applies to:
+
+⟦BT⟧
+Part Design
+Freeform
+Assembly/Kinematics
+CAM
+Drawing
+PMI
+Knowledge
+⟦BT⟧
+
+A domain is separated when the boundary is real, not merely because the roadmap names it.
 # 5. Correct dependency direction
 
 The intended dependency direction is:
@@ -919,15 +874,14 @@ Unsupported cases fail closed.
 
 ## 12.6 Sheet Metal
 
-Sheet Metal is a specialized semantic engineering module.
+Sheet Metal is a specialized engineering domain with its own material/process/machine behavior.
 
-It owns:
+It owns semantic concepts such as:
 
-```text
+⟦BT⟧
 SheetMetalPart
-SheetMetalParameters
-MaterialRule
 Thickness
+BendDefinition
 BendRadius
 BendAngle
 KFactor
@@ -941,36 +895,60 @@ CornerDefinition
 FoldDefinition
 UnfoldDefinition
 FlatPatternDefinition
-ManufacturingData
-```
+⟦BT⟧
 
-Its relation to mathematics is explicit:
+Its dependency structure is:
 
-```text
-Sheet Metal engineering equations
-        ↓
-Cad.Expressions / typed units
-        ↓
-Sheet Metal domain validation
-        ↓
-Engine
-        ↓
-bend/unfold/offset/intersection topology contract
-        ↓
-Rust mathematics
-```
+⟦BT⟧
+Sheet Metal
+   → CAD Core
+   → Science / Material
+   → Engineering Resource Model
+   → Expression / Quantity services
+   → Phenomena Simulation Service when scientifically applicable
+⟦BT⟧
 
-Therefore Sheet Metal **depends on the shared mathematical contract layer, not directly on the concrete Rust implementation**.
+Its domain equations use the shared expression system. Its exact geometric operations use the common Engine → Math Contract → Rust boundary.
 
-Its equations and engineering rules do not belong inside Rust merely because they are formulas.
+Sheet Metal must be capable of rejecting materially or mechanically incompatible operations before requesting exact geometry. The rejection must be based on material/process/machine/tool capabilities and rules, not hard-coded material-name cases.
 
-Its geometric deformation/unfolding operations do not belong as ad-hoc C# geometry either.
+A separate Sheet Metal library is the preferred implementation boundary once the domain is introduced in code.
+# 13. Product, Assembly, and BOM
 
-This split applies to every specialized domain.
+Product structure is part of the CAD Engineering Core.
 
----
+Assembly owns product/occurrence semantics:
 
-# 13. Product and Assembly
+⟦BT⟧
+Product
+SubProduct
+PartOccurrence
+PartDefinition
+OccurrenceTransform
+Configuration
+AssemblyConstraints
+EngineeringConnections
+FunctionalInterfaces
+⟦BT⟧
+
+BOM is a CAD product-structure service/view over that authoritative structure.
+
+⟦BT⟧
+Product Structure
+      ↓
+   BOM Service
+      ↓
+  ┌───┼───────────┐
+  ↓   ↓           ↓
+Drawing CAM      PLM/ERP
+⟦BT⟧
+
+Manufacturing, drawing, PLM/ERP, purchasing, and service views may derive specialized BOM interpretations, but they do not redefine the underlying CAD product structure.
+
+The occurrence and the part definition are different identities. Repeated occurrences may share an evaluated part result while retaining occurrence-specific transform and context.
+
+Assembly-level features are semantic operations over product context, not unexplained shape mutations.
+
 
 Assembly is a semantic graph.
 

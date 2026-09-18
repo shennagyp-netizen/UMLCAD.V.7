@@ -345,7 +345,7 @@ Important CATIA drafting capability mapping is documented from the official Dass
 
 Current system-CAD branch:
 - branch: `milestone/cad-system-s0-boundaries`
-- current implementation head: `d26d7c5bc6bf04d0691a6307e4b0cb283b0868bb`
+- current implementation head: `a3b23567c402351d6e513a8030c8c202c1e7ec3c`
 - PR #38 remains open and unmerged.
 
 Validation status at this snapshot:
@@ -356,8 +356,8 @@ Validation status at this snapshot:
 - Do not merge the PR or claim a green milestone until the authoritative Rust, comprehensive E2E, Metal, and performance workflows execute normally and pass on the exact head.
 
 Next implementation boundary after infrastructure recovery:
-1. Complete/validate the shared CAD reference/result contracts.
-2. Move the evaluation engine from architectural shell to executable Specification → Evaluation → Result flow.
-3. Integrate the first real Part/Sketch/Feature vertical slice with authoritative B-Rep/topology provenance.
-4. Then connect Sheet Metal/CAM/Drawing to actual CAD results rather than only their current typed domain foundations.
-5. Add machine-specific postprocessor contracts beyond the initial deterministic milling G-code implementation.
+1. Integrate the new typed CAD specification/reference/result contracts with the real Rust kernel through a dedicated ICadKernelEvaluator adapter; do not route them through the legacy V4 build model.
+2. Replace the contract-test kernel in the S1 tests with real kernel-backed evaluation for the first certified geometry subset.
+3. Establish authoritative B-Rep/topology provenance and semantic reference resolution from the real kernel result.
+4. Connect Sheet Metal/CAM/Drawing/BOM to authoritative CAD results, preserving their existing domain boundaries.
+5. Execute the authoritative Rust/.NET/E2E/Metal/performance gates on the exact branch head before declaring S1/S0 green or merging PR #38.

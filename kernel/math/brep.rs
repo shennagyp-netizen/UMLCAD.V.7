@@ -982,9 +982,10 @@ impl AxisAlignedBox {
         if !self.min.is_finite() || !self.max.is_finite() {
             return Err(BRepError::NonFinite);
         }
-        let eps = tolerance.threshold(
-            self.max.sub(self.min).length().max(1.0)
-        ).map_err(|_| BRepError::InvalidTolerance)?;
+        let d = self.max.sub(self.min);
+        let scale = d.x.abs().max(d.y.abs()).max(d.z.abs()).max(f64::MIN_POSITIVE);
+        let eps = tolerance.threshold(scale)
+            .map_err(|_| BRepError::InvalidTolerance)?;
         if self.max.x - self.min.x <= eps
             || self.max.y - self.min.y <= eps
             || self.max.z - self.min.z <= eps {
@@ -1027,7 +1028,9 @@ impl AxisAlignedBox {
     pub fn classify_point(&self, p: Vec3, tolerance: Tolerance) -> Result<SolidPointClass, BRepError> {
         self.validate(tolerance)?;
         if !p.is_finite() { return Err(BRepError::NonFinite); }
-        let eps = tolerance.threshold(self.max.sub(self.min).length().max(1.0))
+        let d = self.max.sub(self.min);
+        let scale = d.x.abs().max(d.y.abs()).max(d.z.abs()).max(f64::MIN_POSITIVE);
+        let eps = tolerance.threshold(scale)
             .map_err(|_| BRepError::InvalidTolerance)?;
         let inside = p.x > self.min.x + eps && p.x < self.max.x - eps
             && p.y > self.min.y + eps && p.y < self.max.y - eps
@@ -1056,7 +1059,9 @@ pub fn box_intersection(
     let min = Vec3::new(a.min.x.max(b.min.x), a.min.y.max(b.min.y), a.min.z.max(b.min.z));
     let max = Vec3::new(a.max.x.min(b.max.x), a.max.y.min(b.max.y), a.max.z.min(b.max.z));
     let result = AxisAlignedBox { min, max };
-    if overlaps(&a, &b, tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)? ) {
+    let scale = a.max.sub(a.min).length().max(b.max.sub(b.min).length()).max(f64::MIN_POSITIVE);
+    let eps = tolerance.threshold(scale).map_err(|_| BRepError::InvalidTolerance)?;
+    if overlaps(&a, &b, eps) {
         result.validate(tolerance)?;
         Ok(Some(result))
     } else {
@@ -1095,9 +1100,11 @@ fn box_grid(
 ) -> Result<Vec<AxisAlignedBox>, BRepError> {
     a.validate(tolerance)?;
     b.validate(tolerance)?;
-    let xs = sorted_unique([a.min.x, a.max.x, b.min.x, b.max.x], tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)?);
-    let ys = sorted_unique([a.min.y, a.max.y, b.min.y, b.max.y], tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)?);
-    let zs = sorted_unique([a.min.z, a.max.z, b.min.z, b.max.z], tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)?);
+    let scale = a.max.sub(a.min).length().max(b.max.sub(b.min).length()).max(f64::MIN_POSITIVE);
+    let eps = tolerance.threshold(scale).map_err(|_| BRepError::InvalidTolerance)?;
+    let xs = sorted_unique([a.min.x, a.max.x, b.min.x, b.max.x], eps);
+    let ys = sorted_unique([a.min.y, a.max.y, b.min.y, b.max.y], eps);
+    let zs = sorted_unique([a.min.z, a.max.z, b.min.z, b.max.z], eps);
     let mut parts = Vec::new();
     for xw in xs.windows(2) {
         for yw in ys.windows(2) {
@@ -1138,7 +1145,6 @@ pub fn box_union(
     b: AxisAlignedBox,
     tolerance: Tolerance,
 ) -> Result<Vec<AxisAlignedBox>, BRepError> {
-    let _ = overlaps(&a, &b, tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)?);
     box_grid(a, b, tolerance, |p| contains_closed(&a,p) || contains_closed(&b,p))
 }
 
@@ -1158,7 +1164,9 @@ pub fn box_split_by_plane(
 ) -> Result<Vec<AxisAlignedBox>, BRepError> {
     b.validate(tolerance)?;
     if !coordinate.is_finite() { return Err(BRepError::NonFinite); }
-    let eps = tolerance.threshold(b.max.sub(b.min).length().max(1.0))
+    let d = b.max.sub(b.min);
+    let scale = d.x.abs().max(d.y.abs()).max(d.z.abs()).max(f64::MIN_POSITIVE);
+    let eps = tolerance.threshold(scale)
         .map_err(|_| BRepError::InvalidTolerance)?;
     if coordinate <= axis_value(b.min,axis)+eps || coordinate >= axis_value(b.max,axis)-eps {
         return Ok(vec![b]);
@@ -1176,7 +1184,8 @@ pub fn box_imprint_planes(
 ) -> Result<(Vec<f64>,Vec<f64>,Vec<f64>), BRepError> {
     a.validate(tolerance)?;
     b.validate(tolerance)?;
-    let eps=tolerance.threshold(a.max.sub(a.min).length().max(b.max.sub(b.min).length()).max(1.0))
+    let scale = a.max.sub(a.min).length().max(b.max.sub(b.min).length()).max(f64::MIN_POSITIVE);
+    let eps=tolerance.threshold(scale)
         .map_err(|_| BRepError::InvalidTolerance)?;
     Ok((
         sorted_unique([a.min.x,a.max.x,b.min.x,b.max.x],eps),
@@ -1272,6 +1281,26 @@ mod tests {
         }
         let shell_faces=faces.iter().map(|f|f.id.clone()).collect();
         BRepSolid{vertices,edges,coedges,wires,faces,shells:vec![BRepShell{id:"s0".into(),faces:shell_faces}]}
+    }
+
+    #[test]
+    fn aabb_tolerance_is_scale_consistent() {
+        let t = Tolerance::new(1.0e-12, 1.0e-9).unwrap();
+        let small = AxisAlignedBox {
+            min: Vec3::new(0.0, 0.0, 0.0),
+            max: Vec3::new(1.0e-3, 2.0e-3, 3.0e-3),
+        };
+        assert!(small.validate(t).is_ok());
+        assert_eq!(small.volume(t), Ok(6.0e-9));
+
+        let shifted = AxisAlignedBox {
+            min: Vec3::new(1.0e12, -1.0e12, 5.0e11),
+            max: Vec3::new(1.0e12 + 1.0, -1.0e12 + 2.0, 5.0e11 + 3.0),
+        };
+        assert!(shifted.validate(t).is_ok());
+        assert_eq!(shifted.classify_point(
+            Vec3::new(1.0e12 + 0.5, -1.0e12 + 1.0, 5.0e11 + 1.5), t
+        ).unwrap(), SolidPointClass::Inside);
     }
 
     #[test]

@@ -89,7 +89,7 @@ Product/Assembly semantics
 occurrences/configurations
 engineering connections
 kinematic behaviors
-materials/physical properties
+material assignment/references; Science owns material physical properties
 simulation mapping
 drawing/PMI semantics
 templates/reuse

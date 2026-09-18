@@ -423,6 +423,106 @@ impl Torus3 {
 }
 
 #[cfg(test)]
+mod circular_prism_red_tests {
+    use super::super::circular_prism::evaluate_circular_prism;
+    use super::super::tolerance::Tolerance;
+    use super::super::vec::Vec3;
+
+    #[test]
+    fn exact_circular_prism_metrics_are_authoritative() {
+        let result = evaluate_circular_prism(
+            Vec3::new(20.0, 20.0, 10.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            5.0,
+            10.0,
+            Tolerance::new(1.0e-9, 1.0e-9).unwrap(),
+        )
+        .unwrap();
+
+        assert!((result.volume - (250.0 * std::f64::consts::PI)).abs() < 1.0e-12);
+        assert!((result.surface_area - (150.0 * std::f64::consts::PI)).abs() < 1.0e-12);
+        assert_eq!(result.centroid, Vec3::new(20.0, 20.0, 15.0));
+        assert_eq!(result.bounds_min, Vec3::new(15.0, 15.0, 10.0));
+        assert_eq!(result.bounds_max, Vec3::new(25.0, 25.0, 20.0));
+    }
+
+    #[test]
+    fn translation_is_a_metamorphic_invariant_of_intrinsic_metrics() {
+        let tolerance = Tolerance::new(1.0e-9, 1.0e-9).unwrap();
+        let a = evaluate_circular_prism(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            2.0,
+            7.0,
+            tolerance,
+        )
+        .unwrap();
+        let b = evaluate_circular_prism(
+            Vec3::new(13.0, -4.0, 5.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            2.0,
+            7.0,
+            tolerance,
+        )
+        .unwrap();
+
+        assert_eq!(a.volume, b.volume);
+        assert_eq!(a.surface_area, b.surface_area);
+        assert_eq!(a.radius, b.radius);
+        assert_eq!(a.depth, b.depth);
+        assert_eq!(b.centroid, a.centroid.add(Vec3::new(13.0, -4.0, 5.0)));
+    }
+
+    #[test]
+    fn invalid_domain_fails_closed() {
+        let tolerance = Tolerance::new(1.0e-9, 1.0e-9).unwrap();
+
+        assert!(evaluate_circular_prism(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 0.0),
+            1.0,
+            1.0,
+            tolerance,
+        ).is_err());
+
+        assert!(evaluate_circular_prism(
+            Vec3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            0.0,
+            1.0,
+            tolerance,
+        ).is_err());
+
+        assert!(evaluate_circular_prism(
+            Vec3::new(f64::NAN, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            1.0,
+            1.0,
+            tolerance,
+        ).is_err());
+    }
+
+    #[test]
+    fn bounded_property_cases_preserve_exact_volume_formula() {
+        let tolerance = Tolerance::new(1.0e-9, 1.0e-9).unwrap();
+        for i in 1..=25 {
+            let radius = i as f64 * 0.25;
+            let depth = 0.5 + i as f64 * 0.75;
+            let result = evaluate_circular_prism(
+                Vec3::new(i as f64, -2.0 * i as f64, 3.0),
+                Vec3::new(0.0, 0.0, 1.0),
+                radius,
+                depth,
+                tolerance,
+            )
+            .unwrap();
+            let expected = std::f64::consts::PI * radius * radius * depth;
+            assert!((result.volume - expected).abs() <= 1.0e-12 * expected.max(1.0));
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

@@ -1,0 +1,35 @@
+name: Documentation validation
+
+on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+      - "fix/**"
+  pull_request:
+
+jobs:
+  latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install LaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y latexmk texlive-latex-extra texlive-fonts-recommended
+
+      - name: Compile handbook
+        working-directory: docs
+        run: latexmk -pdf -interaction=nonstopmode -halt-on-error doc.tex
+
+      - name: Verify PDF
+        run: test -s docs/doc.pdf
+
+      - name: Upload handbook PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: umlcad-v7-architecture-handbook
+          path: docs/doc.pdf
+          if-no-files-found: error

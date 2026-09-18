@@ -229,8 +229,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "linux")]
-    #[ignore = "requires an NVIDIA CUDA device and NVRTC runtime"]
+    #[cfg(all(target_os = "linux", feature = "cuda-hardware"))]
     fn cuda_candidate_pairs_match_cpu_subset_and_repeat_bitwise() {
         let boxes = vec![
             Aabb3::new(Vec3::new(0.0,0.0,0.0), Vec3::new(1.0,1.0,1.0)).unwrap(),
@@ -254,8 +253,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "linux")]
-    #[ignore = "requires an NVIDIA CUDA device and NVRTC runtime"]
+    #[cfg(all(target_os = "linux", feature = "cuda-hardware"))]
     fn cuda_extreme_fixture_preserves_f64_overlaps() {
         let a = Aabb3::new(
             Vec3::new(f64::MAX*0.25,0.0,0.0),

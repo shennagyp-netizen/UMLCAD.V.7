@@ -107,7 +107,7 @@ public sealed class CadEvaluationVerticalSliceTests
             });
 
         var positive = new ExtrusionFeatureSpecification(
-            new CadId("feature-a"), sketch.Id, support,
+            new CadId("feature-a"), sketch.Id, new CadId("circle-a"), support,
             new CadVector3(0, 0, 1), 10, FeatureBooleanOperation.Add);
         var negative = positive with { Direction = new CadVector3(0, 0, -1) };
 
@@ -153,9 +153,9 @@ public sealed class CadEvaluationVerticalSliceTests
             new CadId("base"), new CadFrame(new CadId("part"), CadFrameKind.Part, 0, 0, 0), 10, 10, 10);
 
         var a = new ExtrusionFeatureSpecification(
-            new CadId("a"), new CadId("b"), support, new CadVector3(0, 0, 1), 5, FeatureBooleanOperation.Add);
+            new CadId("a"), new CadId("b"), new CadId("circle-a"), support, new CadVector3(0, 0, 1), 5, FeatureBooleanOperation.Add);
         var b = new ExtrusionFeatureSpecification(
-            new CadId("b"), new CadId("a"), support, new CadVector3(0, 0, 1), 5, FeatureBooleanOperation.Add);
+            new CadId("b"), new CadId("a"), new CadId("circle-b"), support, new CadVector3(0, 0, 1), 5, FeatureBooleanOperation.Add);
 
         var document = new CadDocumentSpecification(
             new CadId("cycle"), "A", "mm", new CadFeatureSpecification[] { baseFeature, a, b });
@@ -184,9 +184,9 @@ public sealed class CadEvaluationVerticalSliceTests
             });
 
         var featureA = new ExtrusionFeatureSpecification(
-            new CadId("feature-a"), sketch.Id, support, new CadVector3(0, 0, 1), 10, FeatureBooleanOperation.Add);
+            new CadId("feature-a"), sketch.Id, new CadId("circle-a"), support, new CadVector3(0, 0, 1), 10, FeatureBooleanOperation.Add);
         var featureB = new ExtrusionFeatureSpecification(
-            new CadId("feature-b"), sketch.Id, support, new CadVector3(0, 0, -1), featureBDistance, FeatureBooleanOperation.Remove);
+            new CadId("feature-b"), sketch.Id, new CadId("circle-b"), support, new CadVector3(0, 0, -1), featureBDistance, FeatureBooleanOperation.Remove);
 
         return new CadDocumentSpecification(
             new CadId("vertical-slice"), "A", "mm",

@@ -84,8 +84,13 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
             throw new InvalidOperationException(
                 $"Machine '{machine.MachineId}' does not support process '{operation.Process}' at stock thickness {operation.StockThicknessMm.ToString(CultureInfo.InvariantCulture)} mm.");
 
-        if (!MachineToolCompatibility.IsCompatible(machine, tool))
-            throw new InvalidOperationException("Machine/tool interfaces are incompatible.");
+        if (!string.Equals(operation.ToolId, tool.ToolId, StringComparison.Ordinal))
+            throw new InvalidOperationException(
+                $"Operation references tool '{operation.ToolId}', but tool definition '{tool.ToolId}' was supplied.");
+
+        if (!MachineToolCompatibility.IsCompatible(machine, tool, operation.Process))
+            throw new InvalidOperationException(
+                "Machine, tool, and manufacturing process are incompatible.");
 
         if (operation.Process is not ManufacturingProcessKind.Milling)
             throw new NotSupportedException(

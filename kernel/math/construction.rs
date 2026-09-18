@@ -179,10 +179,16 @@ impl PlanarPolygon {
     }
 
     fn signed_area(&self) -> f64 {
+        if self.vertices.is_empty() {
+            return 0.0;
+        }
+        // Compute the shoelace sum in a local frame to prevent cancellation
+        // when the polygon is translated far from the coordinate origin.
+        let reference = self.vertices[0];
         0.5 * self.vertices.iter().enumerate()
             .map(|(i, p)| {
                 let q = self.vertices[(i + 1) % self.vertices.len()];
-                p.x * q.y - p.y * q.x
+                p.sub(reference).cross(q.sub(reference))
             })
             .sum::<f64>()
     }
@@ -195,16 +201,18 @@ impl PlanarPolygon {
     pub fn centroid(&self, tolerance: Tolerance) -> Result<Vec2, ConstructionError> {
         self.validate(tolerance)?;
         let area = self.signed_area();
+        let reference = self.vertices[0];
         let mut cx = 0.0;
         let mut cy = 0.0;
         for i in 0..self.vertices.len() {
-            let a = self.vertices[i];
-            let b = self.vertices[(i + 1) % self.vertices.len()];
-            let cross = a.x * b.y - b.x * a.y;
+            let a = self.vertices[i].sub(reference);
+            let b = self.vertices[(i + 1) % self.vertices.len()].sub(reference);
+            let cross = a.cross(b);
             cx += (a.x + b.x) * cross;
             cy += (a.y + b.y) * cross;
         }
-        let result = Vec2::new(cx / (6.0 * area), cy / (6.0 * area));
+        let local = Vec2::new(cx / (6.0 * area), cy / (6.0 * area));
+        let result = reference.add(local);
         if result.is_finite() { Ok(result) } else { Err(ConstructionError::Overflow) }
     }
 
@@ -928,6 +936,22 @@ mod tests {
             Vec2::new(0.0, 0.0), Vec2::new(w, 0.0),
             Vec2::new(w, h), Vec2::new(0.0, h),
         ])
+    }
+
+    #[test]
+    fn planar_polygon_area_and_centroid_are_translation_invariant() {
+        let local = rect(20.0, 10.0);
+        let shifted = PlanarPolygon::new(vec![
+            Vec2::new(1.0e12, 1.0e12),
+            Vec2::new(1.0e12 + 20.0, 1.0e12),
+            Vec2::new(1.0e12 + 20.0, 1.0e12 + 10.0),
+            Vec2::new(1.0e12, 1.0e12 + 10.0),
+        ]);
+        assert!((local.area(tol()).unwrap() - 200.0).abs() <= 1.0e-9);
+        assert!((shifted.area(tol()).unwrap() - 200.0).abs() <= 1.0e-6);
+        let centroid = shifted.centroid(tol()).unwrap();
+        assert!((centroid.x - (1.0e12 + 10.0)).abs() <= 1.0e-3);
+        assert!((centroid.y - (1.0e12 + 5.0)).abs() <= 1.0e-3);
     }
 
     #[test]

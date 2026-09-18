@@ -221,7 +221,7 @@ The system architecture is a directed acyclic graph of abstraction levels and re
 
 The principal semantic direction is:
 
-⟦BT⟧
+`
 Platform Foundation
         ↓
 Mathematics
@@ -235,7 +235,7 @@ Engineering Resource Model
 Specialized Engineering Domains
         ↓
 Application / Workflow / Presentation
-⟦BT⟧
+`
 
 This is an abstraction model, not a requirement that every row become one .NET project.
 
@@ -243,20 +243,20 @@ Science provides reusable facts and services. CAD Core provides shared engineeri
 
 External technologies are reached through outward adapters:
 
-⟦BT⟧
+`
 UMLCAD-owned contract/service
         ↓
 adapter/provider
         ↓
 external application/controller/system
-⟦BT⟧
+`
 
 C4 terminology is separate from project terminology. A C4 Container is a major runtime/deployment/data boundary; it is not automatically a .NET assembly.
 
 The normative details are in:
-- ⟦BT⟧docs/architecture/ABSTRACTION_AND_DEPENDENCY_MODEL.md⟦BT⟧
-- ⟦BT⟧docs/architecture/c4/⟦BT⟧
-- ⟦BT⟧docs/architecture/architecture.json⟦BT⟧
+- `docs/architecture/ABSTRACTION_AND_DEPENDENCY_MODEL.md`
+- `docs/architecture/c4/`
+- `docs/architecture/architecture.json`
 
 B-Rep is authoritative when produced by a certified operation. Render meshes, drawing graphics, simulation meshes, and other consumer assets are derived representations.
 # 4. Project and library boundaries
@@ -265,12 +265,12 @@ Project boundaries must follow stable dependency responsibilities rather than th
 
 The current .NET foundation remains:
 
-⟦BT⟧
+`
 UMLCAD.Cad.Expressions
 UMLCAD.Cad.Semantics
 UMLCAD.Cad.Contracts
 UMLCAD.Cad.Engine
-⟦BT⟧
+`
 
 These are an implementation projection of the larger architecture, not its permanent shape.
 
@@ -284,7 +284,7 @@ A subject should become a separate library when it has an independent public/dep
 
 Sheet Metal is explicitly a strong candidate for a separate engineering library because it owns a coherent manufacturing-specific semantic system:
 
-⟦BT⟧
+`
 Thickness
 Bend
 Flange
@@ -296,11 +296,11 @@ Fold/Unfold
 FlatPattern
 material/process compatibility
 machine/tool constraints
-⟦BT⟧
+`
 
 Its exact placement is governed by the architecture manifest, not by arbitrary project minimization.
 
-A separate ⟦BT⟧UMLCAD.Engineering.SheetMetal⟦BT⟧ library is preferred once implementation begins, unless a demonstrated boundary analysis shows that keeping it within a broader project is architecturally cleaner.
+A separate `UMLCAD.Engineering.SheetMetal` library is preferred once implementation begins, unless a demonstrated boundary analysis shows that keeping it within a broader project is architecturally cleaner.
 
 The Sheet Metal library must consume shared Science, CAD Core, Engineering Resource, expression, and applicable Phenomena Simulation services. It must not become a private geometry kernel or a direct concrete Rust client.
 
@@ -308,7 +308,7 @@ The Sheet Metal library must consume shared Science, CAD Core, Engineering Resou
 
 The same rule applies to:
 
-⟦BT⟧
+`
 Part Design
 Freeform
 Assembly/Kinematics
@@ -316,7 +316,7 @@ CAM
 Drawing
 PMI
 Knowledge
-⟦BT⟧
+`
 
 A domain is separated when the boundary is real, not merely because the roadmap names it.
 # 5. Correct dependency direction
@@ -878,7 +878,7 @@ Sheet Metal is a specialized engineering domain with its own material/process/ma
 
 It owns semantic concepts such as:
 
-⟦BT⟧
+`
 SheetMetalPart
 Thickness
 BendDefinition
@@ -895,18 +895,18 @@ CornerDefinition
 FoldDefinition
 UnfoldDefinition
 FlatPatternDefinition
-⟦BT⟧
+`
 
 Its dependency structure is:
 
-⟦BT⟧
+`
 Sheet Metal
    → CAD Core
    → Science / Material
    → Engineering Resource Model
    → Expression / Quantity services
    → Phenomena Simulation Service when scientifically applicable
-⟦BT⟧
+`
 
 Its domain equations use the shared expression system. Its exact geometric operations use the common Engine → Math Contract → Rust boundary.
 
@@ -919,7 +919,7 @@ Product structure is part of the CAD Engineering Core.
 
 Assembly owns product/occurrence semantics:
 
-⟦BT⟧
+`
 Product
 SubProduct
 PartOccurrence
@@ -929,11 +929,11 @@ Configuration
 AssemblyConstraints
 EngineeringConnections
 FunctionalInterfaces
-⟦BT⟧
+`
 
 BOM is a CAD product-structure service/view over that authoritative structure.
 
-⟦BT⟧
+`
 Product Structure
       ↓
    BOM Service
@@ -941,7 +941,7 @@ Product Structure
   ┌───┼───────────┐
   ↓   ↓           ↓
 Drawing CAM      PLM/ERP
-⟦BT⟧
+`
 
 Manufacturing, drawing, PLM/ERP, purchasing, and service views may derive specialized BOM interpretations, but they do not redefine the underlying CAD product structure.
 
@@ -976,3 +976,397 @@ Repeated occurrences may share one evaluated part result while retaining occurre
 Assembly-level features must be modeled as semantic operations over a product context rather than as unexplained shape mutations.
 
 ---
+
+# 14. CAM, Manufacturing, and G-code
+
+CAM is an engineering domain that consumes authoritative CAD/product results, material science, and the shared Engineering Resource Model.
+
+Its responsibilities include:
+
+\`\`\`
+ManufacturingSetup
+StockDefinition
+ManufacturingFeature
+ManufacturingOperation
+MachiningStrategy
+CuttingCondition
+Toolpath
+OperationSequence
+SimulationRequest
+NCProgram
+PostprocessingIntent
+\`\`\`
+
+CAM does not stop at toolpath generation.
+
+The production path is:
+
+\`\`\`
+Authoritative CAD Result
+        ↓
+Manufacturing interpretation
+        ↓
+Process planning
+        ↓
+Machine / Tool / Fixture capability checks
+        ↓
+optional Phenomena Simulation Service
+        ↓
+Toolpath
+        ↓
+Machine-specific postprocessor
+        ↓
+deterministic NC / G-code program
+\`\`\`
+
+G-code/NC is therefore a real downstream engineering result, not a viewer/export convenience.
+
+The semantic model must distinguish:
+
+\`\`\`
+Toolpath          = machine-independent or machine-constrained path intent
+Postprocessor     = translation to a controller dialect
+NC/G-code         = executable machine program representation
+Machine controller= external execution environment
+\`\`\`
+
+A postprocessor is an adapter/provider implementing an explicit manufacturing-output contract.
+
+It must not alter manufacturing semantics silently.
+
+The G-code generation contract must preserve deterministic ordering, explicit units/modes, tool/operation identity, machine context, and validation diagnostics.
+
+The application must be able to report:
+
+\`\`\`
+valid
+invalid
+unsupported
+ambiguous
+non-postprocessable
+\`\`\`
+
+rather than emitting plausible but unsafe NC output.
+
+## 14.1 Machine-aware CAM
+
+The Engineering Resource Model provides:
+
+\`\`\`
+Machine
+Tool
+Fixture
+Process
+MachineCapability
+ToolCapability
+ProcessCapability
+\`\`\`
+
+CAM combines these with material and geometry.
+
+For example:
+
+\`\`\`
+Material
+   +
+Machine capability
+   +
+Tool capability
+   +
+Operation constraints
+   +
+Geometry
+        ↓
+Manufacturing plan
+        ↓
+Toolpath
+        ↓
+Postprocessor
+        ↓
+G-code / NC
+\`\`\`
+
+Machine/controller integration is external to the semantic manufacturing model.
+
+---
+
+# 15. Drawing capability map
+
+Drawing must be mapped against the real CATIA drafting capability surface, not reduced to "views + dimensions".
+
+Dassault Systèmes documents Generative Drafting capabilities including associative generation from 3D parts, assemblies, surfaces, hybrid parts and sheet-metal definitions; front/side/top/isometric views; section, aligned/offset section, detail, circular/profiled detail and clipping views; associative dimensions and annotations; dress-up; assembly filtering; BOM generation in drawings; and standards/interoperability such as ANSI/ISO/JIS and DXF/DWG. Interactive Drafting adds interactive 2D design, dimensioning, associative annotations, GD&T, balloons, roughness symbols, notes, centerlines/axes/thread lines/area-fill/mark-up arrows, and drawing structure editing. These are treated as capability requirements to map into UMLCAD's own semantics, not as a command-by-command CATIA object model.
+
+The UMLCAD Drawing domain therefore needs, by capability family:
+
+### Drawing document structure
+
+\`\`\`
+DrawingDocument
+DrawingSheet
+SheetFormat
+Border
+TitleBlock
+RevisionBlock
+Zone
+DrawingTree
+ExternalReference
+\`\`\`
+
+### Generated views
+
+\`\`\`
+ProjectionView
+FrontView
+RearView
+TopView
+BottomView
+LeftView
+RightView
+IsometricView
+AuxiliaryView
+SectionView
+AlignedSectionView
+OffsetSectionView
+DetailView
+CircularDetailView
+ProfiledDetailView
+ClippingView
+BrokenView
+UnfoldedView
+\`\`\`
+
+### View semantics
+
+\`\`\`
+ViewSource
+ViewOrientation
+ViewAxis
+ProjectionMethod
+DisplayMode
+HiddenLinePolicy
+SectionDefinition
+ClippingDefinition
+AssemblyFilter
+GenerativeUpdateState
+AssociativityState
+\`\`\`
+
+### Dimensions
+
+At minimum:
+
+\`\`\`
+Length
+Distance
+Angle
+Radius
+Diameter
+Chamfer
+Coordinate/ordinate
+Baseline/chain
+Hole/thread-related dimension
+Angular/linear associative dimensions
+\`\`\`
+
+Dimension semantics must support:
+
+\`\`\`
+tolerances
+limits
+units
+precision
+prefix/suffix
+stacking
+reference/driving distinction
+associativity
+placement constraints
+dimension standards
+\`\`\`
+
+### Annotation / GD&T
+
+\`\`\`
+Text
+RichText
+Note
+Leader
+Balloon
+Datum
+DatumTarget
+GeometricTolerance
+FeatureControlFrame
+SurfaceTexture/Roughness
+WeldingSymbol
+FlagNote
+\`\`\`
+
+Where standards are supported, the domain must explicitly encode the applicable standard rather than treating formatting as arbitrary viewer text.
+
+### Dress-up / 2D geometry
+
+\`\`\`
+Centerline
+AxisLine
+SymmetryLine
+ThreadLine
+AreaFill
+Hatching
+BreakLine
+ConstructionGeometry
+MarkUpArrow
+2D geometry
+\`\`\`
+
+### Sheet presentation
+
+\`\`\`
+line types
+line weights
+fonts
+symbols
+layers
+view-specific display properties
+standards
+sheet scaling
+view positioning
+\`\`\`
+
+### BOM on drawing
+
+Drawing must consume the CAD Product Structure/BOM service and support:
+
+\`\`\`
+BOMTable
+BOMItem
+ItemNumber
+Quantity
+PartNumber
+Revision
+Description
+\`\`\`
+
+The drawing BOM is a representation of the CAD product structure; it does not redefine assembly truth.
+
+### Associativity
+
+The key contract is:
+
+\`\`\`
+3D authoritative result
+        ↓
+Drawing View specification
+        ↓
+projection / section / hidden-line result
+        ↓
+drawing dimensions / annotations / dress-up
+\`\`\`
+
+When the model changes, the drawing records which specifications remain associative, which require update, and which become missing/ambiguous/invalid.
+
+No viewer heuristic may silently repair broken drawing references.
+
+### Drawing standards
+
+The domain must support an explicit standard/context model, initially allowing the architectural space for:
+
+\`\`\`
+ISO
+ANSI
+JIS
+project/customer-specific standards
+\`\`\`
+
+The selected standard affects drafting semantics and presentation rules; it must not change the underlying CAD geometry.
+
+The detailed CATIA capability mapping used for this scope is based on Dassault Systèmes' Generative Drafting and Interactive Drafting product descriptions. See the architecture source references recorded with this roadmap.
+
+---
+
+# 16. Science, phenomena simulation, and engineering consumers
+
+Phenomena simulation is below CAM and Sheet Metal as a reusable scientific capability.
+
+The service answers:
+
+\`\`\`
+"What happens physically under these inputs?"
+\`\`\`
+
+The consuming engineering domain answers:
+
+\`\`\`
+"What engineering decision should be made from that result?"
+\`\`\`
+
+Thus:
+
+\`\`\`
+Science
+  └── Phenomena Simulation Service
+             ↑
+             ├── CAM
+             ├── Sheet Metal
+             ├── Kinematics / other domains where applicable
+             └── future engineering domains
+\`\`\`
+
+An implementation provider may use an internal solver or an external scientific application.
+
+The provider is interchangeable behind the service contract.
+
+---
+
+# 17. Library boundary strategy
+
+The architecture distinguishes logical units from physical assemblies.
+
+The following are strong candidates for independent libraries when their implementation begins:
+
+\`\`\`
+UMLCAD.Science
+UMLCAD.Engineering.Resources
+UMLCAD.Engineering.SheetMetal
+UMLCAD.Engineering.CAM
+UMLCAD.Engineering.Drawing
+\`\`\`
+
+This is not a requirement to create all five before their public boundaries are real.
+
+The promotion rule is:
+
+\`\`\`
+logical domain
+      ↓
+stable public semantic/service boundary
+      ↓
+independent assembly when justified
+\`\`\`
+
+The important rule is that **a strong bounded domain must not remain buried in a generic project merely to reduce project count**.
+
+At the same time, the solution must not be fragmented into one project per command.
+
+---
+
+# 18. Capability traceability
+
+Every large engineering domain receives a capability matrix:
+
+\`\`\`
+External capability
+    ↓
+UMLCAD semantic capability
+    ↓
+required services
+    ↓
+required mathematical contracts
+    ↓
+authoritative result
+    ↓
+derived representations
+    ↓
+E2E scenario
+\`\`\`
+
+A CATIA comparison is therefore made by capability and evidence, not by counting command names.
+

@@ -1,4 +1,5 @@
 pub mod api;
+pub mod gpu;
 #[path = "../../math/mod.rs"]
 pub mod functions;
 pub mod services;

@@ -425,6 +425,8 @@ public sealed record CadFeatureEvaluationResult(
     IReadOnlyList<CadDiagnostic> Diagnostics,
     AuthoritativeCadResult? AuthoritativeResult)
 {
+    public CadSketchEvaluationResult? SketchResult { get; init; }
+
     public bool Succeeded => Status == CadEvaluationStatus.Succeeded;
 }
 
@@ -449,7 +451,10 @@ public sealed record KernelEvaluationRequest(
 public sealed record KernelEvaluationResponse(
     CadEvaluationStatus Status,
     AuthoritativeCadResult? AuthoritativeResult,
-    IReadOnlyList<CadDiagnostic> Diagnostics);
+    IReadOnlyList<CadDiagnostic> Diagnostics)
+{
+    public CadSketchEvaluationResult? SketchResult { get; init; }
+}
 
 public interface ICadKernelEvaluator
 {

@@ -62,9 +62,14 @@ fn signed_area2(loop_points: &[Vec2]) -> f64 {
     if loop_points.is_empty() {
         return 0.0;
     }
+    // Translate the local calculation to the first vertex to avoid
+    // catastrophic cancellation for large absolute UV coordinates.
+    let reference = loop_points[0];
     0.5 * loop_points.iter().enumerate().map(|(i, p)| {
         let q = loop_points[(i + 1) % loop_points.len()];
-        p.x * q.y - p.y * q.x
+        let a = p.sub(reference);
+        let b = q.sub(reference);
+        a.cross(b)
     }).sum::<f64>()
 }
 
@@ -72,17 +77,56 @@ fn polygon_centroid2(loop_points: &[Vec2], area: f64) -> Result<Vec2, BRepError>
     if area == 0.0 {
         return Err(BRepError::Degenerate);
     }
+    let reference = loop_points[0];
     let mut x = 0.0;
     let mut y = 0.0;
     for i in 0..loop_points.len() {
-        let a = loop_points[i];
-        let b = loop_points[(i + 1) % loop_points.len()];
-        let c = a.x * b.y - b.x * a.y;
+        let a = loop_points[i].sub(reference);
+        let b = loop_points[(i + 1) % loop_points.len()].sub(reference);
+        let c = a.cross(b);
         x += (a.x + b.x) * c;
         y += (a.y + b.y) * c;
     }
-    let result = Vec2::new(x / (6.0 * area), y / (6.0 * area));
+    let local = Vec2::new(x / (6.0 * area), y / (6.0 * area));
+    let result = reference.add(local);
     if result.is_finite() { Ok(result) } else { Err(BRepError::Overflow) }
+}
+
+fn loop_boundary_contains(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> bool {
+    loop_points.iter().enumerate().any(|(i, a)| {
+        let b = loop_points[(i + 1) % loop_points.len()];
+        let edge = b.sub(*a);
+        let rel = point.sub(*a);
+        let cross = edge.cross(rel);
+        cross.is_finite() && cross.abs() <= tolerance * edge.length().max(rel.length()).max(f64::MIN_POSITIVE)
+            && point.x >= a.x.min(b.x) - tolerance
+            && point.x <= a.x.max(b.x) + tolerance
+            && point.y >= a.y.min(b.y) - tolerance
+            && point.y <= a.y.max(b.y) + tolerance
+    })
+}
+
+fn is_convex_loop(loop_points: &[Vec2], tolerance: f64) -> bool {
+    if loop_points.len() < 3 {
+        return false;
+    }
+    let area = signed_area2(loop_points);
+    if !area.is_finite() || area == 0.0 {
+        return false;
+    }
+    let sign = area.signum();
+    for i in 0..loop_points.len() {
+        let a = loop_points[i];
+        let b = loop_points[(i + 1) % loop_points.len()];
+        let d = loop_points[(i + 2) % loop_points.len()];
+        let value = b.sub(a).cross(d.sub(b));
+        let edge_scale = b.sub(a).length().max(d.sub(b).length()).max(f64::MIN_POSITIVE);
+        let eps = tolerance * edge_scale;
+        if !value.is_finite() || !eps.is_finite() || value * sign <= eps {
+            return false;
+        }
+    }
+    true
 }
 
 fn point_in_convex_loop(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> bool {
@@ -92,7 +136,8 @@ fn point_in_convex_loop(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> bo
         let a = loop_points[i];
         let b = loop_points[(i + 1) % loop_points.len()];
         let cross = b.sub(a).cross(point.sub(a));
-        let eps = tolerance * (b.sub(a).length() + point.sub(a).length() + 1.0);
+        let edge_scale = b.sub(a).length().max(point.sub(a).length()).max(f64::MIN_POSITIVE);
+        let eps = tolerance * edge_scale;
         if sign > 0.0 {
             if cross < -eps { return false; }
         } else if sign < 0.0 {
@@ -114,16 +159,21 @@ fn segment_intersects_2d(a: Vec2, b: Vec2, c: Vec2, d: Vec2, tolerance: f64) -> 
     let ab_d = orient(a, b, d);
     let cd_a = orient(c, d, a);
     let cd_b = orient(c, d, b);
-    let eps = tolerance * (b.sub(a).length() + d.sub(c).length() + 1.0);
-    if [ab_c, ab_d, cd_a, cd_b].iter().any(|v| !v.is_finite()) {
+    let geometric_scale = b.sub(a).length()
+        .max(d.sub(c).length())
+        .max(a.sub(c).length())
+        .max(a.sub(d).length())
+        .max(f64::MIN_POSITIVE);
+    let orient_eps = tolerance * geometric_scale;
+    if !orient_eps.is_finite() || [ab_c, ab_d, cd_a, cd_b].iter().any(|v| !v.is_finite()) {
         return false;
     }
-    if ab_c.abs() <= eps && on_segment(a, b, c, tolerance) { return true; }
-    if ab_d.abs() <= eps && on_segment(a, b, d, tolerance) { return true; }
-    if cd_a.abs() <= eps && on_segment(c, d, a, tolerance) { return true; }
-    if cd_b.abs() <= eps && on_segment(c, d, b, tolerance) { return true; }
-    ((ab_c > eps && ab_d < -eps) || (ab_c < -eps && ab_d > eps))
-        && ((cd_a > eps && cd_b < -eps) || (cd_a < -eps && cd_b > eps))
+    if ab_c.abs() <= orient_eps && on_segment(a, b, c, tolerance) { return true; }
+    if ab_d.abs() <= orient_eps && on_segment(a, b, d, tolerance) { return true; }
+    if cd_a.abs() <= orient_eps && on_segment(c, d, a, tolerance) { return true; }
+    if cd_b.abs() <= orient_eps && on_segment(c, d, b, tolerance) { return true; }
+    ((ab_c > orient_eps && ab_d < -orient_eps) || (ab_c < -orient_eps && ab_d > orient_eps))
+        && ((cd_a > orient_eps && cd_b < -orient_eps) || (cd_a < -orient_eps && cd_b > orient_eps))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -159,6 +209,9 @@ impl PlanarRegion3 {
         if !outer_area.is_finite() || outer_area.abs() <= eps * eps {
             return Err(BRepError::Degenerate);
         }
+        if !is_convex_loop(&self.outer, eps) {
+            return Err(BRepError::InvalidRegion);
+        }
         for i in 0..self.outer.len() {
             let a = self.outer[i];
             let b = self.outer[(i + 1) % self.outer.len()];
@@ -184,6 +237,9 @@ impl PlanarRegion3 {
             if !hole_area.is_finite() || hole_area.abs() <= eps * eps {
                 return Err(BRepError::Degenerate);
             }
+            if !is_convex_loop(hole, eps) {
+                return Err(BRepError::InvalidRegion);
+            }
             if !point_in_convex_loop(hole[0], &self.outer, eps) {
                 return Err(BRepError::InvalidRegion);
             }
@@ -199,6 +255,31 @@ impl PlanarRegion3 {
                 }
             }
         }
+
+        // Hole loops must be pairwise disjoint and non-nested.
+        for i in 0..self.holes.len() {
+            for j in (i + 1)..self.holes.len() {
+                if point_in_convex_loop(self.holes[i][0], &self.holes[j], eps)
+                    || point_in_convex_loop(self.holes[j][0], &self.holes[i], eps)
+                {
+                    return Err(BRepError::InvalidRegion);
+                }
+                for a in 0..self.holes[i].len() {
+                    for b in 0..self.holes[j].len() {
+                        if segment_intersects_2d(
+                            self.holes[i][a],
+                            self.holes[i][(a + 1) % self.holes[i].len()],
+                            self.holes[j][b],
+                            self.holes[j][(b + 1) % self.holes[j].len()],
+                            eps,
+                        ) {
+                            return Err(BRepError::InvalidRegion);
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -248,30 +329,21 @@ impl PlanarRegion3 {
         let u = d.dot(self.u_dir);
         let v = d.dot(self.v_dir);
         let uv = Vec2::new(u, v);
+        if loop_boundary_contains(uv, &self.outer, band) {
+            return Ok(RegionClass::OnBoundary);
+        }
         if !point_in_convex_loop(uv, &self.outer, band) {
             return Ok(RegionClass::Outside);
+        }
+        for hole in &self.holes {
+            if loop_boundary_contains(uv, hole, band) {
+                return Ok(RegionClass::OnBoundary);
+            }
         }
         for hole in &self.holes {
             if point_in_convex_loop(uv, hole, band) {
                 return Ok(RegionClass::InsideHole);
             }
-        }
-        let point_on_segment = |a: Vec2, b: Vec2| {
-            let edge = b.sub(a);
-            let rel = uv.sub(a);
-            let cross = edge.cross(rel);
-            cross.is_finite()
-                && cross.abs() <= band * (edge.length() + rel.length() + 1.0)
-                && uv.x >= a.x.min(b.x) - band
-                && uv.x <= a.x.max(b.x) + band
-                && uv.y >= a.y.min(b.y) - band
-                && uv.y <= a.y.max(b.y) + band
-        };
-        let on_outer = self.outer.iter().enumerate().any(|(i, a)| {
-            point_on_segment(*a, self.outer[(i + 1) % self.outer.len()])
-        });
-        if on_outer {
-            return Ok(RegionClass::OnBoundary);
         }
         Ok(RegionClass::Inside)
     }
@@ -415,7 +487,7 @@ fn inertia_from_second(second: [[f64; 3]; 3]) -> [[f64; 3]; 3] {
 }
 
 impl BRepSolid {
-    pub fn validate(&self, tolerance: Tolerance) -> Result<(), BRepError> {
+    fn validate_structure(&self, tolerance: Tolerance) -> Result<(), BRepError> {
         validate_tolerance(tolerance)?;
         if self.shells.len() != 1 {
             return Err(BRepError::UnsupportedBoolean);
@@ -466,9 +538,38 @@ impl BRepSolid {
             if incidence.len() != 2 {
                 return Err(BRepError::NonManifoldEdge);
             }
+            if incidence[0].face == incidence[1].face {
+                return Err(BRepError::NonManifoldEdge);
+            }
             if incidence[0].forward == incidence[1].forward {
                 return Err(BRepError::InconsistentOrientation);
             }
+        }
+
+        // A single shell must be face-connected through shared edges.
+        let mut adjacency: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+        for face_id in &shell.faces {
+            adjacency.entry(face_id.as_str()).or_default();
+        }
+        for incidence in edge_incidence.values() {
+            if incidence.len() == 2 {
+                adjacency.entry(incidence[0].face.as_str()).or_default()
+                    .insert(incidence[1].face.as_str());
+                adjacency.entry(incidence[1].face.as_str()).or_default()
+                    .insert(incidence[0].face.as_str());
+            }
+        }
+        let mut reachable = BTreeSet::new();
+        let mut stack = vec![shell.faces[0].as_str()];
+        while let Some(face_id) = stack.pop() {
+            if reachable.insert(face_id) {
+                if let Some(neighbors) = adjacency.get(face_id) {
+                    stack.extend(neighbors.iter().copied());
+                }
+            }
+        }
+        if reachable.len() != shell.faces.len() {
+            return Err(BRepError::NonManifoldEdge);
         }
 
         for wire in &self.wires {
@@ -523,17 +624,73 @@ impl BRepSolid {
                 .filter(|c| {
                     let edge = self.edges.iter().find(|e| e.id == c.edge);
                     let Some(edge) = edge else { return false; };
-                    let a = edge.start_vertex.as_str() == vertex.id;
-                    let b = edge.end_vertex.as_str() == vertex.id;
-                    a || b
+                    edge.start_vertex == vertex.id || edge.end_vertex == vertex.id
                 })
                 .map(|c| c.face.as_str())
                 .collect::<BTreeSet<_>>();
             if incident_faces.len() < 3 {
                 return Err(BRepError::NonManifoldVertex);
             }
+
+            // The link of a manifold vertex is one connected cycle. Each
+            // incident face contributes exactly two link edges at the vertex.
+            let mut link_degree: BTreeMap<&str, usize> =
+                incident_faces.iter().copied().map(|face| (face, 0usize)).collect();
+            let mut link_adjacency: BTreeMap<&str, BTreeSet<&str>> =
+                incident_faces.iter().copied().map(|face| (face, BTreeSet::new())).collect();
+
+            for edge in &self.edges {
+                if edge.start_vertex != vertex.id && edge.end_vertex != vertex.id {
+                    continue;
+                }
+                let incidence = edge_incidence.get(edge.id.as_str()).ok_or(BRepError::NonManifoldEdge)?;
+                if incidence.len() != 2 || incidence[0].face == incidence[1].face {
+                    return Err(BRepError::NonManifoldVertex);
+                }
+                let f0 = incidence[0].face.as_str();
+                let f1 = incidence[1].face.as_str();
+                if !incident_faces.contains(f0) || !incident_faces.contains(f1) {
+                    return Err(BRepError::NonManifoldVertex);
+                }
+                *link_degree.get_mut(f0).ok_or(BRepError::NonManifoldVertex)? += 1;
+                *link_degree.get_mut(f1).ok_or(BRepError::NonManifoldVertex)? += 1;
+                link_adjacency.get_mut(f0).ok_or(BRepError::NonManifoldVertex)?.insert(f1);
+                link_adjacency.get_mut(f1).ok_or(BRepError::NonManifoldVertex)?.insert(f0);
+            }
+
+            if link_degree.values().any(|degree| *degree != 2) {
+                return Err(BRepError::NonManifoldVertex);
+            }
+
+            let mut link_reachable = BTreeSet::new();
+            let mut link_stack = vec![*incident_faces.iter().next().ok_or(BRepError::NonManifoldVertex)?];
+            while let Some(face_id) = link_stack.pop() {
+                if link_reachable.insert(face_id) {
+                    if let Some(neighbors) = link_adjacency.get(face_id) {
+                        link_stack.extend(neighbors.iter().copied());
+                    }
+                }
+            }
+            if link_reachable.len() != incident_faces.len() {
+                return Err(BRepError::NonManifoldVertex);
+            }
         }
 
+
+        Ok(())
+    }
+
+    pub fn validate(&self, tolerance: Tolerance) -> Result<(), BRepError> {
+        self.validate_structure(tolerance)?;
+        // Exact solid moments below triangulate convex outer face loops. A
+        // planar face with an inner loop requires a certified polygon-with-hole
+        // decomposition that is not yet part of this authority. Reject it here
+        // rather than silently counting the hole as material.
+        if self.faces.iter().any(|face| {
+            !face.inner_wires.is_empty() || !face.region.holes.is_empty()
+        }) {
+            return Err(BRepError::UnsupportedBoolean);
+        }
         let volume = self.moments(tolerance)?.signed_volume;
         if volume <= 0.0 {
             return Err(BRepError::InvalidSolidOrientation);
@@ -542,60 +699,12 @@ impl BRepSolid {
     }
 
     pub fn surface_area(&self, tolerance: Tolerance) -> Result<f64, BRepError> {
-        self.validate_topology_only(tolerance)?;
+        self.validate_structure(tolerance)?;
         let mut area = 0.0;
         for face in &self.faces {
             area += face.region.area(tolerance)?;
         }
         if area.is_finite() && area > 0.0 { Ok(area) } else { Err(BRepError::Overflow) }
-    }
-
-    fn validate_topology_only(&self, tolerance: Tolerance) -> Result<(), BRepError> {
-        validate_tolerance(tolerance)?;
-        if self.shells.len() != 1 {
-            return Err(BRepError::UnsupportedBoolean);
-        }
-        let vertex_ids = unique_ids(self.vertices.iter().map(|v| v.id.as_str()))?;
-        let edge_ids = unique_ids(self.edges.iter().map(|e| e.id.as_str()))?;
-        let coedge_ids = unique_ids(self.coedges.iter().map(|e| e.id.as_str()))?;
-        let wire_ids = unique_ids(self.wires.iter().map(|e| e.id.as_str()))?;
-        let face_ids = unique_ids(self.faces.iter().map(|e| e.id.as_str()))?;
-        if vertex_ids.is_empty() || edge_ids.is_empty() || coedge_ids.is_empty()
-            || wire_ids.is_empty() || face_ids.is_empty() {
-            return Err(BRepError::Degenerate);
-        }
-        for edge in &self.edges {
-            if !vertex_ids.contains(&edge.start_vertex) || !vertex_ids.contains(&edge.end_vertex) {
-                return Err(BRepError::MissingReference);
-            }
-        }
-        for coedge in &self.coedges {
-            if !edge_ids.contains(&coedge.edge)
-                || !wire_ids.contains(&coedge.wire)
-                || !face_ids.contains(&coedge.face)
-            {
-                return Err(BRepError::MissingReference);
-            }
-        }
-        for wire in &self.wires {
-            if wire.coedges.is_empty() || wire.coedges.iter().any(|id| !coedge_ids.contains(id)) {
-                return Err(BRepError::MissingReference);
-            }
-        }
-        let shell = &self.shells[0];
-        if shell.id.is_empty() || shell.faces.is_empty() || shell.faces.iter().any(|id| !face_ids.contains(id)) {
-            return Err(BRepError::MissingReference);
-        }
-        for face in &self.faces {
-            if !wire_ids.contains(&face.outer_wire)
-                || face.inner_wires.iter().any(|id| !wire_ids.contains(id))
-                || !shell.faces.contains(&face.id)
-            {
-                return Err(BRepError::MissingReference);
-            }
-            face.region.validate(tolerance)?;
-        }
-        Ok(())
     }
 
     pub fn classify_point(&self, p: Vec3, direction: Vec3, tolerance: Tolerance)
@@ -622,54 +731,108 @@ impl BRepSolid {
     }
 
     pub fn moments(&self, tolerance: Tolerance) -> Result<SolidMoments, BRepError> {
-        self.validate_topology_only(tolerance)?;
+        self.validate_structure(tolerance)?;
+        if self.faces.iter().any(|face| {
+            !face.inner_wires.is_empty() || !face.region.holes.is_empty()
+        }) {
+            return Err(BRepError::UnsupportedBoolean);
+        }
+
+        // Evaluate the exact tetrahedral polynomial integrals in a local
+        // reference frame. This avoids catastrophic cancellation when the
+        // solid is translated far from the world origin.
+        let reference = self.vertices.first().ok_or(BRepError::Degenerate)?.point;
+        if !reference.is_finite() {
+            return Err(BRepError::NonFinite);
+        }
+
         let triangles = self.triangles(tolerance)?;
         let mut signed_volume = 0.0;
-        let mut first = Vec3::new(0.0, 0.0, 0.0);
-        let mut second = matrix_zero();
+        let mut first_local = Vec3::new(0.0, 0.0, 0.0);
+        let mut second_local = matrix_zero();
         let mut surface_area = 0.0;
 
         for triangle in triangles {
-            let tetra = triangle.a.dot(triangle.b.cross(triangle.c)) / 6.0;
-            if !tetra.is_finite() { return Err(BRepError::Overflow); }
+            let a = triangle.a.sub(reference);
+            let b = triangle.b.sub(reference);
+            let c = triangle.c.sub(reference);
+            let tetra = a.dot(b.cross(c)) / 6.0;
+            if !tetra.is_finite() {
+                return Err(BRepError::Overflow);
+            }
             signed_volume += tetra;
-            first = first.add(triangle.a.add(triangle.b).add(triangle.c).scale(tetra / 4.0));
-            second = add3(second, tetra_raw_second(triangle.a, triangle.b, triangle.c, tetra));
-            surface_area += 0.5 * triangle.b.sub(triangle.a).cross(triangle.c.sub(triangle.a)).length();
+            first_local = first_local.add(a.add(b).add(c).scale(tetra / 4.0));
+            second_local = add3(second_local, tetra_raw_second(a, b, c, tetra));
+
+            let area = 0.5 * b.sub(a).cross(c.sub(a)).length();
+            if !area.is_finite() {
+                return Err(BRepError::Overflow);
+            }
+            surface_area += area;
         }
 
-        if !signed_volume.is_finite() || signed_volume.abs() <= tolerance
-            .threshold(self.bbox_extent().max(1.0))
-            .map_err(|_| BRepError::InvalidTolerance)?
-        {
+        let extent = self.bbox_extent().max(1.0);
+        let volume_scale = extent * extent * extent;
+        let volume_tolerance = tolerance.threshold(volume_scale)
+            .map_err(|_| BRepError::InvalidTolerance)?;
+        if !signed_volume.is_finite() || signed_volume.abs() <= volume_tolerance {
             return Err(BRepError::ZeroVolume);
         }
-        let centroid = first.scale(1.0 / signed_volume);
-        let inertia_origin = inertia_from_second(second);
-        let shift = scale3(
-            sub_outer(centroid, centroid),
-            0.0,
-        );
-        let _ = shift;
-        let cc = outer_product(centroid, centroid);
+
+        let centroid_local = first_local.scale(1.0 / signed_volume);
+        let centroid = reference.add(centroid_local);
+        if !centroid.is_finite() {
+            return Err(BRepError::Overflow);
+        }
+
+        let inertia_local_origin = inertia_from_second(second_local);
+        let m = signed_volume;
+        let c = centroid_local;
         let inertia_centroid = [
             [
-                inertia_origin[0][0] - signed_volume * (centroid.y * centroid.y + centroid.z * centroid.z),
-                inertia_origin[0][1] + signed_volume * centroid.x * centroid.y,
-                inertia_origin[0][2] + signed_volume * centroid.x * centroid.z,
+                inertia_local_origin[0][0] - m * (c.y * c.y + c.z * c.z),
+                inertia_local_origin[0][1] + m * c.x * c.y,
+                inertia_local_origin[0][2] + m * c.x * c.z,
             ],
             [
-                inertia_origin[1][0] + signed_volume * centroid.y * centroid.x,
-                inertia_origin[1][1] - signed_volume * (centroid.x * centroid.x + centroid.z * centroid.z),
-                inertia_origin[1][2] + signed_volume * centroid.y * centroid.z,
+                inertia_local_origin[1][0] + m * c.y * c.x,
+                inertia_local_origin[1][1] - m * (c.x * c.x + c.z * c.z),
+                inertia_local_origin[1][2] + m * c.y * c.z,
             ],
             [
-                inertia_origin[2][0] + signed_volume * centroid.z * centroid.x,
-                inertia_origin[2][1] + signed_volume * centroid.z * centroid.y,
-                inertia_origin[2][2] - signed_volume * (centroid.x * centroid.x + centroid.y * centroid.y),
+                inertia_local_origin[2][0] + m * c.z * c.x,
+                inertia_local_origin[2][1] + m * c.z * c.y,
+                inertia_local_origin[2][2] - m * (c.x * c.x + c.y * c.y),
             ],
         ];
-        let _ = cc;
+
+        // Move the centroidal tensor from the local reference frame to the
+        // world-origin frame with the parallel-axis theorem.
+        let inertia_origin = [
+            [
+                inertia_centroid[0][0] + m * (centroid.y * centroid.y + centroid.z * centroid.z),
+                inertia_centroid[0][1] - m * centroid.x * centroid.y,
+                inertia_centroid[0][2] - m * centroid.x * centroid.z,
+            ],
+            [
+                inertia_centroid[1][0] - m * centroid.y * centroid.x,
+                inertia_centroid[1][1] + m * (centroid.x * centroid.x + centroid.z * centroid.z),
+                inertia_centroid[1][2] - m * centroid.y * centroid.z,
+            ],
+            [
+                inertia_centroid[2][0] - m * centroid.z * centroid.x,
+                inertia_centroid[2][1] - m * centroid.z * centroid.y,
+                inertia_centroid[2][2] + m * (centroid.x * centroid.x + centroid.y * centroid.y),
+            ],
+        ];
+
+        if inertia_centroid.iter().flatten().any(|v| !v.is_finite())
+            || inertia_origin.iter().flatten().any(|v| !v.is_finite())
+            || !surface_area.is_finite()
+        {
+            return Err(BRepError::Overflow);
+        }
+
         Ok(SolidMoments {
             signed_volume,
             volume: signed_volume.abs(),
@@ -734,7 +897,9 @@ fn validate_face_region_edge_correspondence(
         let coedges = wire.coedges.iter()
             .map(|id| solid.coedges.iter().find(|c| c.id == *id).ok_or(BRepError::MissingReference))
             .collect::<Result<Vec<_>, _>>()?;
-        let _ = coedges;
+        if coedges.iter().any(|coedge| coedge.face != face.id) {
+            return Err(BRepError::InconsistentOrientation);
+        }
         // The topological loop is authoritative; the planar region supplies
         // the corresponding surface mathematics. Explicit correspondence is
         // required at construction time through matching endpoint positions.
@@ -817,9 +982,10 @@ impl AxisAlignedBox {
         if !self.min.is_finite() || !self.max.is_finite() {
             return Err(BRepError::NonFinite);
         }
-        let eps = tolerance.threshold(
-            self.max.sub(self.min).length().max(1.0)
-        ).map_err(|_| BRepError::InvalidTolerance)?;
+        let d = self.max.sub(self.min);
+        let scale = d.x.abs().max(d.y.abs()).max(d.z.abs()).max(f64::MIN_POSITIVE);
+        let eps = tolerance.threshold(scale)
+            .map_err(|_| BRepError::InvalidTolerance)?;
         if self.max.x - self.min.x <= eps
             || self.max.y - self.min.y <= eps
             || self.max.z - self.min.z <= eps {
@@ -862,7 +1028,9 @@ impl AxisAlignedBox {
     pub fn classify_point(&self, p: Vec3, tolerance: Tolerance) -> Result<SolidPointClass, BRepError> {
         self.validate(tolerance)?;
         if !p.is_finite() { return Err(BRepError::NonFinite); }
-        let eps = tolerance.threshold(self.max.sub(self.min).length().max(1.0))
+        let d = self.max.sub(self.min);
+        let scale = d.x.abs().max(d.y.abs()).max(d.z.abs()).max(f64::MIN_POSITIVE);
+        let eps = tolerance.threshold(scale)
             .map_err(|_| BRepError::InvalidTolerance)?;
         let inside = p.x > self.min.x + eps && p.x < self.max.x - eps
             && p.y > self.min.y + eps && p.y < self.max.y - eps
@@ -891,7 +1059,9 @@ pub fn box_intersection(
     let min = Vec3::new(a.min.x.max(b.min.x), a.min.y.max(b.min.y), a.min.z.max(b.min.z));
     let max = Vec3::new(a.max.x.min(b.max.x), a.max.y.min(b.max.y), a.max.z.min(b.max.z));
     let result = AxisAlignedBox { min, max };
-    if overlaps(&a, &b, tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)? ) {
+    let scale = a.max.sub(a.min).length().max(b.max.sub(b.min).length()).max(f64::MIN_POSITIVE);
+    let eps = tolerance.threshold(scale).map_err(|_| BRepError::InvalidTolerance)?;
+    if overlaps(&a, &b, eps) {
         result.validate(tolerance)?;
         Ok(Some(result))
     } else {
@@ -930,9 +1100,11 @@ fn box_grid(
 ) -> Result<Vec<AxisAlignedBox>, BRepError> {
     a.validate(tolerance)?;
     b.validate(tolerance)?;
-    let xs = sorted_unique([a.min.x, a.max.x, b.min.x, b.max.x], tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)?);
-    let ys = sorted_unique([a.min.y, a.max.y, b.min.y, b.max.y], tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)?);
-    let zs = sorted_unique([a.min.z, a.max.z, b.min.z, b.max.z], tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)?);
+    let scale = a.max.sub(a.min).length().max(b.max.sub(b.min).length()).max(f64::MIN_POSITIVE);
+    let eps = tolerance.threshold(scale).map_err(|_| BRepError::InvalidTolerance)?;
+    let xs = sorted_unique([a.min.x, a.max.x, b.min.x, b.max.x], eps);
+    let ys = sorted_unique([a.min.y, a.max.y, b.min.y, b.max.y], eps);
+    let zs = sorted_unique([a.min.z, a.max.z, b.min.z, b.max.z], eps);
     let mut parts = Vec::new();
     for xw in xs.windows(2) {
         for yw in ys.windows(2) {
@@ -973,7 +1145,6 @@ pub fn box_union(
     b: AxisAlignedBox,
     tolerance: Tolerance,
 ) -> Result<Vec<AxisAlignedBox>, BRepError> {
-    let _ = overlaps(&a, &b, tolerance.threshold(1.0).map_err(|_| BRepError::InvalidTolerance)?);
     box_grid(a, b, tolerance, |p| contains_closed(&a,p) || contains_closed(&b,p))
 }
 
@@ -993,7 +1164,9 @@ pub fn box_split_by_plane(
 ) -> Result<Vec<AxisAlignedBox>, BRepError> {
     b.validate(tolerance)?;
     if !coordinate.is_finite() { return Err(BRepError::NonFinite); }
-    let eps = tolerance.threshold(b.max.sub(b.min).length().max(1.0))
+    let d = b.max.sub(b.min);
+    let scale = d.x.abs().max(d.y.abs()).max(d.z.abs()).max(f64::MIN_POSITIVE);
+    let eps = tolerance.threshold(scale)
         .map_err(|_| BRepError::InvalidTolerance)?;
     if coordinate <= axis_value(b.min,axis)+eps || coordinate >= axis_value(b.max,axis)-eps {
         return Ok(vec![b]);
@@ -1011,7 +1184,8 @@ pub fn box_imprint_planes(
 ) -> Result<(Vec<f64>,Vec<f64>,Vec<f64>), BRepError> {
     a.validate(tolerance)?;
     b.validate(tolerance)?;
-    let eps=tolerance.threshold(a.max.sub(a.min).length().max(b.max.sub(b.min).length()).max(1.0))
+    let scale = a.max.sub(a.min).length().max(b.max.sub(b.min).length()).max(f64::MIN_POSITIVE);
+    let eps=tolerance.threshold(scale)
         .map_err(|_| BRepError::InvalidTolerance)?;
     Ok((
         sorted_unique([a.min.x,a.max.x,b.min.x,b.max.x],eps),
@@ -1110,6 +1284,26 @@ mod tests {
     }
 
     #[test]
+    fn aabb_tolerance_is_scale_consistent() {
+        let t = Tolerance::new(1.0e-12, 1.0e-9).unwrap();
+        let small = AxisAlignedBox {
+            min: Vec3::new(0.0, 0.0, 0.0),
+            max: Vec3::new(1.0e-3, 2.0e-3, 3.0e-3),
+        };
+        assert!(small.validate(t).is_ok());
+        assert_eq!(small.volume(t), Ok(6.0e-9));
+
+        let shifted = AxisAlignedBox {
+            min: Vec3::new(1.0e12, -1.0e12, 5.0e11),
+            max: Vec3::new(1.0e12 + 1.0, -1.0e12 + 2.0, 5.0e11 + 3.0),
+        };
+        assert!(shifted.validate(t).is_ok());
+        assert_eq!(shifted.classify_point(
+            Vec3::new(1.0e12 + 0.5, -1.0e12 + 1.0, 5.0e11 + 1.5), t
+        ).unwrap(), SolidPointClass::Inside);
+    }
+
+    #[test]
     fn explicit_brep_incidence_is_closed_and_manifold() {
         let solid = tetra_brep();
         assert!(solid.validate(tol()).is_ok());
@@ -1132,6 +1326,113 @@ mod tests {
         assert!((c.x-12.0).abs()<=1.0e-12 && (c.y-21.5).abs()<=1.0e-12 && (c.z-30.0).abs()<=1.0e-12);
         assert_eq!(region.classify_point(Vec3::new(12.0,21.0,30.0),tol()).unwrap(),RegionClass::Inside);
         assert_eq!(region.classify_point(Vec3::new(12.0,25.0,30.0),tol()).unwrap(),RegionClass::Outside);
+    }
+
+    #[test]
+    fn planar_region_area_and_centroid_are_translation_invariant() {
+        let local = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0), Vec2::new(10.0,0.0),
+                Vec2::new(10.0,20.0), Vec2::new(0.0,20.0),
+            ],
+            holes: vec![],
+        };
+        let shifted = PlanarRegion3 {
+            origin: Vec3::new(1.0e12,1.0e12,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0), Vec2::new(10.0,0.0),
+                Vec2::new(10.0,20.0), Vec2::new(0.0,20.0),
+            ],
+            holes: vec![],
+        };
+        assert!((local.area(tol()).unwrap() - shifted.area(tol()).unwrap()).abs() <= 1.0e-8);
+        assert!((local.centroid(tol()).unwrap().x - 5.0).abs() <= 1.0e-9);
+        assert!((shifted.centroid(tol()).unwrap().x - (1.0e12 + 5.0)).abs() <= 1.0e-3);
+        assert!((shifted.centroid(tol()).unwrap().y - (1.0e12 + 10.0)).abs() <= 1.0e-3);
+    }
+
+    #[test]
+    fn planar_region_rejects_nested_holes() {
+        let region = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0),Vec2::new(10.0,0.0),
+                Vec2::new(10.0,10.0),Vec2::new(0.0,10.0),
+            ],
+            holes: vec![
+                vec![Vec2::new(2.0,2.0),Vec2::new(8.0,2.0),Vec2::new(8.0,8.0),Vec2::new(2.0,8.0)],
+                vec![Vec2::new(4.0,4.0),Vec2::new(6.0,4.0),Vec2::new(6.0,6.0),Vec2::new(4.0,6.0)],
+            ],
+        };
+        assert_eq!(region.validate(tol()), Err(BRepError::InvalidRegion));
+    }
+
+    #[test]
+    fn planar_region_predicates_are_scale_consistent() {
+        let small = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0), Vec2::new(1.0e-6,0.0),
+                Vec2::new(1.0e-6,1.0e-6), Vec2::new(0.0,1.0e-6),
+            ],
+            holes: vec![],
+        };
+        assert!(small.validate(tol()).is_ok());
+
+        let large = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0), Vec2::new(1.0e6,0.0),
+                Vec2::new(1.0e6,1.0e6), Vec2::new(0.0,1.0e6),
+            ],
+            holes: vec![],
+        };
+        assert!(large.validate(tol()).is_ok());
+    }
+
+    #[test]
+    fn planar_region_rejects_nonconvex_certification_and_marks_hole_boundary() {
+        let nonconvex = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0), Vec2::new(4.0,0.0),
+                Vec2::new(2.0,1.0), Vec2::new(4.0,4.0),
+                Vec2::new(0.0,4.0),
+            ],
+            holes: vec![],
+        };
+        assert_eq!(nonconvex.validate(tol()), Err(BRepError::InvalidRegion));
+
+        let region = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0),Vec2::new(10.0,0.0),
+                Vec2::new(10.0,10.0),Vec2::new(0.0,10.0),
+            ],
+            holes: vec![vec![
+                Vec2::new(3.0,3.0),Vec2::new(7.0,3.0),
+                Vec2::new(7.0,7.0),Vec2::new(3.0,7.0),
+            ]],
+        };
+        assert_eq!(
+            region.classify_point(Vec3::new(3.0,5.0,0.0), tol()).unwrap(),
+            RegionClass::OnBoundary
+        );
     }
 
     #[test]
@@ -1165,6 +1466,26 @@ mod tests {
     }
 
     #[test]
+    fn solid_rejects_wire_coedge_attached_to_different_face() {
+        let mut solid = tetra_brep();
+        solid.coedges.iter_mut()
+            .find(|c| c.id == "c0_0")
+            .expect("tetrahedron test coedge exists")
+            .face = "f2".into();
+        assert_eq!(solid.validate(tol()), Err(BRepError::InconsistentOrientation));
+    }
+
+    #[test]
+    fn solid_rejects_edge_with_same_face_on_both_sides() {
+        let mut solid = tetra_brep();
+        solid.coedges.iter_mut()
+            .find(|c| c.id == "c1_2")
+            .expect("tetrahedron test coedge exists")
+            .face = "f0".into();
+        assert_eq!(solid.validate(tol()), Err(BRepError::NonManifoldEdge));
+    }
+
+    #[test]
     fn solid_rejects_reversed_global_orientation() {
         let mut solid = tetra_brep();
         for face in &mut solid.faces { face.orientation = !face.orientation; }
@@ -1190,6 +1511,35 @@ mod tests {
         let pieces = box_union(a, touching, tol()).unwrap();
         let total: f64 = pieces.iter().map(|p| p.volume(tol()).unwrap()).sum();
         assert!((total - 12000.0).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn solid_moment_domain_rejects_holed_faces_until_exact_decomposition_exists() {
+        let mut solid = tetra_brep();
+        solid.faces[0].region.holes.push(vec![
+            Vec2::new(0.2,0.1), Vec2::new(0.3,0.1), Vec2::new(0.3,0.2), Vec2::new(0.2,0.2),
+        ]);
+        assert_eq!(solid.validate(tol()), Err(BRepError::UnsupportedBoolean));
+        assert_eq!(solid.moments(tol()), Err(BRepError::UnsupportedBoolean));
+    }
+
+    #[test]
+    fn translated_tetra_moments_are_stable() {
+        let mut solid = tetra_brep();
+        let shift = Vec3::new(1.0e12, -1.0e12, 5.0e11);
+        for vertex in &mut solid.vertices {
+            vertex.point = vertex.point.add(shift);
+        }
+        for face in &mut solid.faces {
+            face.region.origin = face.region.origin.add(shift);
+        }
+
+        let moments = solid.moments(tol()).unwrap();
+        assert!((moments.volume - 1.0 / 6.0).abs() <= 1.0e-10);
+        assert!((moments.centroid.x - (1.0e12 + 0.25)).abs() <= 1.0e-3);
+        assert!((moments.centroid.y - (-1.0e12 + 0.25)).abs() <= 1.0e-3);
+        assert!((moments.centroid.z - (5.0e11 + 0.25)).abs() <= 1.0e-3);
+        assert!(moments.inertia_centroid.iter().flatten().all(|v| v.is_finite()));
     }
 
     #[test]

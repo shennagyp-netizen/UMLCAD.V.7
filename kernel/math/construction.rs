@@ -44,7 +44,63 @@ fn valid_tolerance(t: Tolerance) -> Result<(), ConstructionError> {
 }
 
 fn scale2(points: &[Vec2]) -> f64 {
-    points.iter().map(|p| p.x.abs().max(p.y.abs())).fold(1.0, f64::max)
+    if points.is_empty() {
+        return 1.0;
+    }
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    let mut max_edge: f64 = 0.0;
+    for p in points {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
+    for i in 0..points.len() {
+        max_edge = max_edge.max(points[i].sub(points[(i + 1) % points.len()]).length());
+    }
+    (max_x - min_x).hypot(max_y - min_y).max(max_edge).max(1.0)
+}
+
+fn loft_family_convex(
+    lower: &PlanarPolygon,
+    upper: &PlanarPolygon,
+    tolerance: Tolerance,
+) -> Result<(), ConstructionError> {
+    let scale = scale2(&lower.vertices).max(scale2(&upper.vertices));
+    let eps = tolerance.threshold(scale)
+        .map_err(|_| ConstructionError::InvalidTolerance)?;
+    let eps2 = eps * eps;
+    if !eps2.is_finite() {
+        return Err(ConstructionError::Overflow);
+    }
+    let winding = lower.signed_area().signum();
+    if winding == 0.0 || upper.signed_area().signum() != winding {
+        return Err(ConstructionError::InvalidDimensions);
+    }
+    for i in 0..lower.vertices.len() {
+        let a0 = lower.vertices[i];
+        let b0 = lower.vertices[(i + 1) % lower.vertices.len()];
+        let c0 = lower.vertices[(i + 2) % lower.vertices.len()];
+        let a1 = upper.vertices[i];
+        let b1 = upper.vertices[(i + 1) % upper.vertices.len()];
+        let c1 = upper.vertices[(i + 2) % upper.vertices.len()];
+        let e00 = b0.sub(a0);
+        let e10 = c0.sub(b0);
+        let e01 = b1.sub(a1);
+        let e11 = c1.sub(b1);
+        let bernstein = [
+            e00.cross(e10),
+            e01.cross(e10) + e00.cross(e11),
+            e01.cross(e11),
+        ];
+        if bernstein.iter().any(|v| !v.is_finite() || *v * winding <= eps2) {
+            return Err(ConstructionError::Unsupported);
+        }
+    }
+    Ok(())
 }
 
 fn orient(a: Vec2, b: Vec2, c: Vec2) -> f64 {
@@ -59,17 +115,32 @@ fn on_segment(a: Vec2, b: Vec2, p: Vec2, eps: f64) -> bool {
 }
 
 fn segment_intersects(a: Vec2, b: Vec2, c: Vec2, d: Vec2, eps: f64) -> bool {
-    let ab_c = orient(a, b, c);
-    let ab_d = orient(a, b, d);
-    let cd_a = orient(c, d, a);
-    let cd_b = orient(c, d, b);
-    if [ab_c, ab_d, cd_a, cd_b].iter().any(|v| !v.is_finite()) { return false; }
-    if ab_c.abs() <= eps && on_segment(a, b, c, eps) { return true; }
-    if ab_d.abs() <= eps && on_segment(a, b, d, eps) { return true; }
-    if cd_a.abs() <= eps && on_segment(c, d, a, eps) { return true; }
-    if cd_b.abs() <= eps && on_segment(c, d, b, eps) { return true; }
-    ((ab_c > eps && ab_d < -eps) || (ab_c < -eps && ab_d > eps))
-        && ((cd_a > eps && cd_b < -eps) || (cd_a < -eps && cd_b > eps))
+    let ab = b.sub(a);
+    let cd = d.sub(c);
+    let ab_c = ab.cross(c.sub(a));
+    let ab_d = ab.cross(d.sub(a));
+    let cd_a = cd.cross(a.sub(c));
+    let cd_b = cd.cross(b.sub(c));
+    if [ab_c, ab_d, cd_a, cd_b].iter().any(|v| !v.is_finite()) {
+        return false;
+    }
+    // Orientations have units of length². Scale the positional tolerance by
+    // the geometry involved rather than comparing an area directly to a length.
+    let geometric_scale = ab.length()
+        .max(cd.length())
+        .max(a.sub(c).length())
+        .max(a.sub(d).length())
+        .max(eps);
+    let orient_eps = eps * geometric_scale;
+    if !orient_eps.is_finite() {
+        return false;
+    }
+    if ab_c.abs() <= orient_eps && on_segment(a, b, c, eps) { return true; }
+    if ab_d.abs() <= orient_eps && on_segment(a, b, d, eps) { return true; }
+    if cd_a.abs() <= orient_eps && on_segment(c, d, a, eps) { return true; }
+    if cd_b.abs() <= orient_eps && on_segment(c, d, b, eps) { return true; }
+    ((ab_c > orient_eps && ab_d < -orient_eps) || (ab_c < -orient_eps && ab_d > orient_eps))
+        && ((cd_a > orient_eps && cd_b < -orient_eps) || (cd_a < -orient_eps && cd_b > orient_eps))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -108,10 +179,16 @@ impl PlanarPolygon {
     }
 
     fn signed_area(&self) -> f64 {
+        if self.vertices.is_empty() {
+            return 0.0;
+        }
+        // Compute the shoelace sum in a local frame to prevent cancellation
+        // when the polygon is translated far from the coordinate origin.
+        let reference = self.vertices[0];
         0.5 * self.vertices.iter().enumerate()
             .map(|(i, p)| {
                 let q = self.vertices[(i + 1) % self.vertices.len()];
-                p.x * q.y - p.y * q.x
+                p.sub(reference).cross(q.sub(reference))
             })
             .sum::<f64>()
     }
@@ -124,16 +201,18 @@ impl PlanarPolygon {
     pub fn centroid(&self, tolerance: Tolerance) -> Result<Vec2, ConstructionError> {
         self.validate(tolerance)?;
         let area = self.signed_area();
+        let reference = self.vertices[0];
         let mut cx = 0.0;
         let mut cy = 0.0;
         for i in 0..self.vertices.len() {
-            let a = self.vertices[i];
-            let b = self.vertices[(i + 1) % self.vertices.len()];
-            let cross = a.x * b.y - b.x * a.y;
+            let a = self.vertices[i].sub(reference);
+            let b = self.vertices[(i + 1) % self.vertices.len()].sub(reference);
+            let cross = a.cross(b);
             cx += (a.x + b.x) * cross;
             cy += (a.y + b.y) * cross;
         }
-        let result = Vec2::new(cx / (6.0 * area), cy / (6.0 * area));
+        let local = Vec2::new(cx / (6.0 * area), cy / (6.0 * area));
+        let result = reference.add(local);
         if result.is_finite() { Ok(result) } else { Err(ConstructionError::Overflow) }
     }
 
@@ -148,7 +227,14 @@ impl PlanarPolygon {
                 self.vertices[(i + 1) % self.vertices.len()],
                 self.vertices[(i + 2) % self.vertices.len()],
             );
-            if value.abs() <= eps { return Ok(false); }
+            let edge_scale = self.vertices[(i + 1) % self.vertices.len()]
+                .sub(self.vertices[i])
+                .length()
+                .max(self.vertices[(i + 2) % self.vertices.len()]
+                    .sub(self.vertices[(i + 1) % self.vertices.len()])
+                    .length())
+                .max(eps);
+            if value.abs() <= eps * edge_scale { return Ok(false); }
             if sign == 0.0 { sign = value.signum(); }
             else if value.signum() != sign { return Ok(false); }
         }
@@ -167,7 +253,11 @@ fn line_intersection(
     if !denominator.is_finite() {
         return Err(ConstructionError::Overflow);
     }
-    if denominator.abs() <= eps {
+    let determinant_eps = eps * r.length().max(s.length()).max(eps);
+    if !determinant_eps.is_finite() {
+        return Err(ConstructionError::Overflow);
+    }
+    if denominator.abs() <= determinant_eps {
         return Err(ConstructionError::Degenerate);
     }
     let t = q.sub(p).cross(s) / denominator;
@@ -555,6 +645,7 @@ impl PolygonLoft {
         if self.lower.signed_area().signum() != self.upper.signed_area().signum() {
             return Err(ConstructionError::InvalidDimensions);
         }
+        loft_family_convex(&self.lower, &self.upper, tolerance)?;
         Ok(())
     }
 
@@ -848,6 +939,58 @@ mod tests {
     }
 
     #[test]
+    fn planar_polygon_area_and_centroid_are_translation_invariant() {
+        let local = rect(20.0, 10.0);
+        let shifted = PlanarPolygon::new(vec![
+            Vec2::new(1.0e12, 1.0e12),
+            Vec2::new(1.0e12 + 20.0, 1.0e12),
+            Vec2::new(1.0e12 + 20.0, 1.0e12 + 10.0),
+            Vec2::new(1.0e12, 1.0e12 + 10.0),
+        ]);
+        assert!((local.area(tol()).unwrap() - 200.0).abs() <= 1.0e-9);
+        assert!((shifted.area(tol()).unwrap() - 200.0).abs() <= 1.0e-6);
+        let centroid = shifted.centroid(tol()).unwrap();
+        assert!((centroid.x - (1.0e12 + 10.0)).abs() <= 1.0e-3);
+        assert!((centroid.y - (1.0e12 + 5.0)).abs() <= 1.0e-3);
+    }
+
+    #[test]
+    fn determinant_and_orientation_tolerances_are_scale_consistent() {
+        let small = PlanarPolygon::new(vec![
+            Vec2::new(0.0, 0.0),
+            Vec2::new(1.0e-6, 0.0),
+            Vec2::new(1.0e-6, 1.0e-6),
+            Vec2::new(0.0, 1.0e-6),
+        ]);
+        let large = PlanarPolygon::new(vec![
+            Vec2::new(0.0, 0.0),
+            Vec2::new(1.0e6, 0.0),
+            Vec2::new(1.0e6, 1.0e6),
+            Vec2::new(0.0, 1.0e6),
+        ]);
+        assert!(small.validate(tol()).is_ok());
+        assert!(large.validate(tol()).is_ok());
+        assert!(offset_convex_polygon(&small, 1.0e-7, tol()).is_ok());
+        assert!(offset_convex_polygon(&large, 1.0e5, tol()).is_ok());
+    }
+
+    #[test]
+    fn geometric_scale_is_translation_invariant_for_construction_tolerance() {
+        let local = rect(20.0, 10.0);
+        let shifted = PlanarPolygon::new(vec![
+            Vec2::new(1.0e12, 1.0e12),
+            Vec2::new(1.0e12 + 20.0, 1.0e12),
+            Vec2::new(1.0e12 + 20.0, 1.0e12 + 10.0),
+            Vec2::new(1.0e12, 1.0e12 + 10.0),
+        ]);
+        let local_offset = offset_convex_polygon(&local, 2.0, tol()).unwrap();
+        let shifted_offset = offset_convex_polygon(&shifted, 2.0, tol()).unwrap();
+        assert!((local_offset.vertices[1].x - local_offset.vertices[0].x - 24.0).abs() <= 1.0e-9);
+        assert!((shifted_offset.vertices[1].x - shifted_offset.vertices[0].x - 24.0).abs() <= 1.0e-6);
+        assert!((shifted_offset.vertices[0].x - local_offset.vertices[0].x - 1.0e12).abs() <= 1.0e-3);
+    }
+
+    #[test]
     fn convex_polygon_offset_preserves_winding_and_has_expected_rectangle_bounds() {
         let p = rect(20.0, 10.0);
         let outward = offset_convex_polygon(&p, 2.0, tol()).unwrap();
@@ -981,7 +1124,6 @@ mod tests {
             Err(ConstructionError::InvalidDimensions)
         );
     }
-
     #[test]
     fn extrusion_volume_is_exact() {
         let x = LinearExtrusion { profile: rect(20.0, 10.0), height: 30.0 };

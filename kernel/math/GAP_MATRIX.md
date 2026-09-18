@@ -21,14 +21,14 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | Curve differentials | `curve_differential.rs`, existing Bezier/B-spline/NURBS | First/second derivative tests | Complete Curve2/Curve3 framework, curvature/torsion/Frenet | Linalg / NURBS | High | P0 | Partial |
 | NURBS exact operations | `nurbs_ops.rs` + existing NURBS | Knot insertion/reversal/continuity tests | Knot removal, degree elevation, splitting, rational curve generalization | Polynomial / homogeneous math | High | P0 | Partial |
 | Surface differentials | `surface_differential.rs`, existing NURBS surface differential | Second-order/curvature planar tests | Independent oracle coverage, singular-point classification, more general surfaces | Curve/NURBS | High | P0 | Partial |
-| Trim mathematics | Existing historical implementation plus current math foundation | Existing project tests | Unified parameter-space trims, nesting/self-intersection/touch classification, 3D correspondence | Curves / predicates | Medium | P0 | Missing as unified V7 layer |
+| Trim mathematics | Analytic parameter-space line/arc trims with nesting, boundary, orientation, and self-intersection predicates | Focused trim regressions, including line/arc and arc/arc intersections plus translation stability | General freeform 3D trim correspondence and broader touch/overlap classifications remain future contracts | Curves / predicates | Medium | P0 | Implemented / Tested (certified line/arc domain) |
 | General distance/projection | `distance.rs`, existing spatial | Focused primitive tests | General curve/surface closest-point engine with verification | Curves / surfaces | High | P0 | Partial |
 | General intersections | Existing bounded V6 families + `intersections.rs` | Existing V7 tests | General curve-curve, curve-surface, surface-surface candidate isolation/refinement/verification | Polynomial / interval / surfaces | Medium | P0 | Partial |
 | Offset / sweep / loft / blend | `construction.rs` plus existing `offsets.rs`/`sweeps.rs` | Independent construction authority tests | Future extensions require new explicit certified domains | Surface differential / intersection | Medium | P0 | Implemented / Tested (certified domains) |
 | Fillet / chamfer | `construction.rs` bounded analytic box families + existing backend contracts | Independent closed-form tests + backend contracts | General arbitrary-edge fillet/chamfer remains a future extension | Intersections / curvature | Medium | P1 | Implemented / Tested (bounded families) |
-| B-Rep supporting math | Existing topology plus bounded V6 mathematics | Existing topology tests | Unified edge/face/wire/shell incidence and geometric consistency validators | Predicates / intersections | Medium | P0 | Partial |
-| Solid mathematics | Existing bounded volume/engineering evidence | Existing tests | General point-in-solid, centroid/inertia, orientation/closure mathematics | B-Rep | Low/Medium | P0 | Partial |
-| Boolean support | Existing bounded/native pathways | Existing tests | General topology-aware region construction from intersections | B-Rep + intersections | Low/Medium | P0 | Partial |
+| B-Rep supporting math | Explicit edge/coedge/wire/face/shell incidence, ownership, orientation, closure, shell connectivity, and vertex-link validation | B-Rep structural regressions and scale/boundary tests | General curved-face sewing and unrestricted topology construction remain future contracts | Predicates / intersections | Medium | P0 | Implemented / Tested (certified explicit-topology planar domain) |
+| Solid mathematics | Explicit closed/oriented planar-face solid mathematics with point classification, volume, centroid, surface area, and inertia | B-Rep/solid regression tests | General curved-face and holed-face exact decomposition remains outside the certified solid domain and is rejected fail-closed | B-Rep | Low/Medium | P0 | Implemented / Tested (certified domain) |
+| Boolean support | Exact bounded AABB intersection/union/difference plus split/imprint partition mathematics | Existing AABB Boolean/split/imprint regressions | General topology-aware B-Rep Boolean construction from surface intersections remains outside the certified domain | B-Rep + intersections | Low/Medium | P0 | Implemented / Tested (bounded AABB domain) |
 | Constraint equations | `constraints.rs`, `relations.rs` | Exhaustive constraint + relation authority tests | Supported semantic constraint/relation enums are complete; new families require new contracts | Differential geometry | Medium | P0 | Implemented / Tested |
 | Analytic Jacobians | `jacobian.rs`, `relation_jacobian.rs` | Exhaustive independent finite-difference verification for every supported family | Finite differences remain verification-only; future new equations require analytic rows | Constraints + derivatives | High | P0 | Implemented / Tested |
 | Nonlinear solver | Damped SVD/least-squares solve with adaptive damping, accepted-history convergence, terminal/status authority | Extensive solver, scale, mixed-unit, rank/conditioning, convergence and red-team tests | No separate named Newton/TR backend is required while the current damped least-squares acceptance model remains the supported equivalent | Linalg + Jacobians | Medium | P0 | Implemented / Tested |
@@ -54,6 +54,9 @@ As of main commit `8fea60633c4f95f0175d18faa54878e7af9f44a6`, the current suppor
 M10 status is therefore `Implemented / Tested`. This does not imply completion of M8, M9, or M0-M16 as a whole.
 
 ## M8 closure record
+
+The construction authority is certified only for the declared bounded analytic families. The current hardening also certifies that polygon-loft affine interpolation remains strictly convex through its full parameter family rather than assuming endpoint convexity alone.
+
 
 As of main commit `fdb34d5a1e03ed399f900848b6dbe96da71d1a13`, M8 is closed for the currently supported certified construction domains:
 - convex planar offsets with deterministic miter joins;
@@ -91,3 +94,23 @@ core scalar/tolerance
 ```
 
 The CPU implementation remains normative. GPU implementations are accelerators and cannot redefine semantics.
+
+## M9 closure record
+
+As of branch head `5d8b77f1c00ae31a9b22abb1187c1710f267923e`, the M9 mathematical authority is closed for its declared certified domains:
+- explicit B-Rep vertex/edge/coedge/wire/face/shell incidence and reference validation;
+- opposite coedge orientation and face ownership checks;
+- closed-wire endpoint continuity;
+- shell face-connectivity validation;
+- connected two-manifold vertex-link validation;
+- planar-region outer-loop and convex-hole validation, nesting/disjointness checks, and explicit boundary classification;
+- analytic line/arc trim self-intersection predicates in the certified parameter-space domain;
+- exact closed, single-shell, planar-face solid volume, centroid, surface area, and inertia mathematics;
+- fail-closed rejection of holed solid moments/point classification until a certified polygon-with-hole decomposition exists;
+- exact bounded AABB intersection/union/difference, split, and imprint partition mathematics;
+- translation/scale stability regressions for planar regions, trims, solid moments, and bounded AABB operations.
+- bounded AABB tolerance scales use actual geometric extent, including sub-unit and large-translation regression coverage.
+
+The CPU mathematical layer remains authoritative. OCCT and future GPU backends are not used to define M9 semantics. General curved-face B-Rep sewing, unrestricted topology-aware Boolean construction, and arbitrary curved/holed exact solid decomposition remain outside the certified M9 domain.
+
+M9 status is therefore `Implemented / Tested` for the declared certified domains. Exact-head Rust and comprehensive E2E/red-team gates are green on `9d04c05f...`. Post-merge main verification is still required before this closure becomes final.

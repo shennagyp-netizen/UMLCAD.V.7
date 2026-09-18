@@ -1,6 +1,11 @@
 name: M16 performance evidence
 
 on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+  pull_request:
   workflow_dispatch:
 
 jobs:

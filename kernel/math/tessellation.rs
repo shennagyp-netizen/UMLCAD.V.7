@@ -1083,18 +1083,28 @@ where
         return Err(TessellationError::MaxDepth);
     }
 
-    // Uniform four-way subdivision halves each edge span, reaching angular
-    // targets much more efficiently than repeated centroid-only three-way
-    // subdivision while retaining every boundary sample used by the mesh.
+    // Longest-edge bisection halves the selected geometric span on each
+    // recursion and avoids the exponential four-way fanout. The midpoint was
+    // already classified and sampled above, so child construction reuses the
+    // authoritative boundary/interior point.
+    let ab_length = a.point.sub(b.point).length();
+    let bc_length = b.point.sub(c.point).length();
+    let ca_length = c.point.sub(a.point).length();
+    if !ab_length.is_finite() || !bc_length.is_finite() || !ca_length.is_finite() {
+        return Err(TessellationError::NonFinite);
+    }
+
+    let child_triangles = if ab_length >= bc_length && ab_length >= ca_length {
+        [(a, ab, c), (ab, b, c)]
+    } else if bc_length >= ca_length {
+        [(b, bc, a), (bc, c, a)]
+    } else {
+        [(c, ca, b), (ca, a, b)]
+    };
 
     let mut maximum_chord = chord_error;
     let mut maximum_angular = angular_error;
-    for (x, y, z) in [
-        (a, ab, ca),
-        (ab, b, bc),
-        (ca, bc, c),
-        (ab, bc, ca),
-    ] {
+    for (x, y, z) in child_triangles {
         let (child_chord, child_angular) = refine_trim_triangle(
             x,
             y,

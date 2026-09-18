@@ -142,9 +142,6 @@ public sealed record ExtrusionFeatureSpecification(
 
         if (!double.IsFinite(DepthMm) || DepthMm <= 0d)
             throw new ArgumentOutOfRangeException(nameof(DepthMm));
-
-        if (!Dependencies.Contains(Profile.ProfileId))
-            Dependencies = Dependencies.Append(Profile.ProfileId).Distinct().ToArray();
     }
 
     public override string OperationKind => "PartDesign.ExtrudeConvexPlanarProfile";

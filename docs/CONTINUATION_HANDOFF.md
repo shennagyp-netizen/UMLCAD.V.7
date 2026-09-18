@@ -426,3 +426,24 @@ The correct current state is therefore:
 - `UMLCAD.Framework` / `projects/demo` remains the legacy application path until a deliberate application-host migration milestone establishes the replacement root.
 - S1 production execution is still incomplete beyond the certified box operation.
 - No new Rust kernel/math change was introduced by the current correction work.
+## Current S1 .NET continuation — kernel frozen
+
+The active S1 development line has advanced beyond the earlier sketch-transport station. The Rust/OCCT kernel is treated as complete and sufficient infrastructure for the application and is frozen for this system-CAD work.
+
+Current .NET increment:
+- ExtrusionFeatureSpecification now carries an explicit ProfileGeometryId so each feature selects a specific sketch geometry rather than an entire sketch.
+- SpecificationGraph validates the selected profile against the referenced sketch.
+- EvaluationIdentity includes the selected profile geometry.
+- CadSketchEvaluationResult now preserves the authoritative solved sketch frame, geometry identities, terminal solver evidence, result identity, and evidence hash.
+- RustCadKernelEvaluator integrates the solved sketch as a canonical .NET result while preserving fail-closed identity checks.
+
+No kernel source was changed by this increment.
+
+Current S1 blocker:
+- the mandatory additive/subtractive final solid evolution still requires the .NET canonical Boolean-result transport/orchestration boundary. Existing kernel/OCCT Boolean capability is treated as immutable authority and is not reimplemented in .NET.
+- the system must not fall back to the legacy BuildPackage route and must not manufacture a final B-Rep from render or tool geometry.
+
+Validation state:
+- local .NET execution is unavailable in this session because the .NET SDK is not installed.
+- the repository's recent GitHub Actions failures are zero-step infrastructure failures; they are not interpreted as product test failures or passes.
+- S1 remains IN PROGRESS and is not GREEN.

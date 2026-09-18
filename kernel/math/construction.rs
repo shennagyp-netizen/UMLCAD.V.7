@@ -44,7 +44,63 @@ fn valid_tolerance(t: Tolerance) -> Result<(), ConstructionError> {
 }
 
 fn scale2(points: &[Vec2]) -> f64 {
-    points.iter().map(|p| p.x.abs().max(p.y.abs())).fold(1.0, f64::max)
+    if points.is_empty() {
+        return 1.0;
+    }
+    let mut min_x = f64::INFINITY;
+    let mut min_y = f64::INFINITY;
+    let mut max_x = f64::NEG_INFINITY;
+    let mut max_y = f64::NEG_INFINITY;
+    let mut max_edge = 0.0;
+    for p in points {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
+    for i in 0..points.len() {
+        max_edge = max_edge.max(points[i].sub(points[(i + 1) % points.len()]).length());
+    }
+    (max_x - min_x).hypot(max_y - min_y).max(max_edge).max(1.0)
+}
+
+fn loft_family_convex(
+    lower: &PlanarPolygon,
+    upper: &PlanarPolygon,
+    tolerance: Tolerance,
+) -> Result<(), ConstructionError> {
+    let scale = scale2(&lower.vertices).max(scale2(&upper.vertices));
+    let eps = tolerance.threshold(scale)
+        .map_err(|_| ConstructionError::InvalidTolerance)?;
+    let eps2 = eps * eps;
+    if !eps2.is_finite() {
+        return Err(ConstructionError::Overflow);
+    }
+    let winding = lower.signed_area().signum();
+    if winding == 0.0 || upper.signed_area().signum() != winding {
+        return Err(ConstructionError::InvalidDimensions);
+    }
+    for i in 0..lower.vertices.len() {
+        let a0 = lower.vertices[i];
+        let b0 = lower.vertices[(i + 1) % lower.vertices.len()];
+        let c0 = lower.vertices[(i + 2) % lower.vertices.len()];
+        let a1 = upper.vertices[i];
+        let b1 = upper.vertices[(i + 1) % upper.vertices.len()];
+        let c1 = upper.vertices[(i + 2) % upper.vertices.len()];
+        let e00 = b0.sub(a0);
+        let e10 = c0.sub(b0);
+        let e01 = b1.sub(a1);
+        let e11 = c1.sub(b1);
+        let bernstein = [
+            e00.cross(e10),
+            e01.cross(e10) + e00.cross(e11),
+            e01.cross(e11),
+        ];
+        if bernstein.iter().any(|v| !v.is_finite() || *v * winding <= eps2) {
+            return Err(ConstructionError::Unsupported);
+        }
+    }
+    Ok(())
 }
 
 fn orient(a: Vec2, b: Vec2, c: Vec2) -> f64 {
@@ -555,6 +611,7 @@ impl PolygonLoft {
         if self.lower.signed_area().signum() != self.upper.signed_area().signum() {
             return Err(ConstructionError::InvalidDimensions);
         }
+        loft_family_convex(&self.lower, &self.upper, tolerance)?;
         Ok(())
     }
 

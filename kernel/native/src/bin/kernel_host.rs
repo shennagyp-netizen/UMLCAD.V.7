@@ -4,7 +4,9 @@ use std::thread;
 
 use serde_json::{json, Value};
 use umlcad_kernel_rust::api::{dispatch, KernelRequest, KernelResponse};
+use umlcad_kernel_rust::functions::analytic::Cylinder3;
 use umlcad_kernel_rust::functions::snapshot::{Constraint, GeometryItem, SemanticSnapshot};
+use umlcad_kernel_rust::functions::vec::Vec3;
 use umlcad_kernel_rust::functions::validation::Severity;
 use umlcad_kernel_rust::{Arc, Circle, Geometry, Line, Point};
 
@@ -13,6 +15,7 @@ const BUILD_SCHEMA: &str = "uml-cad-build-package/1.0.0";
 const MODEL_SCHEMA: &str = "uml-cad-compiled-model/1.1.0";
 const BOX_SOLID_SCHEMA: &str = "uml-cad-axis-aligned-box-solid/1.0.0";
 const SKETCH_SOLVE_SCHEMA: &str = "uml-cad-sketch-solve/1.0.0";
+const CIRCULAR_PRISM_SCHEMA: &str = "uml-cad-circular-prism-solid/1.0.0";
 const MAX_REQUEST_BYTES: usize = 32 * 1024 * 1024;
 
 fn main() {
@@ -31,6 +34,7 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
         ("POST", "/v1/build/evaluate") => evaluate(&body),
         ("POST", "/v1/geometry/box-solid") => box_solid(&body),
         ("POST", "/v1/geometry/solve-sketch") => solve_sketch(&body),
+        ("POST", "/v1/geometry/circular-prism-solid") => circular_prism_solid(&body),
         ("POST", "/v1/geometry/extrude-convex-planar-profile") => extrude_convex_planar_profile(&body),
         ("GET", "/health") => (200, json!({"status":"ok"})),
         _ => (404, failure("KERNEL_NOT_FOUND", "Unknown kernel endpoint.")),
@@ -767,6 +771,247 @@ fn finite_json_number(value: Option<&Value>) -> Result<f64, &'static str> {
         return Err("Sketch numeric property must be finite.");
     }
     Ok(number)
+}
+
+fn circular_prism_solid(body: &[u8]) -> (u16, Value) {
+    let root: Value = match serde_json::from_slice(body) {
+        Ok(value) => value,
+        Err(error) => {
+            return (
+                422,
+                failure(
+                    "KERNEL_CIRCULAR_PRISM_JSON",
+                    &format!("The circular-prism request is not valid JSON: {error}."),
+                ),
+            )
+        }
+    };
+
+    if root.get("schema").and_then(Value::as_str) != Some(CIRCULAR_PRISM_SCHEMA) {
+        return (
+            422,
+            failure(
+                "KERNEL_CIRCULAR_PRISM_SCHEMA",
+                "Unsupported circular-prism schema.",
+            ),
+        );
+    }
+
+    let operation_identity = match root.get("operationIdentity").and_then(Value::as_str) {
+        Some(value) if !value.trim().is_empty() => value,
+        _ => {
+            return (
+                422,
+                failure(
+                    "KERNEL_CIRCULAR_PRISM_INPUT",
+                    "operationIdentity is required.",
+                ),
+            )
+        }
+    };
+
+    let origin = match json_vec3(root.get("origin")) {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_CIRCULAR_PRISM_INPUT", message)),
+    };
+    let axis_raw = match json_vec3(root.get("axis")) {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_CIRCULAR_PRISM_INPUT", message)),
+    };
+    let radius = match finite_json_number(root.get("radius")) {
+        Ok(value) if value > 0.0 => value,
+        Ok(_) => {
+            return (
+                422,
+                failure(
+                    "KERNEL_CIRCULAR_PRISM_INPUT",
+                    "radius must be finite and positive.",
+                ),
+            )
+        }
+        Err(message) => return (422, failure("KERNEL_CIRCULAR_PRISM_INPUT", message)),
+    };
+    let depth = match finite_json_number(root.get("depth")) {
+        Ok(value) if value > 0.0 => value,
+        Ok(_) => {
+            return (
+                422,
+                failure(
+                    "KERNEL_CIRCULAR_PRISM_INPUT",
+                    "depth must be finite and positive.",
+                ),
+            )
+        }
+        Err(message) => return (422, failure("KERNEL_CIRCULAR_PRISM_INPUT", message)),
+    };
+
+    let tolerance_object = root.get("tolerance").and_then(Value::as_object);
+    let tolerance = match umlcad_kernel_rust::functions::tolerance::Tolerance::new(
+        tolerance_object
+            .and_then(|object| object.get("absolute"))
+            .and_then(Value::as_f64)
+            .unwrap_or(1.0e-9),
+        tolerance_object
+            .and_then(|object| object.get("relative"))
+            .and_then(Value::as_f64)
+            .unwrap_or(1.0e-9),
+    ) {
+        Ok(value) => value,
+        Err(_) => {
+            return (
+                422,
+                failure(
+                    "KERNEL_CIRCULAR_PRISM_TOLERANCE",
+                    "Tolerance must be finite and non-negative.",
+                ),
+            )
+        }
+    };
+
+    let cylinder = Cylinder3 {
+        origin,
+        axis: axis_raw,
+        radius,
+    };
+    let unit_axis = match cylinder.unit_axis() {
+        Ok(value) => value,
+        Err(error) => {
+            return (
+                200,
+                json!({
+                    "schema": CIRCULAR_PRISM_SCHEMA,
+                    "status": "failed",
+                    "succeeded": false,
+                    "resultId": null,
+                    "evidenceHash": null,
+                    "origin": {"x": origin.x, "y": origin.y, "z": origin.z},
+                    "axis": {"x": axis_raw.x, "y": axis_raw.y, "z": axis_raw.z},
+                    "radius": radius,
+                    "depth": depth,
+                    "volume": null,
+                    "surfaceArea": null,
+                    "centroid": null,
+                    "bounds": null,
+                    "topology": [],
+                    "diagnostics": [error.to_string()]
+                }),
+            )
+        }
+    };
+
+    let end = origin.add(unit_axis.scale(depth));
+    let extrema = |component_origin: f64, component_end: f64, component_axis: f64| {
+        let radial = radius * (1.0 - component_axis * component_axis).max(0.0).sqrt();
+        (
+            component_origin.min(component_end) - radial,
+            component_origin.max(component_end) + radial,
+        )
+    };
+
+    let (min_x, max_x) = extrema(origin.x, end.x, unit_axis.x);
+    let (min_y, max_y) = extrema(origin.y, end.y, unit_axis.y);
+    let (min_z, max_z) = extrema(origin.z, end.z, unit_axis.z);
+
+    let volume = std::f64::consts::PI * radius * radius * depth;
+    let surface_area =
+        2.0 * std::f64::consts::PI * radius * (radius + depth);
+    let centroid = origin.add(unit_axis.scale(depth * 0.5));
+
+    let scale = radius.max(depth).max(1.0);
+    if tolerance.threshold(scale).is_err()
+        || !volume.is_finite()
+        || !surface_area.is_finite()
+        || !centroid.is_finite()
+        || !min_x.is_finite()
+        || !max_x.is_finite()
+        || !min_y.is_finite()
+        || !max_y.is_finite()
+        || !min_z.is_finite()
+        || !max_z.is_finite()
+    {
+        return (
+            200,
+            json!({
+                "schema": CIRCULAR_PRISM_SCHEMA,
+                "status": "failed",
+                "succeeded": false,
+                "resultId": null,
+                "evidenceHash": null,
+                "origin": {"x": origin.x, "y": origin.y, "z": origin.z},
+                "axis": {"x": unit_axis.x, "y": unit_axis.y, "z": unit_axis.z},
+                "radius": radius,
+                "depth": depth,
+                "volume": null,
+                "surfaceArea": null,
+                "centroid": null,
+                "bounds": null,
+                "topology": [],
+                "diagnostics": ["Circular-prism result is non-finite."]
+            }),
+        );
+    }
+
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(b"uml-cad-circular-prism-solid/1|");
+    hasher.update(operation_identity.as_bytes());
+    for value in [
+        origin.x,
+        origin.y,
+        origin.z,
+        unit_axis.x,
+        unit_axis.y,
+        unit_axis.z,
+        radius,
+        depth,
+        tolerance.absolute,
+        tolerance.relative,
+    ] {
+        hasher.update(value.to_bits().to_le_bytes());
+    }
+    let result_id = format!("solid:{:x}", hasher.finalize());
+
+    let mut evidence = sha2::Sha256::new();
+    evidence.update(b"uml-cad-circular-prism-solid-evidence/1|");
+    evidence.update(result_id.as_bytes());
+    let evidence_hash = format!("{:x}", evidence.finalize());
+
+    (
+        200,
+        json!({
+            "schema": CIRCULAR_PRISM_SCHEMA,
+            "status": "succeeded",
+            "succeeded": true,
+            "resultId": result_id,
+            "evidenceHash": evidence_hash,
+            "origin": {"x": origin.x, "y": origin.y, "z": origin.z},
+            "axis": {"x": unit_axis.x, "y": unit_axis.y, "z": unit_axis.z},
+            "radius": radius,
+            "depth": depth,
+            "volume": volume,
+            "surfaceArea": surface_area,
+            "centroid": {"x": centroid.x, "y": centroid.y, "z": centroid.z},
+            "bounds": {
+                "min": {"x": min_x, "y": min_y, "z": min_z},
+                "max": {"x": max_x, "y": max_y, "z": max_z}
+            },
+            "topology": [
+                {"kind": "Face", "key": "bottom"},
+                {"kind": "Face", "key": "top"},
+                {"kind": "Face", "key": "lateral"}
+            ],
+            "diagnostics": []
+        }),
+    )
+}
+
+fn json_vec3(value: Option<&Value>) -> Result<Vec3, &'static str> {
+    let object = value
+        .and_then(Value::as_object)
+        .ok_or("Vector object is required.")?;
+    let x = finite_json_number(object.get("x"))?;
+    let y = finite_json_number(object.get("y"))?;
+    let z = finite_json_number(object.get("z"))?;
+    Ok(Vec3::new(x, y, z))
 }
 
 fn box_solid(body: &[u8]) -> (u16, Value) {

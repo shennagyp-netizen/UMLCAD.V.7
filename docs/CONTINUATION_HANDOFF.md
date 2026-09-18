@@ -4,7 +4,7 @@
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
 - Main head before PR #30 merge: `d267d9cb5d277da6d655fefd9d122c1c165e9a53`
-- Latest completed roadmap family after merge: M13 — Apple Silicon Metal
+- Latest completed roadmap family after merge: M14 — NVIDIA CUDA (declared AABB domain; hardware-unvalidated)
 - Latest merged M10 closure PR: #27, `math: complete solver result status authority`
 - PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
 - Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
@@ -13,7 +13,7 @@
 - PR #30 validated implementation head: `9d04c05f67f4e5542df56b8612806fe8296f624b`
 
 ## Completed mathematical-authority state
-PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M14 is now the next incomplete roadmap family after the M13 post-merge verification.
+PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M15 is now the next incomplete roadmap family after the M14 post-merge verification.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -105,7 +105,7 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 1. Verify PR #30's final exact-head Rust and comprehensive E2E/red-team gates on the documentation head, then merge it.
 2. Verify post-merge main Rust and comprehensive E2E/red-team gates on the resulting main commit.
 3. After post-merge green, begin M12 GPU abstraction from the updated main head.
-4. M13 is merged and post-merge green; begin M14 from the verified `main` head. CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+4. M14 is merged and post-merge green on `f5095cdf53e5db1ef610c8e2fd3620920456e2da`; begin M15 from that verified `main` head. CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 
 ## M11 completion boundary
 
@@ -188,7 +188,7 @@ The source implementation was green in the authoritative Rust kernel and compreh
 
 ## M13 completion boundary
 
-M13 is now documented as `Implemented / Tested / Hardware-validated` for its declared Apple Silicon Metal domain. The validated implementation head is `b32e8c9f966a22d8eab1469fbb09716b7aba88f7`.
+M13 is now documented as `Implemented / Tested / Hardware-validated` for its declared Apple Silicon Metal domain. The validated implementation head was `625fae34f858c940085712ba315cff8a57b26abb`; M13 post-merge `main` validation passed on `7b55ee99a3ae122dbbff398df5287c8e020bb726`.
 
 The Metal backend lives at `kernel/native/src/gpu/metal.rs` and uses the modern `objc2-metal` binding. It implements a real compute pipeline for conservative AABB candidate generation. Authoritative CPU `f64` AABBs are converted with outward-rounded `f32` bounds only for this broad-phase workload; the GPU output is required to contain every exact CPU `f64` overlap, and the adapter fails closed on a false negative. Candidate pairs are reconstructed deterministically on the CPU, and the hardware test repeats the same workload to verify stable output.
 
@@ -201,3 +201,15 @@ M14 is the current CUDA backend milestone; M15 remains cross-backend conformance
 ## M14 completion boundary
 
 M14 is implemented and tested for the declared CUDA AABB candidate-generation domain. The CPU f64 implementation remains authoritative. CUDA uses device-native f64 for the certified predicate; candidate ordering is reconstructed deterministically on the CPU; exact CPU overlap omission fails closed. The CUDA driver/NVRTC absence path is explicitly handled as unavailable rather than panic-prone. Hardware validation is **Not yet hardware-validated** because the repository has no confirmed NVIDIA runner execution record for this milestone.
+
+## M14 post-merge closure record
+
+M14 is closed on `main` for the declared NVIDIA CUDA acceleration domain at merge commit `f5095cdf53e5db1ef610c8e2fd3620920456e2da`.
+
+- PR #34 exact documentation-inclusive head: `f4009a4abd17ad4bc78de11e216a7fcac70f1e8a`.
+- PR #34 exact-head authoritative gates: Rust kernel PASS, comprehensive E2E/red-team PASS, Metal hardware PASS.
+- Post-merge `main` authoritative gates on `f5095cdf53e5db1ef610c8e2fd3620920456e2da`: Rust kernel PASS, comprehensive E2E/red-team PASS, Metal hardware PASS.
+- CUDA implementation: real device-native-f64 AABB candidate generation via `cudarc`, CPU f64 acceptance/reference authority, deterministic CPU reconstruction, fail-closed false-negative detection, and explicit no-driver handling.
+- Normal repository gates contain zero ignored CUDA tests; hardware cases are feature-gated behind `cuda-hardware` and must be explicitly enabled on an NVIDIA runner.
+- CUDA hardware status: **Not yet hardware-validated**. No confirmed NVIDIA hardware execution record was available during M14 closure.
+- M15 remains responsible for CPU/Metal/CUDA cross-backend conformance; M16 remains final performance/crossover and full red-team closure.

@@ -186,7 +186,7 @@ pub struct PlanarRegion3 {
 }
 
 impl PlanarRegion3 {
-    fn validate_structure(&self, tolerance: Tolerance) -> Result<(), BRepError> {
+    pub fn validate(&self, tolerance: Tolerance) -> Result<(), BRepError> {
         validate_tolerance(tolerance)?;
         if [self.origin, self.u_dir, self.v_dir].iter().any(|v| !v.is_finite()) {
             return Err(BRepError::NonFinite);
@@ -487,7 +487,7 @@ fn inertia_from_second(second: [[f64; 3]; 3]) -> [[f64; 3]; 3] {
 }
 
 impl BRepSolid {
-    pub fn validate(&self, tolerance: Tolerance) -> Result<(), BRepError> {
+    fn validate_structure(&self, tolerance: Tolerance) -> Result<(), BRepError> {
         validate_tolerance(tolerance)?;
         if self.shells.len() != 1 {
             return Err(BRepError::UnsupportedBoolean);
@@ -691,7 +691,6 @@ impl BRepSolid {
         }) {
             return Err(BRepError::UnsupportedBoolean);
         }
-
         let volume = self.moments(tolerance)?.signed_volume;
         if volume <= 0.0 {
             return Err(BRepError::InvalidSolidOrientation);
@@ -739,10 +738,9 @@ impl BRepSolid {
             return Err(BRepError::UnsupportedBoolean);
         }
 
-        // Translate the integration to a model-local reference point. The
-        // tetrahedral volume and raw moments are translation-sensitive; doing
-        // the polynomial accumulation in world coordinates can lose the
-        // small geometry hidden beneath a very large global translation.
+        // Evaluate the exact tetrahedral polynomial integrals in a local
+        // reference frame. This avoids catastrophic cancellation when the
+        // solid is translated far from the world origin.
         let reference = self.vertices.first().ok_or(BRepError::Degenerate)?.point;
         if !reference.is_finite() {
             return Err(BRepError::NonFinite);
@@ -763,9 +761,9 @@ impl BRepSolid {
                 return Err(BRepError::Overflow);
             }
             signed_volume += tetra;
-            first_local = first_local
-                .add(a.add(b).add(c).scale(tetra / 4.0));
+            first_local = first_local.add(a.add(b).add(c).scale(tetra / 4.0));
             second_local = add3(second_local, tetra_raw_second(a, b, c, tetra));
+
             let area = 0.5 * b.sub(a).cross(c.sub(a)).length();
             if !area.is_finite() {
                 return Err(BRepError::Overflow);
@@ -773,10 +771,11 @@ impl BRepSolid {
             surface_area += area;
         }
 
-        if !signed_volume.is_finite() || signed_volume.abs() <= tolerance
-            .threshold(self.bbox_extent().max(1.0))
-            .map_err(|_| BRepError::InvalidTolerance)?
-        {
+        let extent = self.bbox_extent().max(1.0);
+        let volume_scale = extent * extent * extent;
+        let volume_tolerance = tolerance.threshold(volume_scale)
+            .map_err(|_| BRepError::InvalidTolerance)?;
+        if !signed_volume.is_finite() || signed_volume.abs() <= volume_tolerance {
             return Err(BRepError::ZeroVolume);
         }
 
@@ -807,9 +806,8 @@ impl BRepSolid {
             ],
         ];
 
-        // Parallel-axis theorem: move the centroidal tensor from the local
-        // reference frame to the requested world-origin frame.
-        inertia_centroid;
+        // Move the centroidal tensor from the local reference frame to the
+        // world-origin frame with the parallel-axis theorem.
         let inertia_origin = [
             [
                 inertia_centroid[0][0] + m * (centroid.y * centroid.y + centroid.z * centroid.z),
@@ -1316,8 +1314,8 @@ mod tests {
             u_dir: Vec3::new(1.0,0.0,0.0),
             v_dir: Vec3::new(0.0,1.0,0.0),
             outer: vec![
-                Vec2::new(0.0,0.0), Vec2::new(10.0,0.0),
-                Vec2::new(10.0,20.0), Vec2::new(0.0,20.0),
+                Vec2::new(1.0e12,1.0e12), Vec2::new(1.0e12 + 10.0,1.0e12),
+                Vec2::new(1.0e12 + 10.0,1.0e12 + 20.0), Vec2::new(1.0e12,1.0e12 + 20.0),
             ],
             holes: vec![],
         };

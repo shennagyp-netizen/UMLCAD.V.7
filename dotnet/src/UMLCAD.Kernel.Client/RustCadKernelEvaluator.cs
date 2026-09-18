@@ -121,9 +121,84 @@ public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
                 message))
             .ToArray();
 
+        if (status != CadEvaluationStatus.Succeeded)
+        {
+            return new KernelEvaluationResponse(status, null, diagnostics)
+            {
+                SketchSolve = kernelResult
+            };
+        }
+
+        if (kernelResult.ResultId is null ||
+            string.IsNullOrWhiteSpace(kernelResult.EvidenceHash) ||
+            kernelResult.Geometry.Count != specification.Circles.Count)
+        {
+            return new KernelEvaluationResponse(
+                CadEvaluationStatus.KernelFailure,
+                null,
+                new[]
+                {
+                    new CadDiagnostic(
+                        "KERNEL_SKETCH_RESULT_INCOMPLETE",
+                        CadEvaluationStatus.KernelFailure,
+                        "Successful sketch evaluation is missing authoritative result identity, evidence, or geometry.")
+                })
+            {
+                SketchSolve = kernelResult
+            };
+        }
+
+        var expectedCircleIds = specification.Circles
+            .Select(circle => circle.Id.Value)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+
+        var actualCircleIds = kernelResult.Geometry
+            .Select(circle => circle.Id)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+
+        if (!expectedCircleIds.SequenceEqual(actualCircleIds, StringComparer.Ordinal))
+        {
+            return new KernelEvaluationResponse(
+                CadEvaluationStatus.KernelFailure,
+                null,
+                new[]
+                {
+                    new CadDiagnostic(
+                        "KERNEL_SKETCH_RESULT_IDENTITY_MISMATCH",
+                        CadEvaluationStatus.KernelFailure,
+                        "The authoritative sketch solver returned geometry identities different from the semantic sketch.")
+                })
+            {
+                SketchSolve = kernelResult
+            };
+        }
+
+        var sketchResult = new CadSketchEvaluationResult(
+            specification.Id,
+            new CadResultId(kernelResult.ResultId.Value),
+            CadContractVersions.KernelEvaluation,
+            specification.Frame,
+            kernelResult.Geometry,
+            true,
+            kernelResult.Reason,
+            kernelResult.Iterations,
+            kernelResult.FinalResidualNorm,
+            kernelResult.FinalScaledResidualNorm,
+            kernelResult.FinalStepNorm,
+            kernelResult.DegreesOfFreedom,
+            kernelResult.VariableCount,
+            kernelResult.EquationCount,
+            kernelResult.ConditionEstimate,
+            kernelResult.EvidenceHash);
+
+        sketchResult.Validate();
+
         return new KernelEvaluationResponse(status, null, diagnostics)
         {
-            SketchSolve = kernelResult
+            SketchSolve = kernelResult,
+            SketchResult = sketchResult
         };
     }
 

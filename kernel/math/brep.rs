@@ -610,13 +610,54 @@ impl BRepSolid {
                 .filter(|c| {
                     let edge = self.edges.iter().find(|e| e.id == c.edge);
                     let Some(edge) = edge else { return false; };
-                    let a = edge.start_vertex.as_str() == vertex.id;
-                    let b = edge.end_vertex.as_str() == vertex.id;
-                    a || b
+                    edge.start_vertex == vertex.id || edge.end_vertex == vertex.id
                 })
                 .map(|c| c.face.as_str())
                 .collect::<BTreeSet<_>>();
             if incident_faces.len() < 3 {
+                return Err(BRepError::NonManifoldVertex);
+            }
+
+            // The link of a manifold vertex is one connected cycle. Each
+            // incident face contributes exactly two link edges at the vertex.
+            let mut link_degree: BTreeMap<&str, usize> =
+                incident_faces.iter().copied().map(|face| (face, 0usize)).collect();
+            let mut link_adjacency: BTreeMap<&str, BTreeSet<&str>> =
+                incident_faces.iter().copied().map(|face| (face, BTreeSet::new())).collect();
+
+            for edge in &self.edges {
+                if edge.start_vertex != vertex.id && edge.end_vertex != vertex.id {
+                    continue;
+                }
+                let incidence = edge_incidence.get(edge.id.as_str()).ok_or(BRepError::NonManifoldEdge)?;
+                if incidence.len() != 2 || incidence[0].face == incidence[1].face {
+                    return Err(BRepError::NonManifoldVertex);
+                }
+                let f0 = incidence[0].face.as_str();
+                let f1 = incidence[1].face.as_str();
+                if !incident_faces.contains(f0) || !incident_faces.contains(f1) {
+                    return Err(BRepError::NonManifoldVertex);
+                }
+                *link_degree.get_mut(f0).ok_or(BRepError::NonManifoldVertex)? += 1;
+                *link_degree.get_mut(f1).ok_or(BRepError::NonManifoldVertex)? += 1;
+                link_adjacency.get_mut(f0).ok_or(BRepError::NonManifoldVertex)?.insert(f1);
+                link_adjacency.get_mut(f1).ok_or(BRepError::NonManifoldVertex)?.insert(f0);
+            }
+
+            if link_degree.values().any(|degree| *degree != 2) {
+                return Err(BRepError::NonManifoldVertex);
+            }
+
+            let mut link_reachable = BTreeSet::new();
+            let mut link_stack = vec![*incident_faces.iter().next().ok_or(BRepError::NonManifoldVertex)?];
+            while let Some(face_id) = link_stack.pop() {
+                if link_reachable.insert(face_id) {
+                    if let Some(neighbors) = link_adjacency.get(face_id) {
+                        link_stack.extend(neighbors.iter().copied());
+                    }
+                }
+            }
+            if link_reachable.len() != incident_faces.len() {
                 return Err(BRepError::NonManifoldVertex);
             }
         }
@@ -720,6 +761,11 @@ impl BRepSolid {
 
     pub fn moments(&self, tolerance: Tolerance) -> Result<SolidMoments, BRepError> {
         self.validate_topology_only(tolerance)?;
+        if self.faces.iter().any(|face| {
+            !face.inner_wires.is_empty() || !face.region.holes.is_empty()
+        }) {
+            return Err(BRepError::UnsupportedBoolean);
+        }
         let triangles = self.triangles(tolerance)?;
         let mut signed_volume = 0.0;
         let mut first = Vec3::new(0.0, 0.0, 0.0);

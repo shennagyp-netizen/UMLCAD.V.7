@@ -70,7 +70,7 @@ public sealed class RustCadKernelEvaluatorTests
         Assert.Equal(new KernelTolerance(1e-7, 1e-8), geometry.LastRequest.Tolerance);
         Assert.Equal(new KernelVector3(10d, 20d, 30d), geometry.LastRequest.Min);
         Assert.Equal(new KernelVector3(12d, 23d, 34d), geometry.LastRequest.Max);
-        Assert.Equal(new KernelTolerance(1e-9, 1e-9), geometry.LastRequest.Tolerance);
+        Assert.Equal(new KernelTolerance(1e-7, 1e-8), geometry.LastRequest.Tolerance);
     }
 
     [Fact]
@@ -90,6 +90,12 @@ public sealed class RustCadKernelEvaluatorTests
             Assert.Equal(
                 "evaluation-http-001",
                 payload.GetProperty("operationIdentity").GetString());
+            Assert.Equal(
+                1e-7,
+                payload.GetProperty("tolerance").GetProperty("absolute").GetDouble());
+            Assert.Equal(
+                1e-8,
+                payload.GetProperty("tolerance").GetProperty("relative").GetDouble());
 
             return new HttpResponseMessage(HttpStatusCode.OK)
             {

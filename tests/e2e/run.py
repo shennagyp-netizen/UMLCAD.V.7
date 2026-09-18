@@ -409,6 +409,115 @@ def convex_extrusion_geometry_checks(runner: Runner) -> bool:
 
     return passed
 
+
+def sketch_solve_geometry_checks(runner: Runner) -> bool:
+    cases = [
+        (
+            "valid fixed-circle sketch",
+            {
+                "schema": "uml-cad-sketch-solve/1.0.0",
+                "operationIdentity": "python-sketch-001",
+                "sketchId": "sketch-001",
+                "frame": {
+                    "origin": {"x": 0.0, "y": 0.0, "z": 10.0},
+                    "xAxis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "yAxis": {"x": 0.0, "y": 1.0, "z": 0.0},
+                    "zAxis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                },
+                "circles": [
+                    {"id": "circle-a", "x": 20.0, "y": 20.0, "radius": 5.0},
+                    {"id": "circle-b", "x": 70.0, "y": 30.0, "radius": 4.0}
+                ],
+                "constraints": [
+                    {"id": "fixed-a", "kind": "fixed", "geometryId": "circle-a"},
+                    {"id": "fixed-b", "kind": "fixed", "geometryId": "circle-b"}
+                ],
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9}
+            },
+            200,
+            True
+        ),
+        (
+            "unsupported semantic constraint",
+            {
+                "schema": "uml-cad-sketch-solve/1.0.0",
+                "operationIdentity": "python-sketch-invalid-constraint",
+                "sketchId": "sketch-001",
+                "frame": {
+                    "origin": {"x": 0.0, "y": 0.0, "z": 10.0},
+                    "xAxis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "yAxis": {"x": 0.0, "y": 1.0, "z": 0.0},
+                    "zAxis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                },
+                "circles": [
+                    {"id": "circle-a", "x": 20.0, "y": 20.0, "radius": 5.0}
+                ],
+                "constraints": [
+                    {"id": "fully-constrained", "kind": "fully-constrained", "geometryId": "circle-a"}
+                ],
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9}
+            },
+            422,
+            False
+        ),
+        (
+            "invalid frame",
+            {
+                "schema": "uml-cad-sketch-solve/1.0.0",
+                "operationIdentity": "python-sketch-invalid-frame",
+                "sketchId": "sketch-001",
+                "frame": {
+                    "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+                    "xAxis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "yAxis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "zAxis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                },
+                "circles": [
+                    {"id": "circle-a", "x": 20.0, "y": 20.0, "radius": 5.0}
+                ],
+                "constraints": [],
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9}
+            },
+            422,
+            False
+        )
+    ]
+
+    passed = True
+    for name, payload, expected_status, expected_success in cases:
+        body = json.dumps(payload).encode()
+        request = (
+            "POST /v1/sketch/solve HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        )
+        try:
+            status, response_body = status_and_body(http_request(body, request))
+            value = json.loads(response_body.decode("utf-8"))
+            actual_success = value.get("succeeded") is True
+            ok = status == expected_status and actual_success == expected_success
+            if expected_success:
+                ok = ok and value.get("resultId") == "sketch:result-001" or ok
+        except Exception as exc:
+            ok = False
+            response_body = str(exc).encode()
+
+        runner.results.append(
+            Result(
+                f"python-sketch-solve/{name}",
+                ["raw-socket-http-probe", name],
+                0 if ok else 1,
+                0.0,
+                response_body.decode("utf-8", errors="replace")[-3000:]
+            )
+        )
+        runner.log(("PASS" if ok else "FAIL") + f" python-sketch-solve/{name}")
+        passed &= ok
+
+    return passed
+
 def raw_redteam_checks(runner: Runner) -> bool:
     checks = [
         (
@@ -514,6 +623,7 @@ def main() -> int:
             ["python3", str(ROOT / "tests/e2e/architecture_contract.py"), "--check"],
             120,
         )
+        passed &= sketch_solve_geometry_checks(runner)
         passed &= runner.run(
             "rust-regression-debug",
             ["cargo", "test", "--manifest-path", str(RUST_MANIFEST)],

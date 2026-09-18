@@ -7,80 +7,105 @@ public readonly record struct SemanticId(Guid Value)
     public override string ToString() => Value.ToString("D");
 }
 
-public sealed record ProductComponent(
-    SemanticId ComponentId,
-    string PartNumber,
-    string Revision,
-    string Description)
+public sealed record ProductComponent
 {
-    public ProductComponent
+    public SemanticId ComponentId { get; }
+    public string PartNumber { get; }
+    public string Revision { get; }
+    public string Description { get; }
+
+    public ProductComponent(
+        SemanticId componentId,
+        string partNumber,
+        string revision,
+        string description)
     {
-        if (ComponentId.Value == Guid.Empty)
-            throw new ArgumentException("ComponentId is required.", nameof(ComponentId));
+        if (componentId.Value == Guid.Empty)
+            throw new ArgumentException("ComponentId is required.", nameof(componentId));
+        if (string.IsNullOrWhiteSpace(partNumber))
+            throw new ArgumentException("PartNumber is required.", nameof(partNumber));
+        if (string.IsNullOrWhiteSpace(revision))
+            throw new ArgumentException("Revision is required.", nameof(revision));
+        if (string.IsNullOrWhiteSpace(description))
+            throw new ArgumentException("Description is required.", nameof(description));
 
-        if (string.IsNullOrWhiteSpace(PartNumber))
-            throw new ArgumentException("PartNumber is required.", nameof(PartNumber));
-
-        if (string.IsNullOrWhiteSpace(Revision))
-            throw new ArgumentException("Revision is required.", nameof(Revision));
-
-        if (string.IsNullOrWhiteSpace(Description))
-            throw new ArgumentException("Description is required.", nameof(Description));
+        ComponentId = componentId;
+        PartNumber = partNumber;
+        Revision = revision;
+        Description = description;
     }
 }
 
-public sealed record ProductOccurrence(
-    SemanticId OccurrenceId,
-    SemanticId ComponentId,
-    int Quantity,
-    string Context)
+public sealed record ProductOccurrence
 {
-    public ProductOccurrence
+    public SemanticId OccurrenceId { get; }
+    public SemanticId ComponentId { get; }
+    public int Quantity { get; }
+    public string Context { get; }
+
+    public ProductOccurrence(
+        SemanticId occurrenceId,
+        SemanticId componentId,
+        int quantity,
+        string context)
     {
-        if (OccurrenceId.Value == Guid.Empty)
-            throw new ArgumentException("OccurrenceId is required.", nameof(OccurrenceId));
+        if (occurrenceId.Value == Guid.Empty)
+            throw new ArgumentException("OccurrenceId is required.", nameof(occurrenceId));
+        if (componentId.Value == Guid.Empty)
+            throw new ArgumentException("ComponentId is required.", nameof(componentId));
+        if (quantity <= 0)
+            throw new ArgumentOutOfRangeException(nameof(quantity));
+        if (string.IsNullOrWhiteSpace(context))
+            throw new ArgumentException("Context is required.", nameof(context));
 
-        if (ComponentId.Value == Guid.Empty)
-            throw new ArgumentException("ComponentId is required.", nameof(ComponentId));
-
-        if (Quantity <= 0)
-            throw new ArgumentOutOfRangeException(nameof(Quantity));
-
-        if (string.IsNullOrWhiteSpace(Context))
-            throw new ArgumentException("Context is required.", nameof(Context));
+        OccurrenceId = occurrenceId;
+        ComponentId = componentId;
+        Quantity = quantity;
+        Context = context;
     }
 }
 
-public sealed record ProductDefinition(
-    SemanticId ProductId,
-    string PartNumber,
-    string Revision,
-    IReadOnlyList<ProductComponent> Components,
-    IReadOnlyList<ProductOccurrence> Occurrences)
+public sealed record ProductDefinition
 {
-    public ProductDefinition
+    public SemanticId ProductId { get; }
+    public string PartNumber { get; }
+    public string Revision { get; }
+    public IReadOnlyList<ProductComponent> Components { get; }
+    public IReadOnlyList<ProductOccurrence> Occurrences { get; }
+
+    public ProductDefinition(
+        SemanticId productId,
+        string partNumber,
+        string revision,
+        IReadOnlyList<ProductComponent> components,
+        IReadOnlyList<ProductOccurrence> occurrences)
     {
-        if (ProductId.Value == Guid.Empty)
-            throw new ArgumentException("ProductId is required.", nameof(ProductId));
+        if (productId.Value == Guid.Empty)
+            throw new ArgumentException("ProductId is required.", nameof(productId));
+        if (string.IsNullOrWhiteSpace(partNumber))
+            throw new ArgumentException("PartNumber is required.", nameof(partNumber));
+        if (string.IsNullOrWhiteSpace(revision))
+            throw new ArgumentException("Revision is required.", nameof(revision));
 
-        if (string.IsNullOrWhiteSpace(PartNumber))
-            throw new ArgumentException("PartNumber is required.", nameof(PartNumber));
-
-        if (string.IsNullOrWhiteSpace(Revision))
-            throw new ArgumentException("Revision is required.", nameof(Revision));
-
-        Components = Components?.ToArray() ??
-            throw new ArgumentNullException(nameof(Components));
-
-        Occurrences = Occurrences?.ToArray() ??
-            throw new ArgumentNullException(nameof(Occurrences));
+        Components = components?.ToArray()
+            ?? throw new ArgumentNullException(nameof(components));
+        Occurrences = occurrences?.ToArray()
+            ?? throw new ArgumentNullException(nameof(occurrences));
 
         if (Components.GroupBy(x => x.ComponentId).Any(g => g.Count() != 1))
-            throw new ArgumentException("Product component identifiers must be unique.", nameof(Components));
+            throw new ArgumentException(
+                "Product component identifiers must be unique.",
+                nameof(components));
 
         var componentIds = Components.Select(x => x.ComponentId).ToHashSet();
         if (Occurrences.Any(x => !componentIds.Contains(x.ComponentId)))
-            throw new ArgumentException("Every occurrence must reference an existing component.", nameof(Occurrences));
+            throw new ArgumentException(
+                "Every occurrence must reference an existing component.",
+                nameof(occurrences));
+
+        ProductId = productId;
+        PartNumber = partNumber;
+        Revision = revision;
     }
 }
 

@@ -31,7 +31,7 @@ jobs:
         run: |
           set -o pipefail
           set -o pipefail
-          cargo test --manifest-path kernel/native/Cargo.toml gpu::metal -- --nocapture 2>&1 | tee metal-test.log
+          cargo test --manifest-path kernel/native/Cargo.toml gpu:: -- --nocapture 2>&1 | tee metal-test.log
       - name: Upload Metal test log
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4

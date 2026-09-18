@@ -449,7 +449,10 @@ public sealed class CadEvaluationEngine
                 response.AuthoritativeResult?.ResultId,
                 references,
                 response.Diagnostics,
-                response.AuthoritativeResult);
+                response.AuthoritativeResult)
+            {
+                SketchSolve = response.SketchSolve
+            };
 
             current[featureId] = featureResult;
             _cache.Put(featureResult);

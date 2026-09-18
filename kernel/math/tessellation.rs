@@ -1102,8 +1102,8 @@ where
         [(c, ca, b), (ca, a, b)]
     };
 
-    let mut maximum_chord = chord_error;
-    let mut maximum_angular = angular_error;
+    let mut maximum_chord = 0.0f64;
+    let mut maximum_angular = 0.0f64;
     for (x, y, z) in child_triangles {
         let (child_chord, child_angular) = refine_trim_triangle(
             x,
@@ -1121,6 +1121,9 @@ where
         maximum_angular = maximum_angular.max(child_angular);
     }
 
+    // Report only errors belonging to emitted leaf triangles. Intermediate
+    // rejected parents are refinement evidence, not properties of the final
+    // tessellated mesh.
     Ok((maximum_chord, maximum_angular))
 }
 

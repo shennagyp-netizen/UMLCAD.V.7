@@ -14,6 +14,7 @@ public sealed class ConvexProfileExtrusionEvaluator
 
     public async Task<AuthoritativeCadResult> EvaluateAsync(
         ExtrusionFeatureSpecification specification,
+        KernelTolerance tolerance,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(specification);
@@ -36,7 +37,7 @@ public sealed class ConvexProfileExtrusionEvaluator
                 .Select(point => new PlanarProfilePoint(point.U, point.V))
                 .ToArray(),
             Depth: specification.DepthMm,
-            Tolerance: new KernelTolerance(1e-9, 1e-9),
+            Tolerance: tolerance,
             ContractVersion: new ContractVersion("1.0"));
 
         var kernelResult = await _geometry.ExtrudeConvexPlanarProfileAsync(

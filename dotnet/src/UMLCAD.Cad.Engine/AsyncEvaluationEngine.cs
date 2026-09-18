@@ -74,7 +74,10 @@ public sealed class AsyncEvaluationEngine
                         EvaluationOutcomeStatus.Failed,
                         null,
                         [$"Evaluation blocked by unsuccessful dependency '{dependency}'."]);
-                    return outcomes.Values.ToArray();
+                    return plan.Steps
+                        .Where(x => outcomes.ContainsKey(x.StepId))
+                        .Select(x => outcomes[x.StepId])
+                        .ToArray();
                 }
             }
 

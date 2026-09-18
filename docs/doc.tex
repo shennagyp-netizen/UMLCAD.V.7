@@ -298,3 +298,171 @@ CAD Product Structure
         -> BOM
         -> Drawing / CAM / PLM
 \end{lstlisting}
+\begin{longtable}{@{}p{0.07\textwidth}p{0.31\textwidth}p{0.49\textwidth}@{}}
+\toprule
+ID & Family & Certified / recorded state \\
+\midrule
+M0 & Audit and baseline & Repository/math inventory and authority baseline established. \\
+M1 & Scalars, constants, tolerance & Finite-safe scalar operations, constants, explicit tolerance policy. Known legacy direct arithmetic/tolerance migration remains a code-quality concern outside the claimed certified domains. \\
+M2 & Vectors, matrices, quaternion, transform & Vec2/Vec3/Vec4, matrices, quaternion, affine/rigid transform infrastructure. \\
+M3 & Analytic geometry and predicates & Analytic primitives and scale/degeneracy predicates. \\
+M4 & Polynomial and interval & Root/polynomial and interval foundations; not every possible algebraic problem is certified. \\
+M5 & Curves & Bezier/B-spline/NURBS and curve differential foundations. \\
+M6 & Surfaces and NURBS & Parametric surface and NURBS surface differential/trim foundations. \\
+M7 & Distance/projection/intersection & Declared primitive and bounded intersection/projection families. \\
+M8 & CAD construction mathematics & Declared convex/analytic offset, extrusion, revolution, loft, pipe, blend, frame/twist, box fillet/chamfer, shell domains. \\
+M9 & B-Rep and solids & Explicit topology, certified planar-face solid properties, and bounded AABB Boolean/split/imprint domains. General curved-face sewing/unrestricted Boolean construction are outside scope. \\
+M10 & Constraints/Jacobian/solver & Complete analytic Jacobian for supported equation set; damped SVD/least-squares; rank/nullity/conditioning/terminal authority and mixed-unit adversarial evidence. \\
+M11 & Tessellation/spatial & Adaptive curve/surface tessellation; certified convex line/arc trim-aware tessellation; AABB/sphere/subdivision/BVH acceleration. General concave/holed/freeform trim filling is excluded. \\
+M12 & GPU abstraction & Backend-neutral capability, selection, batching, dispatch, executor, and conformance contracts. No GPU resource is semantic state. \\
+M13 & Metal & Real Apple Silicon Metal conservative AABB candidate-generation backend; hardware-validated on Apple Silicon. Metal lacks native hardware f64, so broad authoritative f64 math remains CPU. \\
+M14 & CUDA & Real CUDA device-native-f64 AABB candidate generation; standard repository CI lacks confirmed NVIDIA hardware execution, so hardware status remains unvalidated. \\
+M15 & Cross-backend conformance & CPU/Metal/CUDA common AABB candidate-set conformance contract; current hardware evidence validates CPU/Metal; CUDA hardware is unvalidated. \\
+M16 & Performance and final red team & Apple Silicon performance evidence plus final adversarial matrix; mathematical roadmap closed. \\
+\bottomrule
+\end{longtable}
+
+\section{CPU authority}
+CPU is normative. GPU code must conform to the CPU contract and cannot redefine semantics.
+
+\section{Numerical infrastructure}
+Current native numerical implementation uses \texttt{nalgebra = 0.33}. The policy is not to replace numerical infrastructure merely for novelty; a replacement requires a demonstrated correctness/architecture reason and a verification plan.
+
+\chapter{Mathematical Gap Matrix - Fine-Grained State}
+
+The following summarizes the current matrix without pretending that every listed operation is universally complete.
+
+\begin{longtable}{@{}p{0.26\textwidth}p{0.17\textwidth}p{0.50\textwidth}@{}}
+\toprule
+Capability & Status & Explicit limitation / interpretation \\
+\midrule
+Scalars / finite arithmetic & Implemented, partial migration & Some legacy geometry still performs direct arithmetic. \\
+Constants & Implemented & No material P0 gap recorded. \\
+Explicit tolerance & Implemented, migration pending & Legacy local epsilons remain; tolerance must be explicit at authoritative boundaries. \\
+Vec2/Vec3/Vec4 & Implemented & Duplicate historical Point representations remain. \\
+Mat2/Mat3/Mat4 & Implemented, integration pending & Robust rank/condition semantics route through linear algebra authority. \\
+Quaternion & Implemented, hardening pending & Very large intermediate rotations require continued overflow hardening. \\
+Affine/rigid transforms & Implemented, extension pending & More constructors/property coverage remain possible. \\
+Robust LU/QR/SVD & Implemented, hardening pending & Wider null-space and deeper ill-conditioning coverage remain desirable. \\
+Predicates & Implemented, extension pending & Broader exact/error-bound escalation remains future work. \\
+Analytic primitives & Implemented, extension pending & Broader containment/projection/distance families remain. \\
+Analytic intersections & Partial & Primitive cross-product matrix and structured overlap representations remain incomplete. \\
+Segments/rays & Partial & Pairwise intersection families remain. \\
+Polynomial/roots & Partial & Stable clustered/repeated/complex root authority remains broader than current contract. \\
+Interval arithmetic & Partial & Full transcendental/polynomial interval machinery is not claimed. \\
+Curve differentials & Partial & Full general Curve2/Curve3 curvature/torsion framework is not universal. \\
+NURBS exact operations & Partial & Knot removal/degree elevation/general rational operations remain extensions. \\
+Surface differentials & Partial & Broader independent oracle/singular classification remains future. \\
+Trim mathematics & Implemented/Tested for certified line/arc domain & General freeform 3D trim correspondence is outside current certification. \\
+General distance/projection & Partial & No universal closest-point engine is claimed. \\
+General intersections & Partial & Broad curve/curve, curve/surface, surface/surface refinement remains incomplete. \\
+Offset/sweep/loft/blend & Implemented/Tested for certified domains & Future extensions require explicit new certified domains. \\
+Fillet/chamfer & Implemented/Tested for bounded families & Arbitrary edge fillets/chamfers remain future contracts. \\
+B-Rep support & Implemented/Tested for certified planar topology & Curved-face sewing/unrestricted topology is excluded. \\
+Solid math & Implemented/Tested for certified planar-face solids & Holed/curved exact decomposition remains outside domain. \\
+Boolean & Implemented/Tested for bounded AABB domain & General topology-aware B-Rep Boolean construction is excluded. \\
+Constraint equations & Implemented/Tested & New equations require new contracts. \\
+Analytic Jacobians & Implemented/Tested & Finite differences are verification only. \\
+Nonlinear solver & Implemented/Tested & Damped SVD/least-squares is the supported solver model. \\
+Tessellation & Implemented/Tested for declared domains & Tessellation is an approximation with explicit fail-closed depth/policy behavior. \\
+Spatial acceleration & Implemented/Tested for declared domains & OBB is intentionally not a semantic requirement. \\
+GPU abstraction & Implemented/Tested & No hardware backend is part of the abstraction itself. \\
+Metal & Implemented/Tested/Hardware-validated for conservative AABB & Not an authoritative f64 geometry engine. \\
+CUDA & Implemented/Tested/Hardware-unvalidated & Requires an actual NVIDIA runner for hardware claims. \\
+Cross-backend conformance & Implemented/Tested with declared AABB scope & Broader vector/matrix/NURBS cross-backend equivalence is not certified. \\
+Final scale/red-team matrix & Implemented/Tested & M16 covers declared adversarial families; it does not make unsupported mathematics supported. \\
+\bottomrule
+\end{longtable}
+
+\chapter{GPU Architecture and Conformance}
+
+\pathref{kernel/math/gpu.rs} defines the backend-neutral GPU contract.
+
+The current conceptual dimensions are:
+\begin{itemize}
+\item Backend: CPU, Metal, CUDA, or Auto selection.
+\item Precision: authoritative f64 or explicitly scoped conservative f32 broad-phase capability.
+\item Operation: vector/matrix/transform, predicate, curve/surface/NURBS, Jacobian residual, candidate generation, tessellation, as declared.
+\item Determinism: bitwise, numerical, or non-deterministic as explicitly declared.
+\item Capability: availability, f64 support, determinism, operation set, maximum batch/workgroup constraints.
+\end{itemize}
+
+\section{M12 abstraction}
+M12 establishes capability discovery, selection policy, batching and memory checks, workgroup/dispatch planning, backend-neutral execution, and conformance comparison. It is not itself a hardware implementation.
+
+\section{M13 Metal}
+M13 provides a real Apple Silicon Metal execution path for the certified conservative AABB candidate-generation workload. CPU f64 remains the acceptance/reference authority. Metal f32 broad-phase bounds use outward rounding so an accelerator candidate omission is a correctness failure.
+
+\section{M14 CUDA}
+M14 provides real CUDA device-native-f64 AABB candidate generation through the declared feature-gated backend. No hardware status is claimed unless an NVIDIA runner actually executes it.
+
+\section{M15 conformance}
+M15 uses a shared adversarial AABB fixture. False positives are acceptable for a conservative candidate set; false negatives are not. Repeated execution must be deterministic for the declared workload.
+
+\section{M16 performance}
+The recorded macOS-14 release measurements are:
+
+\begin{tabular}{@{}rrrrrrr@{}}
+\toprule
+Batch & CPU median us & Metal median us & CPU Mpair/s & Metal Mpair/s & Setup/transfer & Efficiency \\
+\midrule
+32  & 1.25  & 745.79  & 396.8000 & 0.6651  & 13.16\% & 4.15\% \\
+64  & 4.79  & 1260.67 & 420.7012 & 1.5992  & 11.37\% & 9.97\% \\
+128 & 17.33 & 1136.58 & 468.9321 & 7.1513  & 7.41\%  & 44.59\% \\
+256 & 61.88 & 2035.33 & 527.5152 & 16.0367 & 6.23\%  & 100.00\% \\
+512 & 229.75 & 10602.17& 569.3841 & 12.3386 & 2.08\%  & 76.94\% \\
+\bottomrule
+\end{tabular}
+
+No CPU/Metal crossover occurred in the tested range. This is evidence for that measured workload, not a universal performance theorem.
+
+\chapter{OCCT Boundary}
+
+\pathref{kernel/occt} is an OpenCASCADE-backed native boundary.
+
+The current bridge is C++17 and is built through CMake. The bridge sources include primitive geometry, Boolean operations, extrusion, revolution, loft, fillet, NURBS curve/surface work, differential surface operations, curve/surface operations, section, sweep, sewing, topology evidence, tessellation, exchange, and pathology fixtures.
+
+OCCT may be:
+\begin{itemize}
+\item an implementation backend;
+\item an oracle for independent comparison;
+\item a translation/exchange mechanism.
+\end{itemize}
+
+OCCT must not become the system-wide semantic authority. A domain contract belongs above the backend.
+
+\chapter{Kernel Contract Crates}
+
+The contract workspace separates stable backend-neutral concepts.
+
+\begin{longtable}{@{}p{0.29\textwidth}p{0.63\textwidth}@{}}
+\toprule
+Crate & Responsibility \\
+\midrule
+\texttt{draft-api} & Drafting contract family. \\
+\texttt{exchange-api} & STEP/IGES import/export status, evidence, and backend abstraction. \\
+\texttt{fillet-api} & Fillet contract family. \\
+\texttt{freeform-api} & Freeform surface contract family. \\
+\texttt{geometry-api} & Common geometry backend status, kinds, tolerance context, bounding boxes, topology counts, descriptors, validation. \\
+\texttt{geometry-contract-tests} & Backend-independent geometry contract tests. \\
+\texttt{kernel-integration-api} & Operation identity, phase, cancellation, error classification, and lifecycle semantics. \\
+\texttt{mesh-api} & Mesh vertices/triangles/tessellation options and validation. \\
+\texttt{nurbs-surface-api} & NURBS surface evaluation and trim surface types. \\
+\texttt{offset-api} & Offset contract family. \\
+\texttt{reference-evolution-api} & Topology/reference evolution evidence. \\
+\texttt{reference-migration-api} & Reference migration contract family. \\
+\texttt{shell-api} & Shell/thickening contract family. \\
+\texttt{surface-operations-api} & Point/surface, curve/surface, surface/surface, bilinear and splitting operation contracts. \\
+\texttt{sweep-api} & Sweep contract family. \\
+\texttt{topology-api} & Topology IDs, edge uses, shell orientation/connectivity, containment graphs, repair/snapshot structures. \\
+\bottomrule
+\end{longtable}
+
+\section{Geometry status model}
+\pathref{kernel/contracts/crates/geometry-api/src/lib.rs} defines \texttt{GeometryStatus}: Success, InvalidInput, BackendFailure, TopologyInvalid, Ambiguous, Indeterminate, Unsupported. That vocabulary is intentionally stronger than a Boolean success/failure flag.
+
+\section{Tolerance context}
+The common geometry contract distinguishes modeling and validation tolerances, both finite and non-negative. Tolerance is explicit input rather than hidden global state.
+
+\section{Kernel integration lifecycle}
+\pathref{kernel/contracts/crates/kernel-integration-api/src/lib.rs} defines operation kinds Create, Transform, Modify, Boolean, Repair, Import, Export; phases Preconditions, Execute, Validate, Commit; and operation errors Cancelled, InvalidInput, Unsupported, SemanticInvariantViolation, BackendFailure, Internal. The phase model makes "validation after execution but before semantic commit" explicit.

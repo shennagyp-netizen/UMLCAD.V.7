@@ -78,7 +78,7 @@ mod imp {
     use objc2::rc::Retained;
     use objc2_foundation::{ns_string, NSString};
     use objc2_metal::{
-        MTLBuffer, MTLCommandBuffer, MTLCommandQueue, MTLComputeCommandEncoder,
+        MTLBuffer, MTLCommandBuffer, MTLCommandEncoder, MTLCommandQueue, MTLComputeCommandEncoder,
         MTLComputePipelineState, MTLCreateSystemDefaultDevice, MTLDevice,
         MTLLibrary, MTLResourceOptions, MTLSize,
     };

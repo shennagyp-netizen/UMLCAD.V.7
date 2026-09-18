@@ -275,7 +275,7 @@ public sealed class ArchitectureAndEngineeringTests
     [Fact]
     public void DrawingCapabilityProfileContainsDetailedDraftingSurface()
     {
-        var profile = CatiaDraftingCapabilityProfile.Baseline(DrawingStandard.Iso);
+        var profile = MechanicalDraftingCapabilityProfile.Baseline(DrawingStandard.Iso);
 
         Assert.Contains(DrawingViewKind.Section, profile.ViewKinds);
         Assert.Contains(DrawingViewKind.AlignedSection, profile.ViewKinds);

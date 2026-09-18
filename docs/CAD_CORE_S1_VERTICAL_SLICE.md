@@ -21,7 +21,7 @@ A reference contains:
 
 Resolution is explicit: Resolved, Missing, Ambiguous, Indeterminate, or Unsupported. The engine fails closed whenever a required reference is not uniquely resolved.
 
-The vertical slice uses a planar-face selector defined by normal and point evidence. It therefore does not depend on a face-array index.
+The vertical slice uses a planar-face selector defined by normal and point evidence. The production box adapter now supplies that evidence from the certified box topology contract, so resolution does not depend on face-array order.
 
 ## Vertical slice
 
@@ -46,7 +46,7 @@ Incremental invalidation is the explicit transitive dependent closure of the cha
 
 ## Kernel boundary
 
-The production Rust kernel already contains authoritative B-Rep/topology mathematics. The new .NET contract deliberately does not reach into those implementation types. The concrete Rust/HTTP adapter is the next boundary: it must translate the typed kernel-evaluation contract to the existing native authority without routing CAD semantics back through the legacy V4 build model.
+The production Rust kernel already contains authoritative B-Rep/topology mathematics. The new .NET contract deliberately does not reach into those implementation types. The concrete .NET Rust adapter now exists for the first certified geometry subset (axis-aligned box). It translates the typed kernel-evaluation contract through the existing geometry transport without routing CAD semantics through the legacy V4 build model.
 
 ## Downstream
 

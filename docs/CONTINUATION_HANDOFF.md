@@ -361,3 +361,32 @@ Next implementation boundary after infrastructure recovery:
 3. Establish authoritative B-Rep/topology provenance and semantic reference resolution from the real kernel result.
 4. Connect Sheet Metal/CAM/Drawing/BOM to authoritative CAD results, preserving their existing domain boundaries.
 5. Execute the authoritative Rust/.NET/E2E/Metal/performance gates on the exact branch head before declaring S1/S0 green or merging PR #38.
+
+## System-CAD S1 production adapter progress
+
+The current system-CAD implementation head is `977e8eb5f5aadcd9bd3774e075d776bfa871cd6b`.
+
+The .NET system-CAD boundary now contains a production `ICadKernelEvaluator` implementation:
+- `dotnet/src/UMLCAD.Kernel.Client/RustCadKernelEvaluator.cs`
+- registered by `AddRustKernel()` as the production evaluator;
+- delegates the first certified geometry subset (axis-aligned box solid) to the existing typed Rust geometry transport;
+- maps the kernel result into the new `Cad.Contracts.AuthoritativeCadResult` with deterministic bounds and topology provenance;
+- enriches the certified box topology with semantic planar-face normal/point evidence required by the new reference model;
+- resolves semantic planar-face references independently of topology-array ordering;
+- fails closed on expected-result mismatch, malformed/unsupported selectors, ambiguous topology evidence, incomplete kernel results, and unsupported feature types;
+- does not use or disguise the legacy `uml-cad-build-package/1.0.0` route.
+
+Tests added in `dotnet/tests/UMLCAD.Engineering.Tests/RustCadKernelEvaluatorTests.cs` cover production-adapter box evaluation, semantic face resolution, ambiguity fail-closed behavior, unsupported-feature fail-closed behavior, and CadEvaluationEngine integration.
+
+The adapter currently certifies only the axis-aligned box subset. The S1 semantic vertical slice still contains sketch/circle and extrusion concepts that do not yet have a direct production typed kernel transport contract in the existing mathematical authority. They remain contract-test coverage until those .NET-to-kernel contracts are explicitly established. No geometry is approximated or silently routed through the legacy build model.
+
+Validation status:
+- local container: `dotnet` SDK unavailable;
+- exact-head authoritative workflows for `977e8eb...`: all failed before job execution with `runner_id=0` and zero steps, matching the existing GitHub Actions infrastructure failure pattern;
+- therefore the adapter is **Implemented / Test-authored; compilation and runtime E2E remain unverified**.
+
+Next .NET implementation boundary:
+1. establish the typed sketch/constraint transport required for the S1 semantic sketch without using the legacy build route;
+2. establish a certified profile/result contract that can feed the existing convex-planar-extrusion authority without geometric approximation;
+3. replace the remaining S1 contract-test kernel only when the corresponding production contracts exist;
+4. then connect result provenance and downstream Sheet Metal/CAM/Drawing/BOM consumers to the real authoritative CAD-result graph.

@@ -55,9 +55,10 @@ public sealed class ExecutableCadSliceTests
         Assert.Equal(AuthoritativeResultStatus.Succeeded, result.Status);
         Assert.Equal(6, result.TopologyBindings.Count);
         Assert.True(fake.LastRequest is not null);
-        Assert.Equal(specification.CanonicalDefinition, fake.LastRequest!.OperationIdentity == featureId.Value.ToString("D")
-            ? specification.CanonicalDefinition
-            : string.Empty);
+        Assert.Equal(featureId.Value.ToString("D"), fake.LastRequest!.OperationIdentity);
+        Assert.Equal(new KernelVector3(0d, 0d, 0d), fake.LastRequest.Min);
+        Assert.Equal(new KernelVector3(2d, 3d, 4d), fake.LastRequest.Max);
+        Assert.Equal(new KernelTolerance(1e-9, 1e-9), fake.LastRequest.Tolerance);
     }
 
     [Fact]

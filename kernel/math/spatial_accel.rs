@@ -127,7 +127,7 @@ pub fn subdivide_aabb8(bounds: Aabb3) -> [Aabb3; 8] {
 }
 
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SpatialSubdivisionItem {
     pub id: usize,
     pub bounds: Aabb3,

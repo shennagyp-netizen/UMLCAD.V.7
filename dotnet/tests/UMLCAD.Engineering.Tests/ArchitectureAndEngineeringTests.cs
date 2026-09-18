@@ -232,6 +232,8 @@ public sealed class ArchitectureAndEngineeringTests
         var second = post.Generate(operation, machine, tool);
 
         Assert.Equal(first.Serialize(), second.Serialize());
+        Assert.Equal(first.ContentHash(), second.ContentHash());
+        Assert.Equal(64, first.ContentHash().Length);
         Assert.Contains("G21", first.Lines);
         Assert.Contains("G90", first.Lines);
         Assert.Contains("(TOOL T10 DIA 10)", first.Lines);

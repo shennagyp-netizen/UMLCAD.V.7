@@ -109,7 +109,7 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 
 ## M11 work-in-progress boundary
 
-M11 is now active from `main` commit `59b8f7849bd5d094b31088631006505e2eda61b6`. Head `d400ecefdf5d35a4f88f4917c3f6e07dd551bf01` adds the first surface-tessellation authority slice. It is not yet M11-complete and is awaiting exact-head CI validation.
+M11 is now active from `main` commit `59b8f7849bd5d094b31088631006505e2eda61b6`. Head `a083cdf4504842c6c86e5cf7821aa79f5d8df6e3` contains the first adaptive surface-tessellation authority slice plus the CI-discovered metric correction. It is not yet M11-complete and is awaiting exact-head CI validation.
 
 ## M9 completion boundary
 

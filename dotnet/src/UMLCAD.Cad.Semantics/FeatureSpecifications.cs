@@ -1,27 +1,34 @@
 namespace UMLCAD.Cad.Semantics;
 
-public abstract record FeatureSpecification(
-    SemanticId FeatureId,
-    SemanticId PartId,
-    string Name,
-    IReadOnlyList<SemanticId> Dependencies)
+public abstract record FeatureSpecification
 {
-    public FeatureSpecification
+    public SemanticId FeatureId { get; }
+    public SemanticId PartId { get; }
+    public string Name { get; }
+    public IReadOnlyList<SemanticId> Dependencies { get; }
+
+    protected FeatureSpecification(
+        SemanticId featureId,
+        SemanticId partId,
+        string name,
+        IReadOnlyList<SemanticId> dependencies)
     {
-        if (FeatureId.Value == Guid.Empty)
-            throw new ArgumentException("FeatureId is required.", nameof(FeatureId));
+        if (featureId.Value == Guid.Empty)
+            throw new ArgumentException("FeatureId is required.", nameof(featureId));
+        if (partId.Value == Guid.Empty)
+            throw new ArgumentException("PartId is required.", nameof(partId));
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Feature name is required.", nameof(name));
 
-        if (PartId.Value == Guid.Empty)
-            throw new ArgumentException("PartId is required.", nameof(PartId));
+        Dependencies = dependencies?.Distinct().ToArray()
+            ?? throw new ArgumentNullException(nameof(dependencies));
 
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Feature name is required.", nameof(Name));
+        if (Dependencies.Contains(featureId))
+            throw new ArgumentException("A feature cannot depend on itself.", nameof(dependencies));
 
-        Dependencies = Dependencies?.Distinct().ToArray() ??
-            throw new ArgumentNullException(nameof(Dependencies));
-
-        if (Dependencies.Contains(FeatureId))
-            throw new ArgumentException("A feature cannot depend on itself.", nameof(Dependencies));
+        FeatureId = featureId;
+        PartId = partId;
+        Name = name;
     }
 
     public abstract string OperationKind { get; }
@@ -29,27 +36,43 @@ public abstract record FeatureSpecification(
     public abstract string CanonicalDefinition { get; }
 }
 
-public sealed record AxisAlignedBoxSolidSpecification(
-    SemanticId FeatureId,
-    SemanticId PartId,
-    string Name,
-    IReadOnlyList<SemanticId> Dependencies,
-    double MinXmm,
-    double MinYmm,
-    double MinZmm,
-    double MaxXmm,
-    double MaxYmm,
-    double MaxZmm)
-    : FeatureSpecification(FeatureId, PartId, Name, Dependencies)
+public sealed record AxisAlignedBoxSolidSpecification : FeatureSpecification
 {
-    public AxisAlignedBoxSolidSpecification
-    {
-        var values = new[] { MinXmm, MinYmm, MinZmm, MaxXmm, MaxYmm, MaxZmm };
-        if (values.Any(value => !double.IsFinite(value)))
-            throw new ArgumentOutOfRangeException(nameof(MinXmm), "Box coordinates must be finite.");
+    public double MinXmm { get; }
+    public double MinYmm { get; }
+    public double MinZmm { get; }
+    public double MaxXmm { get; }
+    public double MaxYmm { get; }
+    public double MaxZmm { get; }
 
-        if (MaxXmm <= MinXmm || MaxYmm <= MinYmm || MaxZmm <= MinZmm)
-            throw new ArgumentException("Box maxima must be strictly greater than minima.", nameof(MaxXmm));
+    public AxisAlignedBoxSolidSpecification(
+        SemanticId featureId,
+        SemanticId partId,
+        string name,
+        IReadOnlyList<SemanticId> dependencies,
+        double minXmm,
+        double minYmm,
+        double minZmm,
+        double maxXmm,
+        double maxYmm,
+        double maxZmm)
+        : base(featureId, partId, name, dependencies)
+    {
+        var values = new[] { minXmm, minYmm, minZmm, maxXmm, maxYmm, maxZmm };
+        if (values.Any(value => !double.IsFinite(value)))
+            throw new ArgumentOutOfRangeException(nameof(minXmm), "Box coordinates must be finite.");
+
+        if (maxXmm <= minXmm || maxYmm <= minYmm || maxZmm <= minZmm)
+            throw new ArgumentException(
+                "Box maxima must be strictly greater than minima.",
+                nameof(maxXmm));
+
+        MinXmm = minXmm;
+        MinYmm = minYmm;
+        MinZmm = minZmm;
+        MaxXmm = maxXmm;
+        MaxYmm = maxYmm;
+        MaxZmm = maxZmm;
     }
 
     public override string OperationKind => "PartDesign.AxisAlignedBoxSolid";
@@ -62,54 +85,91 @@ public sealed record AxisAlignedBoxSolidSpecification(
             FormattableString.Invariant($"max=({MaxXmm:R},{MaxYmm:R},{MaxZmm:R})"));
 }
 
-
-public readonly record struct SemanticVector3(double X, double Y, double Z)
+public readonly record struct SemanticVector3
 {
-    public SemanticVector3
+    public double X { get; }
+    public double Y { get; }
+    public double Z { get; }
+
+    public SemanticVector3(double x, double y, double z)
     {
-        if (!double.IsFinite(X) || !double.IsFinite(Y) || !double.IsFinite(Z))
-            throw new ArgumentOutOfRangeException(nameof(X), "Coordinate components must be finite.");
+        if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(z))
+            throw new ArgumentOutOfRangeException(
+                nameof(x),
+                "Coordinate components must be finite.");
+
+        X = x;
+        Y = y;
+        Z = z;
     }
 }
 
-public readonly record struct SketchProfilePoint(double U, double V)
+public readonly record struct SketchProfilePoint
 {
-    public SketchProfilePoint
+    public double U { get; }
+    public double V { get; }
+
+    public SketchProfilePoint(double u, double v)
     {
-        if (!double.IsFinite(U) || !double.IsFinite(V))
-            throw new ArgumentOutOfRangeException(nameof(U), "Profile coordinates must be finite.");
+        if (!double.IsFinite(u) || !double.IsFinite(v))
+            throw new ArgumentOutOfRangeException(
+                nameof(u),
+                "Profile coordinates must be finite.");
+
+        U = u;
+        V = v;
     }
 }
 
-public sealed record ConvexSketchProfileDefinition(
-    SemanticId ProfileId,
-    SemanticId PartId,
-    string Name,
-    SemanticVector3 OriginMm,
-    SemanticVector3 UDirection,
-    SemanticVector3 VDirection,
-    IReadOnlyList<SketchProfilePoint> Points)
+public sealed record ConvexSketchProfileDefinition
 {
-    public ConvexSketchProfileDefinition
-    {
-        if (ProfileId.Value == Guid.Empty)
-            throw new ArgumentException("ProfileId is required.", nameof(ProfileId));
-        if (PartId.Value == Guid.Empty)
-            throw new ArgumentException("PartId is required.", nameof(PartId));
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Profile name is required.", nameof(Name));
+    public SemanticId ProfileId { get; }
+    public SemanticId PartId { get; }
+    public string Name { get; }
+    public SemanticVector3 OriginMm { get; }
+    public SemanticVector3 UDirection { get; }
+    public SemanticVector3 VDirection { get; }
+    public IReadOnlyList<SketchProfilePoint> Points { get; }
 
-        Points = Points?.ToArray() ??
-            throw new ArgumentNullException(nameof(Points));
+    public ConvexSketchProfileDefinition(
+        SemanticId profileId,
+        SemanticId partId,
+        string name,
+        SemanticVector3 originMm,
+        SemanticVector3 uDirection,
+        SemanticVector3 vDirection,
+        IReadOnlyList<SketchProfilePoint> points)
+    {
+        if (profileId.Value == Guid.Empty)
+            throw new ArgumentException("ProfileId is required.", nameof(profileId));
+        if (partId.Value == Guid.Empty)
+            throw new ArgumentException("PartId is required.", nameof(partId));
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Profile name is required.", nameof(name));
+
+        Points = points?.ToArray()
+            ?? throw new ArgumentNullException(nameof(points));
 
         if (Points.Count < 3)
-            throw new ArgumentException("A convex profile requires at least three points.", nameof(Points));
+            throw new ArgumentException(
+                "A convex profile requires at least three points.",
+                nameof(points));
 
-        var uLength = UDirection.X * UDirection.X + UDirection.Y * UDirection.Y + UDirection.Z * UDirection.Z;
-        var vLength = VDirection.X * VDirection.X + VDirection.Y * VDirection.Y + VDirection.Z * VDirection.Z;
-        var dot = UDirection.X * VDirection.X + UDirection.Y * VDirection.Y + UDirection.Z * VDirection.Z;
+        var uLength =
+            (uDirection.X * uDirection.X) +
+            (uDirection.Y * uDirection.Y) +
+            (uDirection.Z * uDirection.Z);
+        var vLength =
+            (vDirection.X * vDirection.X) +
+            (vDirection.Y * vDirection.Y) +
+            (vDirection.Z * vDirection.Z);
+        var dot =
+            (uDirection.X * vDirection.X) +
+            (uDirection.Y * vDirection.Y) +
+            (uDirection.Z * vDirection.Z);
 
-        if (!double.IsFinite(uLength) || !double.IsFinite(vLength) ||
+        if (!double.IsFinite(uLength) ||
+            !double.IsFinite(vLength) ||
             !double.IsFinite(dot) ||
             Math.Abs(uLength - 1d) > 1e-12 ||
             Math.Abs(vLength - 1d) > 1e-12 ||
@@ -117,31 +177,44 @@ public sealed record ConvexSketchProfileDefinition(
         {
             throw new ArgumentException(
                 "Sketch U/V directions must form an orthonormal frame.",
-                nameof(UDirection));
+                nameof(uDirection));
         }
+
+        ProfileId = profileId;
+        PartId = partId;
+        Name = name;
+        OriginMm = originMm;
+        UDirection = uDirection;
+        VDirection = vDirection;
     }
 }
 
-public sealed record ExtrusionFeatureSpecification(
-    SemanticId FeatureId,
-    SemanticId PartId,
-    string Name,
-    IReadOnlyList<SemanticId> Dependencies,
-    ConvexSketchProfileDefinition Profile,
-    double DepthMm)
-    : FeatureSpecification(FeatureId, PartId, Name, Dependencies)
+public sealed record ExtrusionFeatureSpecification : FeatureSpecification
 {
-    public ExtrusionFeatureSpecification
-    {
-        ArgumentNullException.ThrowIfNull(Profile);
+    public ConvexSketchProfileDefinition Profile { get; }
+    public double DepthMm { get; }
 
-        if (Profile.PartId != PartId)
+    public ExtrusionFeatureSpecification(
+        SemanticId featureId,
+        SemanticId partId,
+        string name,
+        IReadOnlyList<SemanticId> dependencies,
+        ConvexSketchProfileDefinition profile,
+        double depthMm)
+        : base(featureId, partId, name, dependencies)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        if (profile.PartId != partId)
             throw new ArgumentException(
                 "Extrusion profile must belong to the same part as the extrusion feature.",
-                nameof(Profile));
+                nameof(profile));
 
-        if (!double.IsFinite(DepthMm) || DepthMm <= 0d)
-            throw new ArgumentOutOfRangeException(nameof(DepthMm));
+        if (!double.IsFinite(depthMm) || depthMm <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(depthMm));
+
+        Profile = profile;
+        DepthMm = depthMm;
     }
 
     public override string OperationKind => "PartDesign.ExtrudeConvexPlanarProfile";
@@ -154,6 +227,6 @@ public sealed record ExtrusionFeatureSpecification(
             $"depth={DepthMm:R}",
             $"origin=({Profile.OriginMm.X:R},{Profile.OriginMm.Y:R},{Profile.OriginMm.Z:R})",
             $"u=({Profile.UDirection.X:R},{Profile.UDirection.Y:R},{Profile.UDirection.Z:R})",
-            $"v=({Profile.VDirection.X:R},{Profile.VDirection.Y:R},{Profile.VDirection.Z:R})",
+            $"v=({Profile.VDirection.X:R},{Profile.VDirection.Y:R},{Profile.UDirection.Z:R})",
             $"points={string.Join(",", Profile.Points.Select(p => $"({p.U:R},{p.V:R})"))}");
 }

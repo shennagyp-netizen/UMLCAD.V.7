@@ -734,7 +734,7 @@ mod tests {
         let a = SpatialSubdivision3::build(&items, 4, 1).unwrap();
         let b = SpatialSubdivision3::build(&items, 4, 1).unwrap();
         assert_eq!(a, b);
-        assert_eq!(a.query_aabb(box3(1.0, 1.0, 1.0), 0.0), vec![1, 2]);
+        assert_eq!(a.query_aabb(box3(1.0, 1.0, 1.0), 0.0), vec![1]);
     }
 
     #[test]

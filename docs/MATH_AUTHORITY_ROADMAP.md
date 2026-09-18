@@ -248,3 +248,7 @@ M14 is implemented and repository-tested for the declared NVIDIA CUDA accelerati
 - CUDA hardware validation remains **Not yet hardware-validated** because no NVIDIA runner has executed the feature-gated hardware suite.
 
 The M14 certified domain does not include CUDA execution of the full f64 vector/matrix/transform/NURBS solver stack. Those remain CPU-authoritative pending additional contracts and M15 cross-backend conformance.
+
+## M15 closure record
+
+M15 is implemented and repository-tested for the declared cross-backend conformance domain of AABB candidate generation. The same CPU-generated reference fixture is compared with Metal where Apple Silicon hardware is available and with CUDA where NVIDIA hardware is available. The conformance contract reports false negatives, false positives, malformed sets, and repeat determinism without weakening the underlying mathematical contract. CUDA hardware was not available for execution during this milestone, so CUDA hardware validation remains explicitly unverified. M16 is the next milestone: performance/crossover plus final red-team closure.

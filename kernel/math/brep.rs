@@ -966,7 +966,7 @@ pub fn extrude_convex_planar_region(
             edge: format!("e_bottom_{i}"),
             wire: "w_bottom".into(),
             face: "f_bottom".into(),
-            forward: false,
+            forward: true,
         });
     }
     wires.push(BRepWire {
@@ -1026,7 +1026,6 @@ pub fn extrude_convex_planar_region(
         }
 
         let u = edge.scale(1.0 / length);
-        let side_id = format!("side_{i}");
         let face_id = format!("f_side_{i}");
         let wire_id = format!("w_side_{i}");
 
@@ -1090,8 +1089,6 @@ pub fn extrude_convex_planar_region(
             },
             orientation: true,
         });
-
-        let _ = side_id;
     }
 
     let solid = BRepSolid {

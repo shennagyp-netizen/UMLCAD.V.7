@@ -247,6 +247,7 @@ fn box_solid(body: &[u8]) -> (u16, Value) {
             200,
             json!({
                 "schema": BOX_SOLID_SCHEMA,
+                "status": "succeeded",
                 "succeeded": true,
                 "resultId": report.result_id,
                 "evidenceHash": report.evidence_hash,
@@ -269,6 +270,7 @@ fn box_solid(body: &[u8]) -> (u16, Value) {
             200,
             json!({
                 "schema": BOX_SOLID_SCHEMA,
+                "status": "failed",
                 "succeeded": false,
                 "resultId": null,
                 "evidenceHash": null,

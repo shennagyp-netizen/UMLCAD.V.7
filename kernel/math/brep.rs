@@ -499,9 +499,38 @@ impl BRepSolid {
             if incidence.len() != 2 {
                 return Err(BRepError::NonManifoldEdge);
             }
+            if incidence[0].face == incidence[1].face {
+                return Err(BRepError::NonManifoldEdge);
+            }
             if incidence[0].forward == incidence[1].forward {
                 return Err(BRepError::InconsistentOrientation);
             }
+        }
+
+        // A single shell must be face-connected through shared edges.
+        let mut adjacency: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+        for face_id in &shell.faces {
+            adjacency.entry(face_id.as_str()).or_default();
+        }
+        for incidence in edge_incidence.values() {
+            if incidence.len() == 2 {
+                adjacency.entry(incidence[0].face.as_str()).or_default()
+                    .insert(incidence[1].face.as_str());
+                adjacency.entry(incidence[1].face.as_str()).or_default()
+                    .insert(incidence[0].face.as_str());
+            }
+        }
+        let mut reachable = BTreeSet::new();
+        let mut stack = vec![shell.faces[0].as_str()];
+        while let Some(face_id) = stack.pop() {
+            if reachable.insert(face_id) {
+                if let Some(neighbors) = adjacency.get(face_id) {
+                    stack.extend(neighbors.iter().copied());
+                }
+            }
+        }
+        if reachable.len() != shell.faces.len() {
+            return Err(BRepError::NonManifoldEdge);
         }
 
         for wire in &self.wires {

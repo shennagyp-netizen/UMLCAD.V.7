@@ -198,31 +198,22 @@ Exact-head validation on `b32e8c9...`: Rust kernel workflow #492 PASS; comprehen
 
 M14 is the current CUDA backend milestone; M15 remains cross-backend conformance; M16 remains final performance/crossover and red-team closure.
 
-## M14 completion boundary
+## M16 completion boundary
 
-M14 is implemented and tested for the declared CUDA AABB candidate-generation domain. The CPU f64 implementation remains authoritative. CUDA uses device-native f64 for the certified predicate; candidate ordering is reconstructed deterministically on the CPU; exact CPU overlap omission fails closed. The CUDA driver/NVRTC absence path is explicitly handled as unavailable rather than panic-prone. Hardware validation is **Not yet hardware-validated** because the repository has no confirmed NVIDIA runner execution record for this milestone.
+M16 is now the final roadmap family and is closed on the M16 branch after exact-head Rust, comprehensive E2E/red-team, Metal hardware, and release-performance validation all passed.
 
-## M14 post-merge closure record
+The final validated branch head is `9257d508676c1b20dde7dc7528e3b8a64ed05825`.
 
-M14 is closed on `main` for the declared NVIDIA CUDA acceleration domain at merge commit `f5095cdf53e5db1ef610c8e2fd3620920456e2da`.
+M16 performance evidence on Apple Silicon (`macos-14`) measured the declared AABB candidate-generation workload at batches 32, 64, 128, 256, and 512. Median CPU/Metal latencies were respectively 1.25/745.79 µs, 4.79/1260.67 µs, 17.33/1136.58 µs, 61.88/2035.33 µs, and 229.75/10602.17 µs. No CPU/Metal crossover occurred in that tested range. The report also captured host preparation, buffer setup/upload, device execution, readback, CPU post-processing, transfer/setup overhead, throughput, and batch efficiency.
 
-- PR #34 exact documentation-inclusive head: `f4009a4abd17ad4bc78de11e216a7fcac70f1e8a`.
-- PR #34 exact-head authoritative gates: Rust kernel PASS, comprehensive E2E/red-team PASS, Metal hardware PASS.
-- Post-merge `main` authoritative gates on `f5095cdf53e5db1ef610c8e2fd3620920456e2da`: Rust kernel PASS, comprehensive E2E/red-team PASS, Metal hardware PASS.
-- CUDA implementation: real device-native-f64 AABB candidate generation via `cudarc`, CPU f64 acceptance/reference authority, deterministic CPU reconstruction, fail-closed false-negative detection, and explicit no-driver handling.
-- Normal repository gates contain zero ignored CUDA tests; hardware cases are feature-gated behind `cuda-hardware` and must be explicitly enabled on an NVIDIA runner.
-- CUDA hardware status: **Not yet hardware-validated**. No confirmed NVIDIA hardware execution record was available during M14 closure.
-- M15 cross-backend conformance is now closed for the declared common AABB candidate-generation workload; M16 remains final performance/crossover and full red-team closure.
+The final M16 red-team matrix covers:
+- scale invariance across 1e-12 through 1e12;
+- near-parallel, tangent, and coincident intersection behavior;
+- non-finite intersection inputs;
+- extreme positive finite NURBS weights and invalid parameter/weight domains;
+- rank-deficient linear systems and deterministic GPU candidate ordering;
+- malformed/duplicate GPU candidate sets.
 
-## M15 post-merge closure record
+M16 CUDA status remains **hardware-unverified** because no NVIDIA runner was available for execution. No claim of CUDA hardware performance or CUDA hardware conformance is made.
 
-M15 is closed on `main` for the declared common CPU/Metal/CUDA AABB candidate-generation workload at merge commit `b88862004debfda016d11c3d7da4dced0501065a`.
-
-- PR #35 validated implementation head: `a6eded2c7de66b6708e819e17916d82798c26a8a`.
-- PR #35 exact-head authoritative gates: Rust kernel PASS; comprehensive E2E/red-team PASS; Metal hardware PASS.
-- Post-merge `main` authoritative gates on `b88862004debfda016d11c3d7da4dced0501065a`: Rust kernel PASS; comprehensive E2E/red-team PASS; Metal hardware PASS.
-- The backend-neutral conformance contract reports false negatives separately from permitted broad-phase false positives and verifies repeat determinism.
-- One canonical adversarial fixture is reused for CPU reference, Metal, and CUDA paths.
-- Metal hardware executes and validates the shared fixture against the CPU f64 reference on Apple Silicon CI.
-- CUDA is wired to the same conformance suite behind the explicit `cuda-hardware` feature, but no NVIDIA hardware execution record is currently available; CUDA remains **Not yet hardware-validated**.
-- The closure does not certify cross-backend equivalence for the broader vector/matrix/transform/NURBS stack; those operations remain CPU-authoritative until additional common hardware contracts are established.
+M0-M16 is now closed as a roadmap of certified mathematical capabilities, not as a claim that every conceivable CAD operation is complete. Future changes to the mathematical authority layer require new explicit capability contracts and fresh gates.

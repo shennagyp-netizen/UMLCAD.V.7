@@ -18,6 +18,7 @@ public sealed record ManufacturingOperation(
     SemanticId OperationId,
     ManufacturingProcessKind Process,
     string ToolId,
+    double StockThicknessMm,
     IReadOnlyList<ToolpathPoint> Path)
 {
     public ManufacturingOperation
@@ -26,6 +27,8 @@ public sealed record ManufacturingOperation(
             throw new ArgumentException("OperationId is required.", nameof(OperationId));
         if (string.IsNullOrWhiteSpace(ToolId))
             throw new ArgumentException("ToolId is required.", nameof(ToolId));
+        if (!double.IsFinite(StockThicknessMm) || StockThicknessMm <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(StockThicknessMm));
 
         Path = Path?.ToArray() ??
             throw new ArgumentNullException(nameof(Path));
@@ -77,11 +80,16 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(tool);
 
+        if (!machine.SupportsProcess(operation.Process, operation.StockThicknessMm))
+            throw new InvalidOperationException(
+                $"Machine '{machine.MachineId}' does not support process '{operation.Process}' at stock thickness {operation.StockThicknessMm.ToString(CultureInfo.InvariantCulture)} mm.");
+
         if (!MachineToolCompatibility.IsCompatible(machine, tool))
             throw new InvalidOperationException("Machine/tool interfaces are incompatible.");
 
-        if (operation.Process is not (ManufacturingProcessKind.Milling or ManufacturingProcessKind.Turning))
-            throw new NotSupportedException($"The deterministic G-code postprocessor does not support {operation.Process}.");
+        if (operation.Process is not ManufacturingProcessKind.Milling)
+            throw new NotSupportedException(
+                $"The deterministic G-code postprocessor currently supports only Milling; process '{operation.Process}' requires a dedicated postprocessor.");
 
         var lines = new List<string>
         {
@@ -89,7 +97,7 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
             $"(UMLCAD OP {operation.OperationId})",
             "G21",
             "G90",
-            $"(TOOL {tool.ToolId})",
+            $"(TOOL {tool.ToolId} DIA {tool.NominalDiameterMm.ToString("0.##########", CultureInfo.InvariantCulture)})",
         };
 
         var first = true;

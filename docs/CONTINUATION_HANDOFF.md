@@ -4,7 +4,7 @@
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
 - Main head before PR #30 merge: `d267d9cb5d277da6d655fefd9d122c1c165e9a53`
-- Latest completed roadmap family after merge: M9 — B-Rep / solid mathematics (certified domains)
+- Latest completed roadmap family after merge: M11 — Tessellation / spatial acceleration (certified domains)
 - Latest merged M10 closure PR: #27, `math: complete solver result status authority`
 - PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
 - Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
@@ -13,7 +13,7 @@
 - PR #30 validated implementation head: `9d04c05f67f4e5542df56b8612806fe8296f624b`
 
 ## Completed mathematical-authority state
-PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M11 is the next incomplete roadmap family after PR #30 post-merge verification.
+PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M12 is now the next incomplete roadmap family after the M11 post-merge verification.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -104,8 +104,8 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 ## Immediate continuation
 1. Verify PR #30's final exact-head Rust and comprehensive E2E/red-team gates on the documentation head, then merge it.
 2. Verify post-merge main Rust and comprehensive E2E/red-team gates on the resulting main commit.
-3. After post-merge green, begin M11 tessellation/spatial mathematics from the updated main head.
-3. Keep GPU work deferred until the CPU mathematical families are closed; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
+3. After post-merge green, begin M12 GPU abstraction from the updated main head.
+4. Keep real Metal/CUDA execution deferred to M13/M14; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 
 ## M11 completion boundary
 
@@ -175,3 +175,13 @@ Every capability must be distinguished as `Implemented`, `Tested`, `Hardware-val
 > CPU defines the reference behavior. Metal and CUDA accelerate it. OCCT can challenge it. Nothing downstream defines it.
 
 > Do not chase feature count. Build strong mathematical primitives from which professional CAD features can be constructed.
+
+## M12 completion boundary
+
+M12 is now documented as `Implemented / Tested` for its declared backend-neutral abstraction domain. The validated implementation head is `8a3043b5c8e216845d281dfe6c6f620d30d868cb`.
+
+The M12 abstraction defines conceptual Auto/CPU/Metal/CUDA backends; explicit capability discovery; f64 precision and determinism requirements; automatic/preferred/explicit backend selection with diagnostic CPU fallback; checked batch-memory sizing and transfer accounting; immutable workgroup/dispatch planning; a backend-neutral executor submission interface; and CPU-versus-accelerator f64 conformance comparison with explicit tolerances and fail-closed mismatch/non-finite handling.
+
+No Metal or CUDA hardware backend is implemented or hardware-validated by M12. No GPU handle/resource enters mathematical semantic state. The deprecated legacy selector remains only for compatibility; authority code uses the diagnostic selection result. M13 adds real Apple Silicon Metal execution; M14 adds real NVIDIA CUDA execution; M15 adds cross-backend hardware conformance.
+
+The source implementation was green in the authoritative Rust kernel and comprehensive E2E/red-team gates before this documentation closure. The documentation-inclusive branch head must pass both gates again before PR #32 is merged.

@@ -345,7 +345,7 @@ Important CATIA drafting capability mapping is documented from the official Dass
 
 Current system-CAD branch:
 - branch: `milestone/cad-system-s0-boundaries`
-- current implementation head: `a3b23567c402351d6e513a8030c8c202c1e7ec3c`
+- current implementation head: `c0c22cb590195c9fc95bc317cd6102923b5dbe91`
 - PR #38 remains open and unmerged.
 
 Validation status at this snapshot:
@@ -364,25 +364,24 @@ Next implementation boundary after infrastructure recovery:
 
 ## System-CAD S1 production adapter progress
 
-The current system-CAD implementation head is `977e8eb5f5aadcd9bd3774e075d776bfa871cd6b`.
+The current system-CAD implementation head is `c0c22cb590195c9fc95bc317cd6102923b5dbe91`.
 
 The .NET system-CAD boundary now contains a production `ICadKernelEvaluator` implementation and a separate CAD-owned semantic reference resolver:
 - `dotnet/src/UMLCAD.Kernel.Client/RustCadKernelEvaluator.cs`
 - registered by `AddRustKernel()` as the production evaluator;
 - delegates the first certified geometry subset (axis-aligned box solid) to the existing typed Rust geometry transport;
 - maps the kernel result into the new `Cad.Contracts.AuthoritativeCadResult` with deterministic bounds and topology provenance;
-- enriches the certified box topology with semantic planar-face normal/point evidence required by the new reference model;
 - resolves semantic planar-face references independently of topology-array ordering;
 - fails closed on expected-result mismatch, malformed/unsupported selectors, ambiguous topology evidence, incomplete kernel results, and unsupported feature types;
 - does not use or disguise the legacy `uml-cad-build-package/1.0.0` route.
 
 Tests added in `dotnet/tests/UMLCAD.Engineering.Tests/RustCadKernelEvaluatorTests.cs` cover production-adapter box evaluation, semantic face resolution, ambiguity fail-closed behavior, unsupported-feature fail-closed behavior, and CadEvaluationEngine integration.
 
-The adapter currently certifies only the axis-aligned box subset. Reference resolution has been separated from the adapter: `AuthoritativeCadReferenceResolver` resolves semantic planar-face evidence against authoritative results inside `UMLCAD.Cad.Engine`; the kernel adapter performs execution/result transport only. The S1 semantic vertical slice still contains sketch/circle and extrusion concepts that do not yet have a direct production typed kernel transport contract in the existing mathematical authority. They remain contract-test coverage until those .NET-to-kernel contracts are explicitly established. No geometry is approximated or silently routed through the legacy build model.
+The production adapter currently certifies the axis-aligned box through the new S1 `ICadKernelEvaluator` path. A typed convex-planar-extrusion transport also exists, but it is not yet composed through that canonical S1 evaluator path and accepts polygonal profiles only. The mandatory circle-sketch → additive/subtractive solid composition therefore remains incomplete. No geometry is approximated and no CAD semantic operation is routed through the legacy `uml-cad-build-package/1.0.0` path.
 
 Validation status:
 - local container: `dotnet` SDK unavailable;
-- exact-head authoritative workflows for `977e8eb...`: all failed before job execution with `runner_id=0` and zero steps, matching the existing GitHub Actions infrastructure failure pattern;
+- exact-head authoritative workflows for `c0c22cb...`: all failed before job execution with `runner_id=0` and zero steps, matching the existing GitHub Actions infrastructure failure pattern;
 - therefore the adapter is **Implemented / Test-authored; compilation and runtime E2E remain unverified**.
 
 Next .NET implementation boundary:
@@ -407,3 +406,11 @@ The .NET S1 evaluation path now carries document-level tolerance semantics end-t
 ## System-CAD frame transformation progress
 
 The oriented `CadFrame` contract now provides deterministic local/world point and vector transforms. This makes frame orientation operational for future sketch planes, occurrence transforms, drawing views, and semantic reference context rather than storing orientation as passive metadata.
+
+## System-CAD correction — kernel changes from previous pass reverted
+
+A prior implementation pass incorrectly broadened the Rust/native transport with additional face-evidence fields and corresponding kernel-host/test changes. That violated the current system-CAD instruction that the existing Rust mathematical authority remain unchanged during .NET system development.
+
+Those changes were reverted from the system branch. The branch is now restored to `c0c22cb590195c9fc95bc317cd6102923b5dbe91`, immediately before that incorrect pass. The existing Rust commits already present in the branch before that point are retained; no new mathematical algorithm or Rust semantic authority was introduced by the correction.
+
+The next implementation work must remain in the .NET semantic/evaluation/application layers unless a narrowly scoped transport exposure of an already-existing Rust capability is demonstrably required by an explicit contract.

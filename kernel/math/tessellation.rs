@@ -1039,24 +1039,8 @@ where
         }
     };
 
-    let chord_error = midpoint_chord_error(
-        SurfaceSample3 {
-            parameter: a.parameter,
-            point: a.point,
-            normal: a.normal,
-        },
-        SurfaceSample3 {
-            parameter: b.parameter,
-            point: b.point,
-            normal: b.normal,
-        },
-        m,
-    )
-    .max(midpoint_chord_error(a, c, m))
-    .max(midpoint_chord_error(b, c, m));
-
     // Sample all three edge midpoints before accepting the triangle. This
-    // keeps the sampled angular/chord certificate sensitive to curvature along
+    // keeps the sampled chord/angular certificate sensitive to curvature along
     // edges instead of relying on the centroid alone.
     let (ab_u, ab_v) = midpoint_parameter(a, b);
     let (bc_u, bc_v) = midpoint_parameter(b, c);
@@ -1064,6 +1048,19 @@ where
     let ab = sample_trim_parameter(trim, ab_u, ab_v, trim_tolerance, eval, normal)?;
     let bc = sample_trim_parameter(trim, bc_u, bc_v, trim_tolerance, eval, normal)?;
     let ca = sample_trim_parameter(trim, ca_u, ca_v, trim_tolerance, eval, normal)?;
+
+    let triangle_approximation = a
+        .point
+        .scale(1.0 / 3.0)
+        .add(b.point.scale(1.0 / 3.0))
+        .add(c.point.scale(1.0 / 3.0));
+    let chord_error = m
+        .point
+        .sub(triangle_approximation)
+        .length()
+        .max(midpoint_chord_error(a, b, ab))
+        .max(midpoint_chord_error(b, c, bc))
+        .max(midpoint_chord_error(c, a, ca));
 
     let mut angular_error = 0.0f64;
     let samples = [a, b, c, m, ab, bc, ca];
@@ -1089,12 +1086,6 @@ where
     // Uniform four-way subdivision halves each edge span, reaching angular
     // targets much more efficiently than repeated centroid-only three-way
     // subdivision while retaining every boundary sample used by the mesh.
-    let (ab_u, ab_v) = midpoint_parameter(a, b);
-    let (bc_u, bc_v) = midpoint_parameter(b, c);
-    let (ca_u, ca_v) = midpoint_parameter(c, a);
-    let ab = sample_trim_parameter(trim, ab_u, ab_v, trim_tolerance, eval, normal)?;
-    let bc = sample_trim_parameter(trim, bc_u, bc_v, trim_tolerance, eval, normal)?;
-    let ca = sample_trim_parameter(trim, ca_u, ca_v, trim_tolerance, eval, normal)?;
 
     let mut maximum_chord = chord_error;
     let mut maximum_angular = angular_error;

@@ -761,12 +761,30 @@ fn sketch_solve(body: &[u8]) -> (u16, Value) {
     hasher.update(operation_identity.as_bytes());
     hasher.update(b"|");
     hasher.update(sketch_id.as_bytes());
-    hasher.update(b"|");
+    hasher.update(b"|frame|");
+    for key in ["origin", "xAxis", "yAxis", "zAxis"] {
+        let vector = frame
+            .get(key)
+            .and_then(|value| vector3(Some(value)).ok())
+            .expect("frame was validated");
+        hasher.update(vector.x.to_bits().to_le_bytes());
+        hasher.update(vector.y.to_bits().to_le_bytes());
+        hasher.update(vector.z.to_bits().to_le_bytes());
+    }
+    hasher.update(b"|circles|");
     for (id, x, y, radius) in &circles {
         hasher.update(id.as_bytes());
         hasher.update(x.to_bits().to_le_bytes());
         hasher.update(y.to_bits().to_le_bytes());
         hasher.update(radius.to_bits().to_le_bytes());
+    }
+    hasher.update(b"|constraints|");
+    for (id, constraint) in snapshot.constraints.iter() {
+        hasher.update(id.as_bytes());
+        if let Constraint::Fixed { entity_id } = constraint {
+            hasher.update(b"fixed|");
+            hasher.update(entity_id.as_bytes());
+        }
     }
     hasher.update(tolerance.absolute.to_bits().to_le_bytes());
     hasher.update(tolerance.relative.to_bits().to_le_bytes());
@@ -1656,6 +1674,24 @@ mod sketch_endpoint_tests {
         assert_eq!(value["status"], "succeeded");
         assert_eq!(value["circles"].as_array().unwrap().len(), 2);
         assert_eq!(value["degreesOfFreedom"], 0);
+    }
+
+    #[test]
+    fn sketch_result_identity_changes_when_frame_changes() {
+        let original = payload("fixed");
+        let mut value: Value = serde_json::from_slice(&original).unwrap();
+        let (status_a, body_a) = sketch_solve(original);
+        assert_eq!(status_a, 200);
+
+        value["frame"]["origin"] = json!({"x": 0.0, "y": 0.0, "z": 11.0});
+        let (status_b, body_b) = sketch_solve(value.to_string().into_bytes());
+        assert_eq!(status_b, 200);
+
+        let first: Value = serde_json::from_slice(&body_a).unwrap();
+        let second: Value = serde_json::from_slice(&body_b).unwrap();
+        assert_eq!(first["succeeded"], true);
+        assert_eq!(second["succeeded"], true);
+        assert_ne!(first["resultId"], second["resultId"]);
     }
 
     #[test]

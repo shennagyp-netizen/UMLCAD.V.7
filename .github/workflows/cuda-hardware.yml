@@ -1,0 +1,33 @@
+name: CUDA hardware validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cuda:
+    runs-on: [self-hosted, linux, x64, cuda]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Verify NVIDIA CUDA device
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi
+          nvcc --version || true
+      - name: Run CUDA hardware validation
+        shell: bash
+        env:
+          RUST_TEST_THREADS: "1"
+        run: |
+          set -o pipefail
+          cargo test --manifest-path kernel/native/Cargo.toml --features cuda-hardware gpu::cuda -- --nocapture 2>&1 | tee cuda-test.log
+      - name: Upload CUDA test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cuda-test-log
+          path: cuda-test.log
+          if-no-files-found: error

@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+cuda-hardware = []
+
 [dependencies]
 sha2 = "0.10"
 nalgebra = "0.33"
@@ -20,3 +24,6 @@ approx = "0.5"
 objc2 = "0.6.2"
 objc2-foundation = { version = "0.3.2", features = ["NSString"] }
 objc2-metal = "0.3.2"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+cudarc = { version = "0.19.9", default-features = true, features = ["cuda-13030"] }

@@ -45,11 +45,11 @@ public sealed class ConvexProfileExtrusionEvaluator
 
         var status = kernelResult.Status switch
         {
-            AxisAlignedBoxSolidKernelStatus.Succeeded => AuthoritativeResultStatus.Succeeded,
-            AxisAlignedBoxSolidKernelStatus.Failed => AuthoritativeResultStatus.Failed,
-            AxisAlignedBoxSolidKernelStatus.Unsupported => AuthoritativeResultStatus.Unsupported,
-            AxisAlignedBoxSolidKernelStatus.Ambiguous => AuthoritativeResultStatus.Ambiguous,
-            AxisAlignedBoxSolidKernelStatus.Indeterminate => AuthoritativeResultStatus.Indeterminate,
+            GeometryKernelStatus.Succeeded => AuthoritativeResultStatus.Succeeded,
+            GeometryKernelStatus.Failed => AuthoritativeResultStatus.Failed,
+            GeometryKernelStatus.Unsupported => AuthoritativeResultStatus.Unsupported,
+            GeometryKernelStatus.Ambiguous => AuthoritativeResultStatus.Ambiguous,
+            GeometryKernelStatus.Indeterminate => AuthoritativeResultStatus.Indeterminate,
             _ => throw new InvalidOperationException(
                 $"Unknown extrusion kernel status '{kernelResult.Status}'."),
         };

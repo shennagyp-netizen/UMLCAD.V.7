@@ -1350,6 +1350,59 @@ mod trimmed_surface_tests {
     }
 
     #[test]
+    fn convex_trimmed_surface_is_deterministic_under_translation() {
+        let policy = TrimTessellationPolicy {
+            chord_error: 1.0e-3,
+            angular_error: 5.0e-2,
+            parameter_chord_error: 1.0e-3,
+            max_depth: 10,
+        };
+        let trim = square_trim();
+        let base = tessellate_trimmed_surface3(
+            &trim,
+            1.0e-9,
+            policy,
+            |u, v| Ok(Vec3::new(u, v, 0.2 * u * u + 0.3 * v * v)),
+            |u, v| {
+                let du = Vec3::new(1.0, 0.0, 0.4 * u);
+                let dv = Vec3::new(0.0, 1.0, 0.6 * v);
+                du.cross(dv)
+                    .normalized()
+                    .map_err(|_| TessellationError::Degenerate)
+            },
+        )
+        .unwrap();
+        let shift = Vec3::new(17.0, -11.0, 5.0);
+        let translated = tessellate_trimmed_surface3(
+            &trim,
+            1.0e-9,
+            policy,
+            |u, v| {
+                let point = Vec3::new(u, v, 0.2 * u * u + 0.3 * v * v);
+                Ok(point.add(shift))
+            },
+            |u, v| {
+                let du = Vec3::new(1.0, 0.0, 0.4 * u);
+                let dv = Vec3::new(0.0, 1.0, 0.6 * v);
+                du.cross(dv)
+                    .normalized()
+                    .map_err(|_| TessellationError::Degenerate)
+            },
+        )
+        .unwrap();
+
+        assert_eq!(base.parameters, translated.parameters);
+        assert_eq!(base.normals, translated.normals);
+        assert_eq!(base.triangles, translated.triangles);
+        assert_eq!(base.max_chord_error, translated.max_chord_error);
+        assert_eq!(base.max_angular_error, translated.max_angular_error);
+        assert_eq!(base.max_parameter_chord_error, translated.max_parameter_chord_error);
+        for (point, translated_point) in base.vertices.iter().zip(&translated.vertices) {
+            assert_eq!(*translated_point, point.add(shift));
+        }
+    }
+
+    #[test]
     fn concave_trim_is_rejected_by_convex_certification() {
         let trim = TrimLoop2 {
             curves: vec![

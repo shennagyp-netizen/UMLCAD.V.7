@@ -1,11 +1,17 @@
 namespace UMLCAD.Cad.Contracts;
 
-public readonly record struct RepresentationIdentity(string Value)
+public readonly record struct RepresentationIdentity
 {
-    public RepresentationIdentity
+    public string Value { get; }
+
+    public RepresentationIdentity(string value)
     {
-        if (string.IsNullOrWhiteSpace(Value))
-            throw new ArgumentException("Representation identity is required.", nameof(Value));
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException(
+                "Representation identity is required.",
+                nameof(value));
+
+        Value = value;
     }
 
     public override string ToString() => Value;
@@ -29,34 +35,61 @@ public enum RepresentationBuildStatus
     Ambiguous,
 }
 
-public sealed record RepresentationRequest(
-    RepresentationKind Kind,
-    ContractResultId SourceResultId,
-    string DisplayPolicy,
-    string RepresentationPolicyVersion)
+public sealed record RepresentationRequest
 {
-    public RepresentationRequest
+    public RepresentationKind Kind { get; }
+    public ContractResultId SourceResultId { get; }
+    public string DisplayPolicy { get; }
+    public string RepresentationPolicyVersion { get; }
+
+    public RepresentationRequest(
+        RepresentationKind kind,
+        ContractResultId sourceResultId,
+        string displayPolicy,
+        string representationPolicyVersion)
     {
-        if (string.IsNullOrWhiteSpace(DisplayPolicy))
-            throw new ArgumentException("DisplayPolicy is required.", nameof(DisplayPolicy));
-        if (string.IsNullOrWhiteSpace(RepresentationPolicyVersion))
-            throw new ArgumentException("RepresentationPolicyVersion is required.", nameof(RepresentationPolicyVersion));
+        if (string.IsNullOrWhiteSpace(displayPolicy))
+            throw new ArgumentException(
+                "DisplayPolicy is required.",
+                nameof(displayPolicy));
+        if (string.IsNullOrWhiteSpace(representationPolicyVersion))
+            throw new ArgumentException(
+                "RepresentationPolicyVersion is required.",
+                nameof(representationPolicyVersion));
+
+        Kind = kind;
+        SourceResultId = sourceResultId;
+        DisplayPolicy = displayPolicy;
+        RepresentationPolicyVersion = representationPolicyVersion;
     }
 }
 
-public sealed record RepresentationResult(
-    RepresentationIdentity Identity,
-    RepresentationBuildStatus Status,
-    ContractResultId SourceResultId,
-    string ContentHash,
-    IReadOnlyList<string> Diagnostics)
+public sealed record RepresentationResult
 {
-    public RepresentationResult
-    {
-        if (string.IsNullOrWhiteSpace(ContentHash))
-            throw new ArgumentException("ContentHash is required.", nameof(ContentHash));
+    public RepresentationIdentity Identity { get; }
+    public RepresentationBuildStatus Status { get; }
+    public ContractResultId SourceResultId { get; }
+    public string ContentHash { get; }
+    public IReadOnlyList<string> Diagnostics { get; }
 
-        Diagnostics = Diagnostics?.ToArray() ??
-            throw new ArgumentNullException(nameof(Diagnostics));
+    public RepresentationResult(
+        RepresentationIdentity identity,
+        RepresentationBuildStatus status,
+        ContractResultId sourceResultId,
+        string contentHash,
+        IReadOnlyList<string> diagnostics)
+    {
+        if (string.IsNullOrWhiteSpace(contentHash))
+            throw new ArgumentException(
+                "ContentHash is required.",
+                nameof(contentHash));
+
+        Diagnostics = diagnostics?.ToArray()
+            ?? throw new ArgumentNullException(nameof(diagnostics));
+
+        Identity = identity;
+        Status = status;
+        SourceResultId = sourceResultId;
+        ContentHash = contentHash;
     }
 }

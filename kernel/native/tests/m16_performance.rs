@@ -67,7 +67,22 @@ fn m16_metal_performance_evidence_is_finite_and_reports_crossover() {
         "batch,cpu_us,metal_total_us,host_prepare_us,buffer_setup_us,device_us,readback_us,postprocess_us,cpu_mpairs_s,metal_mpairs_s,roundtrip_overhead_pct,batch_efficiency_pct,cpu_pairs,crossover"
     );
 
-    let mut metal_throughputs = Vec::new();
+    #[derive(Clone, Copy)]
+    struct Record {
+        n: usize,
+        cpu: Duration,
+        metal: Duration,
+        prep: Duration,
+        setup: Duration,
+        device: Duration,
+        readback: Duration,
+        postprocess: Duration,
+        cpu_pairs: usize,
+        cpu_throughput: f64,
+        metal_throughput: f64,
+    }
+
+    let mut records = Vec::new();
     let mut crossover = None;
 
     for &n in &sizes {
@@ -75,8 +90,6 @@ fn m16_metal_performance_evidence_is_finite_and_reports_crossover() {
         let reference = cpu_candidate_pairs(&input);
         let pair_count = n * (n - 1) / 2;
 
-        // One warm-up run avoids charging the first command-buffer/pipeline path
-        // as representative steady-state latency.
         let (warm_pairs, _) = backend
             .candidate_pairs_timed(&input)
             .expect("Metal warm-up");
@@ -85,7 +98,8 @@ fn m16_metal_performance_evidence_is_finite_and_reports_crossover() {
             &reference,
             &warm_pairs,
             &warm_pairs,
-        ).unwrap();
+        )
+        .unwrap();
         assert!(warm_report.conforms());
 
         let mut cpu_times = Vec::with_capacity(repeats);
@@ -114,7 +128,8 @@ fn m16_metal_performance_evidence_is_finite_and_reports_crossover() {
                 &reference,
                 &metal_pairs,
                 &metal_pairs,
-            ).unwrap();
+            )
+            .unwrap();
             assert!(report.conforms());
             assert_eq!(report.false_negative_count, 0);
 
@@ -137,19 +152,8 @@ fn m16_metal_performance_evidence_is_finite_and_reports_crossover() {
         let transfer_overhead = setup_median + readback_median;
         let roundtrip_overhead_pct =
             100.0 * transfer_overhead.as_secs_f64() / metal_median.as_secs_f64();
-
         let cpu_throughput = million_pairs_per_second(pair_count, cpu_median);
         let metal_throughput = million_pairs_per_second(pair_count, metal_median);
-        metal_throughputs.push(metal_throughput);
-        let max_seen = metal_throughputs
-            .iter()
-            .copied()
-            .fold(0.0_f64, f64::max);
-        let batch_efficiency_pct = if max_seen > 0.0 {
-            100.0 * metal_throughput / max_seen
-        } else {
-            0.0
-        };
 
         if crossover.is_none() && metal_median < cpu_median {
             crossover = Some(n);
@@ -168,30 +172,60 @@ fn m16_metal_performance_evidence_is_finite_and_reports_crossover() {
         }
         assert!(roundtrip_overhead_pct.is_finite());
         assert!(cpu_throughput.is_finite() && metal_throughput.is_finite());
-        assert!(batch_efficiency_pct.is_finite());
 
-        println!(
-            "{n},{:.2},{:.2},{:.2},{:.2},{:.2},{:.2},{:.2},{:.4},{:.4},{:.2},{:.2},{},{}",
-            micros(cpu_median),
-            micros(metal_median),
-            micros(prep_median),
-            micros(setup_median),
-            micros(device_median),
-            micros(readback_median),
-            micros(postprocess_median),
+        records.push(Record {
+            n,
+            cpu: cpu_median,
+            metal: metal_median,
+            prep: prep_median,
+            setup: setup_median,
+            device: device_median,
+            readback: readback_median,
+            postprocess: postprocess_median,
+            cpu_pairs: reference.len(),
             cpu_throughput,
             metal_throughput,
-            roundtrip_overhead_pct,
-            batch_efficiency_pct,
-            reference.len(),
-            crossover.map_or_else(|| "-".into(), |value| value.to_string()),
-        );
+        });
     }
 
-    println!(
-        "M16_CROSSOVER,batch={}",
-        crossover.map_or_else(|| "none".to_string(), |value| value.to_string())
-    );
+    let peak_metal_throughput = records
+        .iter()
+        .map(|record| record.metal_throughput)
+        .fold(0.0_f64, f64::max);
+    assert!(peak_metal_throughput.is_finite() && peak_metal_throughput > 0.0);
+
+    for record in records {
+        let pair_count = record.n * (record.n - 1) / 2;
+        let transfer_overhead = record.setup + record.readback;
+        let roundtrip_overhead_pct =
+            100.0 * transfer_overhead.as_secs_f64() / record.metal.as_secs_f64();
+        let batch_efficiency_pct =
+            100.0 * record.metal_throughput / peak_metal_throughput;
+
+        println!(
+            "{},{:.2},{:.2},{:.2},{:.2},{:.2},{:.2},{:.2},{:.4},{:.4},{:.2},{:.2},{},{}",
+            record.n,
+            micros(record.cpu),
+            micros(record.metal),
+            micros(record.prep),
+            micros(record.setup),
+            micros(record.device),
+            micros(record.readback),
+            micros(record.postprocess),
+            record.cpu_throughput,
+            record.metal_throughput,
+            roundtrip_overhead_pct,
+            batch_efficiency_pct,
+            record.cpu_pairs,
+            crossover.map_or_else(|| "-".into(), |value| value.to_string()),
+        );
+
+        assert!(roundtrip_overhead_pct.is_finite());
+        assert!(batch_efficiency_pct.is_finite());
+        assert!((pair_count as f64).is_finite());
+    }
+
+);
 }
 
 #[test]

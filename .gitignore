@@ -6,3 +6,15 @@ node_modules/
 **/target/
 projects/demo/debug/
 .DS_Store
+
+# LaTeX build products
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex
+*.synctex.gz

@@ -76,7 +76,7 @@ Product/Assembly semantics
 occurrences and configurations
 engineering connections
 kinematic behavior definitions
-materials and physical-property identity
+CAD references to material/scientific data and material assignment semantics
 simulation-model mapping
 drawing/PMI semantics
 templates and reusable semantic modules

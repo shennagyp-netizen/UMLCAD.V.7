@@ -32,13 +32,27 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | Constraint equations | `constraints.rs`, `relations.rs` | Exhaustive constraint + relation authority tests | Supported semantic constraint/relation enums are complete; new families require new contracts | Differential geometry | Medium | P0 | Implemented / Tested |
 | Analytic Jacobians | `jacobian.rs`, `relation_jacobian.rs` | Exhaustive independent finite-difference verification for every supported family | Finite differences remain verification-only; future new equations require analytic rows | Constraints + derivatives | High | P0 | Implemented / Tested |
 | Nonlinear solver | Damped SVD/least-squares solve with adaptive damping, accepted-history convergence, terminal/status authority | Extensive solver, scale, mixed-unit, rank/conditioning, convergence and red-team tests | No separate named Newton/TR backend is required while the current damped least-squares acceptance model remains the supported equivalent | Linalg + Jacobians | Medium | P0 | Implemented / Tested |
-| Tessellation math | Adaptive 3D curve tessellation plus new adaptive parametric-surface tessellation with explicit UV/position/normal/error metadata | Curve tests plus new planar/curved/depth-failure surface regressions | Trim-aware surface boundary preservation and richer conformity guarantees remain to be completed in M11 | Curves / surfaces / trims | High | P1 | Partial — M11 active |
-| Spatial acceleration | Existing AABB/spatial module | Existing spatial tests | Unified BVH/OBB/parameter-space pruning contracts | Bounds / predicates | High | P1 | Partial |
+| Tessellation math | Adaptive 3D curve tessellation, adaptive parametric-surface tessellation, and certified convex line/arc trim-aware outer-loop tessellation with explicit UV/position/normal/error metadata | Curve tests; planar/curved/depth-failure surface tests; trim boundary, convex-fill, concave-rejection, boundary-preservation, and translation/determinism regressions | General concave/holed/freeform trim filling remains outside the certified M11 domain and requires a new mathematical contract; sampled chord/angular metrics are approximation certificates, not exact curvature bounds | Curves / surfaces / trims | High | P1 | Implemented / Tested (certified M11 domain) |
+| Spatial acceleration | AABB, conservative bounding spheres, deterministic 8-way spatial subdivision, BVH query/candidate traversal, and parameter-space bounds | Focused AABB/sphere/parameter/subdivision/BVH determinism, overflow, resident-item, and brute-force-equivalence tests | OBB remains intentionally deferred because no current measured workload justifies another numerical authority; a broader unified bounds interface can be added under a future contract | Bounds / predicates | High | P1 | Implemented / Tested (certified current acceleration domain) |
 | GPU abstraction | None authoritative yet | None | Backend-neutral batch/execution contract | CPU math stable | N/A | P0 | Missing |
 | Metal | None authoritative yet | None | Real Metal backend + conformance on Apple Silicon | GPU abstraction | High | P0 | Missing |
 | CUDA | None authoritative yet | None | Real CUDA backend + conformance on NVIDIA hardware | GPU abstraction | High | P0 | Missing |
 | Cross-backend conformance | None authoritative yet | None | CPU/Metal/CUDA comparison harness | All GPU backends | High | P0 | Missing |
 | Final scale/red-team matrix | Existing scattered tests | Good but incomplete | Standardized 1e-12 … 1e12 and pathological fixture families across all P0 operations | All P0 math | Medium | P0 | Partial |
+
+## M11 closure record
+
+M11 is closed for the declared certified mathematical domain represented by the tessellation and spatial modules:
+- adaptive 3D curve tessellation with explicit chord/angular policy and fail-closed depth handling;
+- adaptive parametric-surface tessellation with UV, position, normal, chord/angular error metadata, deterministic subdivision, and explicit depth failure;
+- trim-aware tessellation for convex parameter-space outer loops composed of certified line/arc trim curves, including exact UV boundary-sample preservation, convexity certification, explicit interior classification, adaptive surface error control, and deterministic translation-invariant output structure;
+- conservative AABB and bounding-sphere broad-phase volumes;
+- deterministic parameter-space bounds and 8-way spatial subdivision with parent-resident item filtering;
+- deterministic BVH AABB query and node-pair candidate traversal with brute-force overlap equivalence.
+
+M11 deliberately does not claim general concave/holed/freeform trimmed-surface triangulation, exact trim-surface curvature bounds, or an OBB semantic contract. Those remain future extensions when their mathematical contracts and workload justification are explicit.
+
+The exact-head Rust and comprehensive E2E/red-team gates are green on the pre-closure head `f585dddc83471556fc8950e9138cd53f05bb6261`. The next documentation commit records the final branch head and merge status. M11 status is therefore `Implemented / Tested` for the declared certified domain.
 
 ## M10 closure record
 

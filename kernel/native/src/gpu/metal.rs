@@ -389,6 +389,20 @@ kernel void candidate_pairs(
                 }
             }
 
+            // The Metal pass is a broad-phase accelerator only. Verify the
+            // no-false-negative invariant against the authoritative f64 predicate
+            // before exposing any candidate set to callers.
+            let candidate_set = candidates.iter().copied().collect::<std::collections::BTreeSet<_>>();
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    if boxes[i].intersects(boxes[j], 0.0) && !candidate_set.contains(&(i, j)) {
+                        return Err(MetalError::CommandFailed(
+                            format!("Metal broad phase omitted exact CPU overlap pair ({i}, {j})"),
+                        ));
+                    }
+                }
+            }
+
             Ok(candidates)
         }
     }

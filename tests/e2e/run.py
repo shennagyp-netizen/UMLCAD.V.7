@@ -499,7 +499,17 @@ def sketch_solve_geometry_checks(runner: Runner) -> bool:
             actual_success = value.get("succeeded") is True
             ok = status == expected_status and actual_success == expected_success
             if expected_success:
-                ok = ok and value.get("resultId") == "sketch:result-001" or ok
+                ok = (
+                    ok
+                    and isinstance(value.get("resultId"), str)
+                    and value.get("resultId", "").startswith("sketch:")
+                    and value.get("evidenceHash") is not None
+                    and value.get("converged") is True
+                    and len(value.get("circles", [])) == 2
+                    and value.get("degreesOfFreedom") == 0
+                )
+            else:
+                ok = ok and bool(value.get("diagnostics"))
         except Exception as exc:
             ok = False
             response_body = str(exc).encode()
@@ -515,6 +525,37 @@ def sketch_solve_geometry_checks(runner: Runner) -> bool:
         )
         runner.log(("PASS" if ok else "FAIL") + f" python-sketch-solve/{name}")
         passed &= ok
+
+    # Determinism/metamorphic check: submitting the same semantic payload twice
+    # must return byte-identical authoritative JSON.
+    deterministic_payload = cases[0][1]
+    deterministic_body = json.dumps(deterministic_payload).encode()
+    deterministic_request = (
+        "POST /v1/sketch/solve HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Type: application/json\r\n"
+        f"Content-Length: {len(deterministic_body)}\r\n"
+        "Connection: close\r\n\r\n"
+    )
+    try:
+        _, first = status_and_body(http_request(deterministic_body, deterministic_request))
+        _, second = status_and_body(http_request(deterministic_body, deterministic_request))
+        ok = first == second
+        detail = second
+    except Exception as exc:
+        ok = False
+        detail = str(exc).encode()
+    runner.results.append(
+        Result(
+            "python-sketch-solve/repeat-determinism",
+            ["raw-socket-http-probe", "repeat-determinism"],
+            0 if ok else 1,
+            0.0,
+            detail.decode("utf-8", errors="replace")[-3000:]
+        )
+    )
+    runner.log(("PASS" if ok else "FAIL") + " python-sketch-solve/repeat-determinism")
+    passed &= ok
 
     return passed
 

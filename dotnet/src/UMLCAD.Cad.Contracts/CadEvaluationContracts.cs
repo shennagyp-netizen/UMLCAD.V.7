@@ -302,6 +302,7 @@ public sealed record SketchFeatureSpecification(
 public sealed record ExtrusionFeatureSpecification(
     CadId Id,
     CadId ProfileSketchId,
+    CadId ProfileGeometryId,
     CadReference Support,
     CadVector3 Direction,
     double Distance,
@@ -312,6 +313,7 @@ public sealed record ExtrusionFeatureSpecification(
     {
         base.Validate();
         if (!ProfileSketchId.IsValid) throw new ArgumentException("Extrusion profile sketch ID is required.");
+        if (!ProfileGeometryId.IsValid) throw new ArgumentException("Extrusion profile geometry ID is required.");
         Support.Validate();
         Direction.Normalize("Extrusion direction");
         if (!double.IsFinite(Distance) || Distance <= 0d)

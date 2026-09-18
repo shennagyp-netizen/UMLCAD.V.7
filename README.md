@@ -4,13 +4,15 @@ UMLCAD.V.7 is a system-CAD architecture in which the .NET layer owns CAD and eng
 
 ## Development
 
-The global development law for system-CAD work is:
+The governing System-CAD documents are:
 
-- [Main-Branch Development Prompt](docs/UMLCAD_V7_MAIN_BRANCH_DEVELOPMENT_PROMPT.md)
+- [System-CAD Architecture](docs/SYSTEM_CAD_ARCHITECTURE.md) — active authority for ownership, C4 structure, canonical evaluation flow, domain boundaries, and architectural gaps.
+- [Main-Branch Development Prompt](docs/UMLCAD_V7_MAIN_BRANCH_DEVELOPMENT_PROMPT.md) — development and validation law.
+- [Continuation Handoff](docs/CONTINUATION_HANDOFF.md) — current implementation/evidence state.
+- [Mathematical Authority Roadmap](docs/MATH_AUTHORITY_ROADMAP.md) — Rust mathematical authority and certified domains.
+- [Architecture Handbook](docs/doc.tex) — published comprehensive reference; it must remain consistent with the active architecture document.
 
-The prompt defines architecture, authority boundaries, TDD, red-team/E2E validation, determinism, failure-closed behavior, provider boundaries, and documentation discipline. It intentionally does **not** contain a fixed comprehensive implementation roadmap.
-
-The repository's current milestone, gap, handoff, architecture, and capability documents at the exact `main` head determine what should be implemented next.
+The architecture document defines **how the system is structured**. The handoff/gap state defines **what is implemented and what should be done next**. The prompt defines **how changes are developed and validated**.
 
 ## Architectural invariants
 

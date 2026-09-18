@@ -426,3 +426,17 @@ The correct current state is therefore:
 - `UMLCAD.Framework` / `projects/demo` remains the legacy application path until a deliberate application-host migration milestone establishes the replacement root.
 - S1 production execution is still incomplete beyond the certified box operation.
 - No new Rust kernel/math change was introduced by the current correction work.
+
+## S1 sketch/constraint transport station
+
+- Current system-CAD branch head: `f39bd1a43ebf5bd515edd95e63eb53d9b7fa30d9`.
+- The next S1 boundary is now implemented as a typed sketch-solver transport around the existing Rust constraint solver; no new solver or geometric approximation was introduced.
+- `uml-cad-sketch-solve/1.0.0` is an explicit contract for circular sketch geometry, sketch frame metadata, fixed constraints, tolerance, solver terminal evidence, result identity, and diagnostics.
+- `RustSketchGeometryService` provides the .NET adapter, and `RustCadKernelEvaluator` now accepts an optional typed sketch service while retaining the existing box-only constructor for compatibility.
+- `CadFeatureEvaluationResult` and `KernelEvaluationResponse` can now carry `CadSketchEvaluationResult` without pretending a sketch is a solid B-Rep.
+- Sketch result identity is content-addressed by operation identity, sketch identity, frame, sorted circle geometry, sorted constraint content, and tolerance. Repeated identical requests therefore have a deterministic result identity/evidence contract.
+- Existing Rust solver authority remains the source of constraint mathematics. The transport supports only `Fixed` circle constraints and rejects `FullyConstrained` until a dedicated mathematical/semantic contract exists.
+- Test paradigms added: contract/unit tests, transport mapping tests, Rust endpoint unit tests, protocol-level Python E2E, fail-closed negative tests, repeated-request determinism, scale metamorphic testing, and result-identity mismatch tests.
+- The production circular-sketch result is intentionally **not** yet promoted to a solid B-Rep. The existing certified extrusion contract is polygonal, while the current mathematical B-Rep construction set does not certify exact circular-profile solid construction. No polygonal approximation is introduced to bridge that gap.
+- Next S1 gap: establish the exact analytic profile-to-solid operation required for circle-driven additive/subtractive features, through an explicit mathematical contract only after verifying/reusing an existing Rust authority capability. Then integrate additive/subtractive feature composition, topology evolution, and the mandatory full vertical slice.
+- CI status at this head: repository Actions jobs are still failing before executable steps are exposed (job step lists empty and log endpoint returns GitHub `BlobNotFound`). Therefore this head is **Implemented / Test-authored / CI-unverified**, not GREEN.

@@ -34,7 +34,7 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | Nonlinear solver | Damped SVD/least-squares solve with adaptive damping, accepted-history convergence, terminal/status authority | Extensive solver, scale, mixed-unit, rank/conditioning, convergence and red-team tests | No separate named Newton/TR backend is required while the current damped least-squares acceptance model remains the supported equivalent | Linalg + Jacobians | Medium | P0 | Implemented / Tested |
 | Tessellation math | Adaptive 3D curve tessellation, adaptive parametric-surface tessellation, and certified convex line/arc trim-aware outer-loop tessellation with explicit UV/position/normal/error metadata | Curve tests; planar/curved/depth-failure surface tests; trim boundary, convex-fill, concave-rejection, boundary-preservation, and translation/determinism regressions | General concave/holed/freeform trim filling remains outside the certified M11 domain and requires a new mathematical contract; sampled chord/angular metrics are approximation certificates, not exact curvature bounds | Curves / surfaces / trims | High | P1 | Implemented / Tested (certified M11 domain) |
 | Spatial acceleration | AABB, conservative bounding spheres, deterministic 8-way spatial subdivision, BVH query/candidate traversal, and parameter-space bounds | Focused AABB/sphere/parameter/subdivision/BVH determinism, overflow, resident-item, and brute-force-equivalence tests | OBB remains intentionally deferred because no current measured workload justifies another numerical authority; a broader unified bounds interface can be added under a future contract | Bounds / predicates | High | P1 | Implemented / Tested (certified current acceleration domain) |
-| GPU abstraction | None authoritative yet | None | Backend-neutral batch/execution contract | CPU math stable | N/A | P0 | Missing |
+| GPU abstraction | `gpu.rs` backend-neutral capability/selection, batch memory, dispatch, executor, and f64 conformance contracts | Focused capability/selection, precision, determinism, overflow, dispatch, fallback, and conformance regressions | No hardware backend is implemented in M12; measured crossover thresholds remain future work; selection uses explicit documented policy inputs | CPU math stable | High | P0 | Implemented / Tested (no hardware backend) |
 | Metal | None authoritative yet | None | Real Metal backend + conformance on Apple Silicon | GPU abstraction | High | P0 | Missing |
 | CUDA | None authoritative yet | None | Real CUDA backend + conformance on NVIDIA hardware | GPU abstraction | High | P0 | Missing |
 | Cross-backend conformance | None authoritative yet | None | CPU/Metal/CUDA comparison harness | All GPU backends | High | P0 | Missing |
@@ -128,3 +128,17 @@ As of branch head `5d8b77f1c00ae31a9b22abb1187c1710f267923e`, the M9 mathematica
 The CPU mathematical layer remains authoritative. OCCT and future GPU backends are not used to define M9 semantics. General curved-face B-Rep sewing, unrestricted topology-aware Boolean construction, and arbitrary curved/holed exact solid decomposition remain outside the certified M9 domain.
 
 M9 status is therefore `Implemented / Tested` for the declared certified domains. Exact-head Rust and comprehensive E2E/red-team gates are green on `9d04c05f...`. Post-merge main verification is still required before this closure becomes final.
+
+## M12 closure record
+
+M12 is closed for the declared backend-neutral GPU abstraction domain. The CPU mathematical layer remains normative and no Metal/CUDA execution is claimed.
+- explicit conceptual backend model for Auto/CPU/Metal/CUDA;
+- capability discovery covering f64 support, operation support, maximum batch size, workgroup limits, and determinism class;
+- explicit automatic/preferred/explicit selection with recorded CPU fallback and no accelerator eligibility when f64 or required determinism is unavailable;
+- checked batched-memory sizing and host/device transfer accounting with overflow rejection;
+- deterministic workgroup/dispatch planning with capability validation;
+- backend-neutral executor submission trait with backend-local submission identity explicitly excluded from semantic state;
+- CPU-versus-accelerator f64 conformance comparison with explicit absolute/relative tolerances and fail-closed length, non-finite, numerical, and bitwise mismatches;
+- legacy GPU API retained only as a deprecated compatibility wrapper; authority decisions use the diagnostic selection result.
+
+No fake GPU execution, f32 semantic downgrade, fast-math authority, Metal/CUDA device resource, or backend-defined mathematical meaning was introduced. M13 (Metal) and M14 (CUDA) remain responsible for real hardware execution.

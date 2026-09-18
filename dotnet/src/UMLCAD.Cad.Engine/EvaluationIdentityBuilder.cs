@@ -15,13 +15,23 @@ public static class EvaluationIdentityBuilder
             .OrderBy(x => x, StringComparer.Ordinal)
             .ToArray();
 
+        var inputs = step.Inputs
+            .OrderBy(x => x.Role, StringComparer.Ordinal)
+            .ThenBy(x => x.Identity, StringComparer.Ordinal)
+            .Select(x => $"{x.Role}={x.Identity}")
+            .ToArray();
+
         var canonical = string.Join(
             "|",
-            "uml-cad-evaluation/1",
+            "uml-cad-evaluation/2",
             step.OperationKind,
             step.NormalizedDefinition,
             string.Join(",", dependencies),
-            step.KernelContractVersion);
+            string.Join(",", inputs),
+            step.ConfigurationContext,
+            step.TolerancePolicy,
+            step.KernelContractVersion,
+            step.RepresentationPolicy);
 
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(canonical));
         return new EvaluationIdentity(Convert.ToHexString(hash).ToLowerInvariant());

@@ -256,3 +256,21 @@ M15 is closed for the declared common GPU workload supported by both accelerator
 The conformance layer is backend-neutral and keeps CPU f64 exact overlap classification authoritative. Accelerator candidate sets must contain every reference overlap; false positives are measured separately because broad-phase conservatism is permitted. Repeat candidate execution must be deterministic. The identical adversarial fixture is executed by CPU reference and Metal hardware; the CUDA path is wired to the same suite but remains hardware-unvalidated because no NVIDIA runner execution record is available.
 
 M15 does not promote Metal or CUDA to authority for the broader f64 vector/matrix/transform/NURBS solver stack. Those capabilities remain CPU-authoritative pending a common hardware contract.
+
+## M16 closure record
+
+M16 is implemented and repository-validated for the final performance and red-team boundary. The release-mode Apple Silicon benchmark records CPU/Metal median latency, pair throughput, host preparation, buffer setup/upload, device execution, readback, CPU post-processing, transfer/setup overhead, and batch efficiency. No CPU/Metal crossover occurred in the tested 32, 64, 128, 256, and 512-item batches; that is a measured result, not a performance failure. CUDA remains explicitly hardware-unverified because no NVIDIA runner execution was available.
+
+### M16 Apple Silicon performance evidence
+
+| Batch | CPU median µs | Metal median µs | CPU Mpair/s | Metal Mpair/s | transfer/setup % | batch efficiency |
+|---:|---:|---:|---:|---:|---:|---:|
+| 32 | 1.25 | 745.79 | 396.8000 | 0.6651 | 13.16% | 4.15% |
+| 64 | 4.79 | 1260.67 | 420.7012 | 1.5992 | 11.37% | 9.97% |
+| 128 | 17.33 | 1136.58 | 468.9321 | 7.1513 | 7.41% | 44.59% |
+| 256 | 61.88 | 2035.33 | 527.5152 | 16.0367 | 6.23% | 100.00% |
+| 512 | 229.75 | 10602.17 | 569.3841 | 12.3386 | 2.08% | 76.94% |
+
+The measured workload uses the certified conservative AABB candidate-generation path. Metal remains an accelerator only; CPU f64 remains authoritative. No benchmark result is promoted into mathematical semantics or used to weaken correctness contracts.
+
+M0-M16 mathematical-authority roadmap closure remains bounded by the accumulated certified domains and this final M16 evidence. CUDA hardware validation, where unavailable, is recorded as unverified rather than inferred.

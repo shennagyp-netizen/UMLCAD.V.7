@@ -428,6 +428,7 @@ public sealed record CadFeatureEvaluationResult(
     AuthoritativeCadResult? AuthoritativeResult)
 {
     public SketchSolveKernelResult? SketchSolve { get; init; }
+    public CadSketchEvaluationResult? SketchResult { get; init; }
 
     public bool Succeeded => Status == CadEvaluationStatus.Succeeded;
 }
@@ -456,6 +457,7 @@ public sealed record KernelEvaluationResponse(
     IReadOnlyList<CadDiagnostic> Diagnostics)
 {
     public SketchSolveKernelResult? SketchSolve { get; init; }
+    public CadSketchEvaluationResult? SketchResult { get; init; }
 }
 
 public interface ICadKernelEvaluator

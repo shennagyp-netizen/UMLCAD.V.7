@@ -10,10 +10,19 @@ namespace UMLCAD.Kernel.Client;
 public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
 {
     private readonly IAuthoritativeGeometryService _boxGeometry;
+    private readonly ISketchGeometryService? _sketchGeometry;
 
     public RustCadKernelEvaluator(IAuthoritativeGeometryService boxGeometry)
+        : this(boxGeometry, null)
+    {
+    }
+
+    public RustCadKernelEvaluator(
+        IAuthoritativeGeometryService boxGeometry,
+        ISketchGeometryService? sketchGeometry)
     {
         _boxGeometry = boxGeometry ?? throw new ArgumentNullException(nameof(boxGeometry));
+        _sketchGeometry = sketchGeometry;
     }
 
     public async Task<KernelEvaluationResponse> EvaluateAsync(
@@ -27,7 +36,167 @@ public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
         {
             BoxFeatureSpecification box =>
                 await EvaluateBoxAsync(request, box, cancellationToken),
+            SketchFeatureSpecification sketch =>
+                await EvaluateSketchAsync(request, sketch, cancellationToken),
             _ => UnsupportedFeature(request.Feature)
+        };
+    }
+
+    private async Task<KernelEvaluationResponse> EvaluateSketchAsync(
+        KernelEvaluationRequest request,
+        SketchFeatureSpecification specification,
+        CancellationToken cancellationToken)
+    {
+        if (_sketchGeometry is null)
+        {
+            return UnsupportedFeature(specification);
+        }
+
+        SketchKernelResult kernelResult;
+        try
+        {
+            kernelResult = await _sketchGeometry.SolveAsync(
+                new SketchSolveRequest(
+                    request.EvaluationId.Value,
+                    specification.Id,
+                    specification.Frame,
+                    specification.Circles,
+                    specification.Constraints,
+                    request.Tolerance,
+                    new ContractVersion("1.0")),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return new KernelEvaluationResponse(
+                CadEvaluationStatus.KernelFailure,
+                null,
+                new[]
+                {
+                    new CadDiagnostic(
+                        "KERNEL_SKETCH_TRANSPORT",
+                        CadEvaluationStatus.KernelFailure,
+                        exception.Message)
+                });
+        }
+
+        var status = kernelResult.Status switch
+        {
+            GeometryKernelStatus.Succeeded => CadEvaluationStatus.Succeeded,
+            GeometryKernelStatus.Failed => CadEvaluationStatus.KernelFailure,
+            GeometryKernelStatus.Unsupported => CadEvaluationStatus.Unsupported,
+            GeometryKernelStatus.Ambiguous => CadEvaluationStatus.AmbiguousEvaluation,
+            GeometryKernelStatus.Indeterminate => CadEvaluationStatus.Indeterminate,
+            _ => throw new InvalidOperationException(
+                $"Unknown sketch-kernel status '{kernelResult.Status}'.")
+        };
+
+        if (status != CadEvaluationStatus.Succeeded)
+        {
+            return new KernelEvaluationResponse(
+                status,
+                null,
+                kernelResult.Diagnostics
+                    .Select(message => new CadDiagnostic(
+                        "KERNEL_SKETCH_RESULT",
+                        status,
+                        message))
+                    .DefaultIfEmpty(
+                        new CadDiagnostic(
+                            "KERNEL_SKETCH_RESULT",
+                            status,
+                            $"The sketch solver returned '{kernelResult.Status}'."))
+                    .ToArray());
+        }
+
+        if (kernelResult.ResultId is null ||
+            kernelResult.EvidenceHash is null ||
+            kernelResult.Converged != true ||
+            kernelResult.Iterations is null ||
+            kernelResult.FinalResidualNorm is null ||
+            kernelResult.FinalScaledResidualNorm is null ||
+            kernelResult.FinalStepNorm is null ||
+            kernelResult.DegreesOfFreedom is null ||
+            kernelResult.VariableCount is null ||
+            kernelResult.EquationCount is null)
+        {
+            return new KernelEvaluationResponse(
+                CadEvaluationStatus.KernelFailure,
+                null,
+                new[]
+                {
+                    new CadDiagnostic(
+                        "KERNEL_SKETCH_RESULT_INCOMPLETE",
+                        CadEvaluationStatus.KernelFailure,
+                        "Successful sketch transport result is missing authoritative solver evidence.")
+                });
+        }
+
+        if (kernelResult.Circles.Count != specification.Circles.Count)
+        {
+            return new KernelEvaluationResponse(
+                CadEvaluationStatus.KernelFailure,
+                null,
+                new[]
+                {
+                    new CadDiagnostic(
+                        "KERNEL_SKETCH_RESULT_GEOMETRY_MISMATCH",
+                        CadEvaluationStatus.KernelFailure,
+                        "Sketch solver returned a circle set different from the requested semantic sketch.")
+                });
+        }
+
+        var expectedIds = specification.Circles
+            .Select(x => x.Id.Value)
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToArray();
+        var actualIds = kernelResult.Circles
+            .Select(x => x.Id)
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        if (!expectedIds.SequenceEqual(actualIds, StringComparer.Ordinal))
+        {
+            return new KernelEvaluationResponse(
+                CadEvaluationStatus.KernelFailure,
+                null,
+                new[]
+                {
+                    new CadDiagnostic(
+                        "KERNEL_SKETCH_RESULT_IDENTITY_MISMATCH",
+                        CadEvaluationStatus.KernelFailure,
+                        "Sketch solver returned geometry identities different from the semantic sketch.")
+                });
+        }
+
+        var result = new CadSketchEvaluationResult(
+            specification.Id,
+            kernelResult.ResultId.ValueAsCadResultId(),
+            CadContractVersions.KernelEvaluation,
+            specification.Frame,
+            kernelResult.Circles,
+            true,
+            kernelResult.Iterations.Value,
+            kernelResult.FinalResidualNorm.Value,
+            kernelResult.FinalScaledResidualNorm.Value,
+            kernelResult.FinalStepNorm.Value,
+            kernelResult.DegreesOfFreedom.Value,
+            kernelResult.VariableCount.Value,
+            kernelResult.EquationCount.Value,
+            kernelResult.EvidenceHash);
+
+        result.Validate();
+
+        return new KernelEvaluationResponse(
+            CadEvaluationStatus.Succeeded,
+            null,
+            Array.Empty<CadDiagnostic>())
+        {
+            SketchResult = result
         };
     }
 

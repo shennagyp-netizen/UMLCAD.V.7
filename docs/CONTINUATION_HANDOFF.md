@@ -13,7 +13,7 @@
 - PR #30 validated implementation head: `9d04c05f67f4e5542df56b8612806fe8296f624b`
 
 ## Completed mathematical-authority state
-PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M16 is now the next incomplete roadmap family after the M15 post-merge verification.
+PR #30 completes M9 for the declared certified domains. M0-M16 is now closed after the M16 post-merge verification.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -226,3 +226,23 @@ M15 is closed on `main` for the declared common CPU/Metal/CUDA AABB candidate-ge
 - Metal hardware executes and validates the shared fixture against the CPU f64 reference on Apple Silicon CI.
 - CUDA is wired to the same conformance suite behind the explicit `cuda-hardware` feature, but no NVIDIA hardware execution record is currently available; CUDA remains **Not yet hardware-validated**.
 - The closure does not certify cross-backend equivalence for the broader vector/matrix/transform/NURBS stack; those operations remain CPU-authoritative until additional common hardware contracts are established.
+
+## M16 completion boundary
+
+M16 is now the final roadmap family and is closed on the M16 branch after exact-head Rust, comprehensive E2E/red-team, Metal hardware, and release-performance validation all passed.
+
+The final validated branch head is `9257d508676c1b20dde7dc7528e3b8a64ed05825`.
+
+M16 performance evidence on Apple Silicon (`macos-14`) measured the declared AABB candidate-generation workload at batches 32, 64, 128, 256, and 512. Median CPU/Metal latencies were respectively 1.25/745.79 µs, 4.79/1260.67 µs, 17.33/1136.58 µs, 61.88/2035.33 µs, and 229.75/10602.17 µs. No CPU/Metal crossover occurred in that tested range. The report also captured host preparation, buffer setup/upload, device execution, readback, CPU post-processing, transfer/setup overhead, throughput, and batch efficiency.
+
+The final M16 red-team matrix covers:
+- scale invariance across 1e-12 through 1e12;
+- near-parallel, tangent, and coincident intersection behavior;
+- non-finite intersection inputs;
+- extreme positive finite NURBS weights and invalid parameter/weight domains;
+- rank-deficient linear systems and deterministic GPU candidate ordering;
+- malformed/duplicate GPU candidate sets.
+
+M16 CUDA status remains **hardware-unverified** because no NVIDIA runner was available for execution. No claim of CUDA hardware performance or CUDA hardware conformance is made.
+
+M0-M16 is now closed as a roadmap of certified mathematical capabilities, not as a claim that every conceivable CAD operation is complete. Future changes to the mathematical authority layer require new explicit capability contracts and fresh gates.

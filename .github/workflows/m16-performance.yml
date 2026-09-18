@@ -1,0 +1,36 @@
+name: M16 performance evidence
+
+on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  metal-performance:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Verify Apple Silicon
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "arm64"
+          system_profiler SPHardwareDataType
+      - name: Run release performance evidence
+        shell: bash
+        run: |
+          set -o pipefail
+          cargo test --release --manifest-path kernel/native/Cargo.toml --test m16_performance -- --nocapture 2>&1 | tee m16-performance.log
+      - name: Upload M16 performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m16-performance-report
+          path: m16-performance.log
+          if-no-files-found: error

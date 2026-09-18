@@ -259,7 +259,7 @@ M15 does not promote Metal or CUDA to authority for the broader f64 vector/matri
 
 ## M16 closure record
 
-M16 is implemented and repository-validated for the final performance and red-team boundary. The release-mode Apple Silicon benchmark records CPU/Metal median latency, pair throughput, host preparation, buffer setup/upload, device execution, readback, CPU post-processing, transfer/setup overhead, and batch efficiency. No CPU/Metal crossover occurred in the tested 32, 64, 128, 256, and 512-item batches; that is a measured result, not a performance failure. CUDA remains explicitly hardware-unverified because no NVIDIA runner execution was available.
+M16 is closed on `main` at merge commit `3d494ebbffb6f944e3e574ab04234deeffd9f91a` and repository-validated for the final performance and red-team boundary. Post-merge main gates on `3d494ebbffb6f944e3e574ab04234deeffd9f91a`: Rust kernel workflow #554 PASS; comprehensive E2E/red-team workflow #476 PASS; Metal hardware workflow #73 PASS; M16 performance workflow #11 PASS. The release-mode Apple Silicon benchmark records CPU/Metal median latency, pair throughput, host preparation, buffer setup/upload, device execution, readback, CPU post-processing, transfer/setup overhead, and batch efficiency. No CPU/Metal crossover occurred in the tested 32, 64, 128, 256, and 512-item batches; that is a measured result, not a performance failure. CUDA remains explicitly hardware-unverified because no NVIDIA runner execution was available.
 
 ### M16 Apple Silicon performance evidence
 

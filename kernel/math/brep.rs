@@ -186,7 +186,7 @@ pub struct PlanarRegion3 {
 }
 
 impl PlanarRegion3 {
-    pub fn validate(&self, tolerance: Tolerance) -> Result<(), BRepError> {
+    fn validate_structure(&self, tolerance: Tolerance) -> Result<(), BRepError> {
         validate_tolerance(tolerance)?;
         if [self.origin, self.u_dir, self.v_dir].iter().any(|v| !v.is_finite()) {
             return Err(BRepError::NonFinite);
@@ -676,6 +676,12 @@ impl BRepSolid {
             }
         }
 
+
+        Ok(())
+    }
+
+    pub fn validate(&self, tolerance: Tolerance) -> Result<(), BRepError> {
+        self.validate_structure(tolerance)?;
         // Exact solid moments below triangulate convex outer face loops. A
         // planar face with an inner loop requires a certified polygon-with-hole
         // decomposition that is not yet part of this authority. Reject it here
@@ -694,60 +700,12 @@ impl BRepSolid {
     }
 
     pub fn surface_area(&self, tolerance: Tolerance) -> Result<f64, BRepError> {
-        self.validate_topology_only(tolerance)?;
+        self.validate_structure(tolerance)?;
         let mut area = 0.0;
         for face in &self.faces {
             area += face.region.area(tolerance)?;
         }
         if area.is_finite() && area > 0.0 { Ok(area) } else { Err(BRepError::Overflow) }
-    }
-
-    fn validate_topology_only(&self, tolerance: Tolerance) -> Result<(), BRepError> {
-        validate_tolerance(tolerance)?;
-        if self.shells.len() != 1 {
-            return Err(BRepError::UnsupportedBoolean);
-        }
-        let vertex_ids = unique_ids(self.vertices.iter().map(|v| v.id.as_str()))?;
-        let edge_ids = unique_ids(self.edges.iter().map(|e| e.id.as_str()))?;
-        let coedge_ids = unique_ids(self.coedges.iter().map(|e| e.id.as_str()))?;
-        let wire_ids = unique_ids(self.wires.iter().map(|e| e.id.as_str()))?;
-        let face_ids = unique_ids(self.faces.iter().map(|e| e.id.as_str()))?;
-        if vertex_ids.is_empty() || edge_ids.is_empty() || coedge_ids.is_empty()
-            || wire_ids.is_empty() || face_ids.is_empty() {
-            return Err(BRepError::Degenerate);
-        }
-        for edge in &self.edges {
-            if !vertex_ids.contains(&edge.start_vertex) || !vertex_ids.contains(&edge.end_vertex) {
-                return Err(BRepError::MissingReference);
-            }
-        }
-        for coedge in &self.coedges {
-            if !edge_ids.contains(&coedge.edge)
-                || !wire_ids.contains(&coedge.wire)
-                || !face_ids.contains(&coedge.face)
-            {
-                return Err(BRepError::MissingReference);
-            }
-        }
-        for wire in &self.wires {
-            if wire.coedges.is_empty() || wire.coedges.iter().any(|id| !coedge_ids.contains(id)) {
-                return Err(BRepError::MissingReference);
-            }
-        }
-        let shell = &self.shells[0];
-        if shell.id.is_empty() || shell.faces.is_empty() || shell.faces.iter().any(|id| !face_ids.contains(id)) {
-            return Err(BRepError::MissingReference);
-        }
-        for face in &self.faces {
-            if !wire_ids.contains(&face.outer_wire)
-                || face.inner_wires.iter().any(|id| !wire_ids.contains(id))
-                || !shell.faces.contains(&face.id)
-            {
-                return Err(BRepError::MissingReference);
-            }
-            face.region.validate(tolerance)?;
-        }
-        Ok(())
     }
 
     pub fn classify_point(&self, p: Vec3, direction: Vec3, tolerance: Tolerance)
@@ -774,7 +732,7 @@ impl BRepSolid {
     }
 
     pub fn moments(&self, tolerance: Tolerance) -> Result<SolidMoments, BRepError> {
-        self.validate_topology_only(tolerance)?;
+        self.validate_structure(tolerance)?;
         if self.faces.iter().any(|face| {
             !face.inner_wires.is_empty() || !face.region.holes.is_empty()
         }) {

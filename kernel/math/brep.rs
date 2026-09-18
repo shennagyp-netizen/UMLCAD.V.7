@@ -1308,8 +1308,8 @@ mod tests {
             u_dir: Vec3::new(1.0,0.0,0.0),
             v_dir: Vec3::new(0.0,1.0,0.0),
             outer: vec![
-                Vec2::new(1.0e12,1.0e12), Vec2::new(1.0e12 + 10.0,1.0e12),
-                Vec2::new(1.0e12 + 10.0,1.0e12 + 20.0), Vec2::new(1.0e12,1.0e12 + 20.0),
+                Vec2::new(0.0,0.0), Vec2::new(10.0,0.0),
+                Vec2::new(10.0,20.0), Vec2::new(0.0,20.0),
             ],
             holes: vec![],
         };

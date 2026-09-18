@@ -2,9 +2,9 @@
 
 ## Status
 
-Authoritative implementation roadmap for `kernel/math/`.
+**M0–M16 is closed for its declared certified mathematical domains.** This document is retained as the mathematical-authority record for `kernel/math/` and as the contract boundary for any future mathematical extension.
 
-This document records the complete mathematical-authority mission supplied for V7 development. It is subordinate to the repository architecture in `README.md` only where it conflicts with existing architectural boundaries; otherwise it is the active implementation roadmap for mathematical work.
+Future System-CAD work must treat `docs/SYSTEM_CAD_ARCHITECTURE.md` as the authority for system architecture. A new mathematical capability may be added only through a new explicit contract, focused authority tests, and the repository validation law; it must not reopen or silently broaden a closed M0–M16 domain.
 
 ## Mission
 

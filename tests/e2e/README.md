@@ -1,6 +1,6 @@
-# UMLCAD V6 E2E / Red-Team Gate
+# UMLCAD V7 E2E / Red-Team Gate
 
-This directory owns the authoritative local integration harness for the V6 kernel boundary.
+This directory owns the authoritative local integration harness for the V7 CAD-system boundary.
 
 ## One command
 
@@ -41,3 +41,10 @@ The demo E2E is also executed so the real Bench Vise application path is covered
 ## Output
 
 The runner writes a JSON report to `tests/e2e/artifacts/e2e-report.json` and returns a non-zero exit code on any failed stage. The generated `artifacts/` directory is local test output and must not be committed.
+
+
+## System-CAD architecture gate
+
+The E2E runner also executes `architecture_contract.py`. This guard checks the repository's .NET assembly dependency graph and source-level namespace boundaries before system-CAD milestones proceed.
+
+The current `UMLCAD.Kernel.Client → UMLCAD.Framework` reference is explicitly treated as a transitional legacy compatibility edge. New CAD semantic/engine code must not create dependencies back toward the application host or the concrete kernel client.

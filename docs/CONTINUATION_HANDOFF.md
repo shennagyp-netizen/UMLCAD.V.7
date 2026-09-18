@@ -248,3 +248,28 @@ The final M16 red-team matrix covers:
 M16 CUDA status remains **hardware-unverified** because no NVIDIA runner was available for execution. No claim of CUDA hardware performance or CUDA hardware conformance is made.
 
 M0-M16 is now closed as a roadmap of certified mathematical capabilities, not as a claim that every conceivable CAD operation is complete. Future changes to the mathematical authority layer require new explicit capability contracts and fresh gates.
+
+## System CAD transition — M-S0
+
+The mathematical-authority roadmap M0-M16 is closed at main commit `f1ab581140453c087beb50aac2216684196d4bdf`. System-CAD implementation now begins from a separate architecture track.
+
+The governing system documents are:
+
+- `docs/CATIA_SYSTEM_IMPLEMENTATION_ROADMAP.md`
+- `docs/UMLCAD_V7_IMPLEMENTATION_PROMPT.md`
+
+The first system milestone is M-S0 — boundary/dependency architecture. It does not expand mathematical authority. It establishes repository-level enforcement for the new .NET layer split:
+
+```
+Cad.Expressions
+      ↓
+Cad.Semantics
+
+Cad.Engine → Cad.Expressions + Cad.Semantics + Cad.Contracts
+
+Kernel.Client → Cad.Contracts
+```
+
+The existing `Kernel.Client → Framework` dependency is retained only as an explicit transitional legacy edge until the later legacy-elimination milestone. No new CAD semantic/engine code may depend on Framework or Kernel.Client.
+
+M-S0 acceptance evidence is owned by `tests/e2e/architecture_contract.py` and the authoritative Python E2E runner.

@@ -11,8 +11,32 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Framework.Tests", "t
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Demo", "..\projects\demo\Demo.csproj", "{B5A6A7E4-5B6D-4DCE-8B3F-61D1EAFCC6E9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Expressions", "src\UMLCAD.Cad.Expressions\UMLCAD.Cad.Expressions.csproj", "{6E8C49F0-6C86-4CB6-B4B5-1B7F1B8E3A01}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Semantics", "src\UMLCAD.Cad.Semantics\UMLCAD.Cad.Semantics.csproj", "{D3C0C3C3-3B0C-4F73-A2C2-9D1DBD2A6B02}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Contracts", "src\UMLCAD.Cad.Contracts\UMLCAD.Cad.Contracts.csproj", "{B8A1D0CE-EDC8-40B5-A76C-4CB7D4E74F03}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Engine", "src\UMLCAD.Cad.Engine\UMLCAD.Cad.Engine.csproj", "{F7C9A9F5-6A3A-4EAB-9B39-9C88F5C4E904}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		{6E8C49F0-6C86-4CB6-B4B5-1B7F1B8E3A01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6E8C49F0-6C86-4CB6-B4B5-1B7F1B8E3A01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6E8C49F0-6C86-4CB6-B4B5-1B7F1B8E3A01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6E8C49F0-6C86-4CB6-B4B5-1B7F1B8E3A01}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D3C0C3C3-3B0C-4F73-A2C2-9D1DBD2A6B02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D3C0C3C3-3B0C-4F73-A2C2-9D1DBD2A6B02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D3C0C3C3-3B0C-4F73-A2C2-9D1DBD2A6B02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D3C0C3C3-3B0C-4F73-A2C2-9D1DBD2A6B02}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B8A1D0CE-EDC8-40B5-A76C-4CB7D4E74F03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B8A1D0CE-EDC8-40B5-A76C-4CB7D4E74F03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B8A1D0CE-EDC8-40B5-A76C-4CB7D4E74F03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B8A1D0CE-EDC8-40B5-A76C-4CB7D4E74F03}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F7C9A9F5-6A3A-4EAB-9B39-9C88F5C4E904}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F7C9A9F5-6A3A-4EAB-9B39-9C88F5C4E904}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F7C9A9F5-6A3A-4EAB-9B39-9C88F5C4E904}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F7C9A9F5-6A3A-4EAB-9B39-9C88F5C4E904}.Release|Any CPU.Build.0 = Release|Any CPU
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection

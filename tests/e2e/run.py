@@ -279,11 +279,11 @@ def box_solid_geometry_checks(runner: Runner) -> bool:
     for name, payload, expected_success in checks:
         body = json.dumps(payload).encode()
         request = (
-            "POST /v1/geometry/box-solid HTTP/1.1\\r\\n"
-            "Host: localhost\\r\\n"
-            "Content-Type: application/json\\r\\n"
-            f"Content-Length: {len(body)}\\r\\n"
-            "Connection: close\\r\\n\\r\\n"
+            "POST /v1/geometry/box-solid HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
         )
         try:
             status, response_body = status_and_body(http_request(body, request))

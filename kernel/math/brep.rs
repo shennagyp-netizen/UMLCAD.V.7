@@ -98,7 +98,7 @@ fn loop_boundary_contains(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> 
         let edge = b.sub(*a);
         let rel = point.sub(*a);
         let cross = edge.cross(rel);
-        cross.is_finite() && cross.abs() <= tolerance * (edge.length() + rel.length() + 1.0)
+        cross.is_finite() && cross.abs() <= tolerance * edge.length().max(rel.length()).max(f64::MIN_POSITIVE)
             && point.x >= a.x.min(b.x) - tolerance
             && point.x <= a.x.max(b.x) + tolerance
             && point.y >= a.y.min(b.y) - tolerance
@@ -120,7 +120,7 @@ fn is_convex_loop(loop_points: &[Vec2], tolerance: f64) -> bool {
         let b = loop_points[(i + 1) % loop_points.len()];
         let d = loop_points[(i + 2) % loop_points.len()];
         let value = b.sub(a).cross(d.sub(b));
-        let edge_scale = b.sub(a).length().max(d.sub(b).length()).max(1.0);
+        let edge_scale = b.sub(a).length().max(d.sub(b).length()).max(f64::MIN_POSITIVE);
         let eps = tolerance * edge_scale;
         if !value.is_finite() || !eps.is_finite() || value * sign <= eps {
             return false;
@@ -136,7 +136,7 @@ fn point_in_convex_loop(point: Vec2, loop_points: &[Vec2], tolerance: f64) -> bo
         let a = loop_points[i];
         let b = loop_points[(i + 1) % loop_points.len()];
         let cross = b.sub(a).cross(point.sub(a));
-        let edge_scale = b.sub(a).length().max(point.sub(a).length()).max(1.0);
+        let edge_scale = b.sub(a).length().max(point.sub(a).length()).max(f64::MIN_POSITIVE);
         let eps = tolerance * edge_scale;
         if sign > 0.0 {
             if cross < -eps { return false; }
@@ -163,7 +163,7 @@ fn segment_intersects_2d(a: Vec2, b: Vec2, c: Vec2, d: Vec2, tolerance: f64) -> 
         .max(d.sub(c).length())
         .max(a.sub(c).length())
         .max(a.sub(d).length())
-        .max(1.0);
+        .max(f64::MIN_POSITIVE);
     let orient_eps = tolerance * geometric_scale;
     if !orient_eps.is_finite() || [ab_c, ab_d, cd_a, cd_b].iter().any(|v| !v.is_finite()) {
         return false;
@@ -1442,7 +1442,7 @@ mod tests {
         solid.coedges.iter_mut()
             .find(|c| c.id == "c0_0")
             .expect("tetrahedron test coedge exists")
-            .face = "f1".into();
+            .face = "f2".into();
         assert_eq!(solid.validate(tol()), Err(BRepError::InconsistentOrientation));
     }
 

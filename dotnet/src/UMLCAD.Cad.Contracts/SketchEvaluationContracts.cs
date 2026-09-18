@@ -135,6 +135,12 @@ public sealed record CadSketchEvaluationResult(
     int EquationCount,
     string EvidenceHash)
 {
+    public CadSketchEvaluationResult
+    {
+        Circles = Circles?.ToArray() ??
+            throw new ArgumentNullException(nameof(Circles));
+    }
+
     public void Validate()
     {
         if (!SketchId.IsValid || !ResultId.IsValid)
@@ -143,8 +149,6 @@ public sealed record CadSketchEvaluationResult(
             throw new ArgumentException("Unsupported sketch kernel contract version.");
         Frame.Validate();
 
-        Circles = Circles?.ToArray() ??
-            throw new ArgumentNullException(nameof(Circles));
         if (Circles.Count == 0 || Circles.Any(x => x is null))
             throw new ArgumentException("Sketch evaluation requires solved circles.", nameof(Circles));
         if (!Circles.Select(x => x.Id).Distinct(StringComparer.Ordinal).SequenceEqual(

@@ -1637,3 +1637,176 @@ The old handbook referenced additional architecture/roadmap files that are not p
 \end{itemize}
 
 \section{CI}
+
+\begin{itemize}
+\item \pathref{.github/workflows/rust-kernel.yml}
+\item \pathref{.github/workflows/e2e.yml}
+\item \pathref{.github/workflows/metal-hardware.yml}
+\item \pathref{.github/workflows/cuda-hardware.yml}
+\item \pathref{.github/workflows/m16-performance.yml}
+\end{itemize}
+
+\section{Viewer / legacy TypeScript}
+\begin{itemize}
+\item \pathref{viewer/package.json}
+\item \pathref{kernel/api/src/index.ts}
+\item \pathref{kernel/api/src/application.ts}
+\item \pathref{kernel/api/src/contracts.ts}
+\item \pathref{kernel/api/src/core.ts}
+\item \pathref{kernel/api/src/kernel.ts}
+\item \pathref{kernel/api/src/solver.ts}
+\item \pathref{kernel/api/server.mjs}
+\end{itemize}
+
+\chapter{Repository Dependency Rules}
+
+The safe dependency direction is:
+
+\begin{lstlisting}
+Platform
+  -> Mathematics
+  -> Science
+  -> CAD semantics
+  -> Engineering resources
+  -> Specialized engineering domains
+  -> Application / presentation
+\end{lstlisting}
+
+Concrete implementation dependencies should point toward stable contracts, not upward into consumers.
+
+The following rules are mandatory:
+\begin{itemize}
+\item .NET semantic/domain code must not embed a concrete Rust implementation dependency when a contract is sufficient.
+\item Viewer code must not become the source of topology, manufacturing, or physical truth.
+\item Domain code must not create a hidden second mathematical kernel.
+\item OCCT types must not become system-wide semantic types merely because the backend can produce them.
+\item Legacy TypeScript APIs must not silently become a competing canonical evaluation engine.
+\item Build/package formats retained for compatibility must not automatically become the semantic authority of the next System-CAD layer.
+\end{itemize}
+
+\chapter{Documentation, Agent, and Change Discipline}
+
+The repository is shared memory for independent engineering agents.
+
+\section{Every change}
+
+Every substantial change follows:
+
+\begin{lstlisting}
+INSPECT
+-> AUTHORITATIVE RED
+-> IMPLEMENT
+-> GREEN
+-> RED-TEAM
+-> FULL E2E
+-> FULL APPLICABLE REPOSITORY GATES
+-> EXACT EVIDENCE
+\end{lstlisting}
+
+\section{Evidence packet}
+
+A completed increment must record:
+\begin{itemize}
+\item exact commit SHA;
+\item exact commands executed;
+\item RED result;
+\item targeted GREEN result;
+\item unit/integration result;
+\item red-team result;
+\item Python E2E result;
+\item full repository gate result;
+\item infrastructure limitations;
+\item capability status.
+\end{itemize}
+
+\section{Branch discipline}
+
+Agents should work in isolated branches/worktrees. A merge is a technical acceptance event, not merely source aggregation.
+
+\section{No hidden coupling}
+
+Agents communicate through source contracts, tests, fixtures, evidence, and exact commit state. Private reasoning is not an architecture dependency.
+
+\chapter{Definition of Done}
+
+A System-CAD capability is complete only when all applicable gates hold:
+
+\begin{lstlisting}
+Semantic contract
+AND correct ownership/layer
+AND implementation
+AND required math contract
+AND reference behavior
+AND frame/configuration behavior
+AND deterministic identity
+AND cache/invalidation
+AND dependency/update behavior
+AND authoritative result
+AND provenance/topology evidence
+AND derived representation where applicable
+AND component tests
+AND red-team tests
+AND Python E2E
+AND full applicable repository validation
+AND exact documentation evidence
+\end{lstlisting}
+
+Use explicit status labels:
+
+\begin{lstlisting}
+Implemented
+Tested
+E2E-validated
+Hardware-validated
+Not yet validated
+Unsupported
+Blocked by infrastructure
+\end{lstlisting}
+
+Never use a percentage as a substitute for a gate.
+
+\chapter{Known Limits and Non-Claims}
+
+The following are deliberate non-claims, not omissions in the documentation:
+
+\begin{itemize}
+\item M0-M16 closure does not certify arbitrary freeform/curved-face topology construction.
+\item General holed/curved exact solid decomposition is not part of the certified solid domain.
+\item General topology-aware B-Rep Boolean construction is not certified.
+\item OBB is not a required semantic acceleration primitive.
+\item Metal is not an authoritative f64 geometry engine.
+\item CUDA hardware has not been claimed without an actual NVIDIA runner.
+\item Rendering/tessellation output is not semantic authority.
+\item The current \texttt{main} tree does not yet verify the full future specialized .NET domain-project set as implemented code.
+\item The older TypeScript API is not the architectural excuse to create a second System-CAD semantic stack.
+\end{itemize}
+
+\chapter{Final Architectural Invariants}
+
+\begin{enumerate}
+\item Rust CPU mathematics is the normative mathematical reference for declared certified domains.
+\item .NET system-CAD owns CAD meaning and orchestration.
+\item Science owns reusable scientific facts and the provider-neutral Phenomena Simulation Service.
+\item Engineering Resources owns Machine, Tool, Fixture, Process, and Capability facts.
+\item Sheet Metal and CAM consume engineering-resource information and perform applicable material/machine/process validation through explicit contracts.
+\item CAM owns manufacturing-process semantics and deterministically emits G-code/NC through its postprocessor boundary.
+\item Product Structure owns product composition.
+\item BOM is derived from Product Structure and is consumed by Drawing, CAM, PLM, and other downstream domains.
+\item Drawing consumes authoritative CAD meaning; it never creates geometry authority.
+\item Simulation providers remain replaceable implementations behind the scientific service boundary.
+\item Specification, Evaluation, Authoritative Result, and Representation remain separate.
+\item References are semantic, not array-position identities.
+\item Topology evolution requires explicit provenance/evidence.
+\item Full and incremental recompute must be semantically equivalent.
+\item Cache keys are deterministic and complete for authoritative inputs.
+\item Failure to prove correctness produces explicit non-success, never plausible substitution.
+\item GPU acceleration conforms to CPU authority and never redefines it.
+\item OCCT remains an implementation/oracle boundary, never semantic authority.
+\item Viewer/presentation is downstream only.
+\item The repository's current milestone/gap documents determine what is implemented next; this handbook documents architecture and state rather than imposing a new feature sequence.
+\end{enumerate}
+
+\chapter*{Revision Note}
+This version replaces the former unstable two-column handbook layout with one stable single-column A4 document. It also removes claims based on paths that were not present on the audited \texttt{main} tree, while preserving the complete mathematical authority record and incorporating the current System-CAD relationship model.
+
+\end{document}

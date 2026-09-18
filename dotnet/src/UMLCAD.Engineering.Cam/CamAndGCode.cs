@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using UMLCAD.Cad.Semantics;
 using UMLCAD.Engineering.Resources;
@@ -55,6 +56,10 @@ public sealed record NcProgram(
     }
 
     public string Serialize() => string.Join("\n", Lines);
+
+    public string ContentHash() =>
+        Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(Serialize()))).ToLowerInvariant();
 }
 
 public interface INcPostprocessor

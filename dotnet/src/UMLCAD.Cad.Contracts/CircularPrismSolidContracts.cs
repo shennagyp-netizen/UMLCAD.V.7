@@ -49,7 +49,7 @@ public sealed record CircularPrismSolidKernelResult(
     double? Volume,
     double? SurfaceArea,
     KernelVector3? Centroid,
-    KernelBoundingBox3? Bounds,
+    CadBoundingBox3? Bounds,
     IReadOnlyList<CircularPrismKernelTopology> Topology,
     IReadOnlyList<string> Diagnostics)
 {

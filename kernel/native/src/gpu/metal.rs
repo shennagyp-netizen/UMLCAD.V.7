@@ -75,7 +75,6 @@ impl MetalBackend {
 #[cfg(target_os = "macos")]
 mod imp {
     use super::*;
-    use crate::functions::vec::Vec3;
     use objc2::rc::Retained;
     use objc2_foundation::{ns_string, NSString};
     use objc2_metal::{
@@ -231,7 +230,7 @@ kernel void candidate_pairs(
             .ok_or(MetalError::Allocation)?;
         unsafe {
             let destination = buffer.contents().cast::<u8>();
-            std::ptr::copy_nonoverlapping(bytes.as_ptr(), destination, bytes.len());
+            std::ptr::copy_nonoverlapping(bytes.as_ptr(), destination.as_ptr(), bytes.len());
         }
         Ok(buffer)
     }
@@ -375,7 +374,7 @@ kernel void candidate_pairs(
             let mut candidates = Vec::new();
             unsafe {
                 let flags = std::slice::from_raw_parts(
-                    flags_buffer.contents().cast::<u32>(),
+                    flags_buffer.contents().cast::<u32>().as_ptr(),
                     pair_count,
                 );
                 for i in 0..n {

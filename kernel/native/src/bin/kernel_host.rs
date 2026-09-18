@@ -29,6 +29,7 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
     let (status, response) = match (method.as_str(), path.as_str()) {
         ("POST", "/v1/build/evaluate") => evaluate(&body),
         ("POST", "/v1/geometry/box-solid") => box_solid(&body),
+        ("POST", "/v1/geometry/extrude-convex-planar-profile") => extrude_convex_planar_profile(&body),
         ("GET", "/health") => (200, json!({"status":"ok"})),
         _ => (404, failure("KERNEL_NOT_FOUND", "Unknown kernel endpoint.")),
     };
@@ -191,6 +192,186 @@ fn write_response(stream: &mut TcpStream, status: u16, body: &[u8]) -> std::io::
     stream.write_all(header.as_bytes())?;
     stream.write_all(body)
 }
+
+fn extrude_convex_planar_profile(body: &[u8]) -> (u16, Value) {
+    let root: Value = match serde_json::from_slice(body) {
+        Ok(value) => value,
+        Err(error) => {
+            return (
+                422,
+                failure("KERNEL_INVALID_JSON", &format!("The request is not valid JSON: {error}.")),
+            )
+        }
+    };
+
+    if root.get("schema").and_then(Value::as_str)
+        != Some("uml-cad-extrude-convex-planar-profile/1.0.0")
+    {
+        return (
+            422,
+            failure(
+                "KERNEL_EXTRUSION_SCHEMA",
+                "Unsupported convex planar extrusion schema.",
+            ),
+        );
+    }
+
+    let operation_identity = match root.get("operationIdentity").and_then(Value::as_str) {
+        Some(value) if !value.trim().is_empty() => value.to_string(),
+        _ => return (
+            422,
+            failure("KERNEL_EXTRUSION_SCHEMA", "operationIdentity is required."),
+        ),
+    };
+
+    let origin = match vector3(root.get("origin")) {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_EXTRUSION_FRAME", message)),
+    };
+    let u_direction = match vector3(root.get("uDirection")) {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_EXTRUSION_FRAME", message)),
+    };
+    let v_direction = match vector3(root.get("vDirection")) {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_EXTRUSION_FRAME", message)),
+    };
+
+    let profile = match root.get("profile").and_then(Value::as_array) {
+        Some(values) if values.len() >= 3 => {
+            let mut points = Vec::with_capacity(values.len());
+            for value in values {
+                let object = match value.as_object() {
+                    Some(object) => object,
+                    None => return (
+                        422,
+                        failure(
+                            "KERNEL_EXTRUSION_PROFILE",
+                            "Profile point must be an object.",
+                        ),
+                    ),
+                };
+                let u = match object.get("u").and_then(Value::as_f64) {
+                    Some(value) if value.is_finite() => value,
+                    _ => return (422, failure("KERNEL_EXTRUSION_PROFILE", "Profile u must be finite.")),
+                };
+                let v = match object.get("v").and_then(Value::as_f64) {
+                    Some(value) if value.is_finite() => value,
+                    _ => return (422, failure("KERNEL_EXTRUSION_PROFILE", "Profile v must be finite.")),
+                };
+                points.push(umlcad_kernel_rust::math::vec::Vec2::new(u, v));
+            }
+            points
+        }
+        Some(_) => return (
+            422,
+            failure(
+                "KERNEL_EXTRUSION_PROFILE",
+                "Profile requires at least three points.",
+            ),
+        ),
+        None => return (
+            422,
+            failure("KERNEL_EXTRUSION_PROFILE", "Profile array is required."),
+        ),
+    };
+
+    let depth = match root.get("depth").and_then(Value::as_f64) {
+        Some(value) if value.is_finite() && value > 0.0 => value,
+        _ => return (
+            422,
+            failure(
+                "KERNEL_EXTRUSION_GEOMETRY",
+                "Depth must be finite and positive.",
+            ),
+        ),
+    };
+
+    let tolerance_value = root.get("tolerance").and_then(Value::as_object);
+    let absolute = tolerance_value
+        .and_then(|object| object.get("absolute"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-9);
+    let relative = tolerance_value
+        .and_then(|object| object.get("relative"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-9);
+
+    let tolerance = match umlcad_kernel_rust::math::tolerance::Tolerance::new(absolute, relative) {
+        Ok(value) => value,
+        Err(_) => return (
+            422,
+            failure(
+                "KERNEL_EXTRUSION_TOLERANCE",
+                "Tolerance must be finite and non-negative.",
+            ),
+        ),
+    };
+
+    let region = umlcad_kernel_rust::math::brep::PlanarRegion3 {
+        origin,
+        u_dir: u_direction,
+        v_dir: v_direction,
+        outer: profile,
+        holes: Vec::new(),
+    };
+
+    let response = dispatch(KernelRequest::ExtrudeConvexPlanarProfile {
+        operation_identity,
+        region,
+        depth,
+        tolerance,
+    });
+
+    match response {
+        Ok(KernelResponse::Extrusion(report)) => (
+            200,
+            json!({
+                "schema": "uml-cad-extrude-convex-planar-profile/1.0.0",
+                "status": "succeeded",
+                "succeeded": true,
+                "resultId": report.result_id,
+                "evidenceHash": report.evidence_hash,
+                "topology": report.topology.iter().map(|entry| json!({
+                    "kind": entry.kind,
+                    "key": entry.key
+                })).collect::<Vec<_>>(),
+                "volume": report.volume,
+                "surfaceArea": report.surface_area,
+                "centroid": {
+                    "x": report.centroid.x,
+                    "y": report.centroid.y,
+                    "z": report.centroid.z
+                },
+                "diagnostics": []
+            }),
+        ),
+        Ok(_) => (
+            500,
+            failure("KERNEL_DISPATCH", "Extrusion dispatch returned the wrong response."),
+        ),
+        Err(error) => (
+            200,
+            json!({
+                "schema": "uml-cad-extrude-convex-planar-profile/1.0.0",
+                "status": "failed",
+                "succeeded": false,
+                "resultId": null,
+                "evidenceHash": null,
+                "topology": [],
+                "volume": null,
+                "surfaceArea": null,
+                "centroid": null,
+                "diagnostics": [{
+                    "code": "KERNEL_EXTRUSION",
+                    "severity": "error",
+                    "message": error.to_string()
+                }]
+            }),
+        ),
+    }
+}
+
 
 fn box_solid(body: &[u8]) -> (u16, Value) {
     let root: Value = match serde_json::from_slice(body) {

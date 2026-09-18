@@ -27,6 +27,8 @@ pub enum Precision {
     F64,
 }
 
+const LEGACY_VECTOR_OPS: &[GpuOperation] = &[GpuOperation::VectorBatch];
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum GpuOperation {
     VectorBatch,
@@ -79,7 +81,7 @@ impl BackendCapability {
             f64,
             deterministic,
             max_batch,
-            operations: &[],
+            operations: LEGACY_VECTOR_OPS,
             max_workgroup_size: None,
             determinism: if deterministic {
                 ExecutionDeterminism::Bitwise
@@ -519,7 +521,10 @@ pub fn select_backend_report(
             }
 
             if find(BackendKind::Cpu).is_some_and(|capability| {
-                capability_can_run(*capability, operation, precision, batch_size, policy)
+                capability.available
+                    && capability.operations.binary_search(&operation).is_ok()
+                    && (precision != Precision::F64 || capability.f64)
+                    && determinism_satisfies(policy.required_determinism, capability.determinism)
             }) {
                 Ok(BackendSelection {
                     backend: BackendKind::Cpu,

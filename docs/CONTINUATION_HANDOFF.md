@@ -4,7 +4,7 @@
 - Repository: `shennagyp-netizen/UMLCAD.V.7`
 - Default branch: `main`
 - Main head before PR #30 merge: `d267d9cb5d277da6d655fefd9d122c1c165e9a53`
-- Latest completed roadmap family after merge: M11 — Tessellation / spatial acceleration (certified domains)
+- Latest completed roadmap family after merge: M12 — GPU abstraction (backend-neutral; no hardware backend)
 - Latest merged M10 closure PR: #27, `math: complete solver result status authority`
 - PR #27 merge commit: `8fea60633c4f95f0175d18faa54878e7af9f44a6`
 - Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
@@ -13,7 +13,7 @@
 - PR #30 validated implementation head: `9d04c05f67f4e5542df56b8612806fe8296f624b`
 
 ## Completed mathematical-authority state
-PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M12 is now the next incomplete roadmap family after the M11 post-merge verification.
+PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M13 is now the next incomplete roadmap family after the M12 post-merge verification.
 
 Completed and validated stations now include:
 - analytic constraint Jacobian authority;
@@ -185,3 +185,15 @@ The M12 abstraction defines conceptual Auto/CPU/Metal/CUDA backends; explicit ca
 No Metal or CUDA hardware backend is implemented or hardware-validated by M12. No GPU handle/resource enters mathematical semantic state. The deprecated legacy selector remains only for compatibility; authority code uses the diagnostic selection result. M13 adds real Apple Silicon Metal execution; M14 adds real NVIDIA CUDA execution; M15 adds cross-backend hardware conformance.
 
 The source implementation was green in the authoritative Rust kernel and comprehensive E2E/red-team gates before this documentation closure. The documentation-inclusive branch head must pass both gates again before PR #32 is merged.
+
+## M13 completion boundary
+
+M13 is now documented as `Implemented / Tested / Hardware-validated` for its declared Apple Silicon Metal domain. The validated implementation head is `b32e8c9f966a22d8eab1469fbb09716b7aba88f7`.
+
+The Metal backend lives at `kernel/native/src/gpu/metal.rs` and uses the modern `objc2-metal` binding. It implements a real compute pipeline for conservative AABB candidate generation. Authoritative CPU `f64` AABBs are converted with outward-rounded `f32` bounds only for this broad-phase workload; the GPU output is required to contain every exact CPU `f64` overlap, and the adapter fails closed on a false negative. Candidate pairs are reconstructed deterministically on the CPU, and the hardware test repeats the same workload to verify stable output.
+
+Apple Metal's lack of native hardware `f64` is represented explicitly in the backend capability. M13 therefore does not claim Metal execution of authoritative f64 vector/matrix/transform/NURBS geometry and does not silently downgrade those semantics. Those remain CPU-authoritative.
+
+Exact-head validation on `b32e8c9...`: Rust kernel workflow #492 PASS; comprehensive E2E/red-team workflow #414 PASS; Metal hardware workflow #11 PASS on the `macos-14` Apple Silicon runner. Earlier failures on the same milestone were corrected before closure and are not part of the validated head.
+
+M14 remains the CUDA backend; M15 remains cross-backend conformance; M16 remains final performance/crossover and red-team closure.

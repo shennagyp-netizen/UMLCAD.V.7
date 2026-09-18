@@ -29,11 +29,15 @@ public sealed record AxisAlignedBoxSolidRequest(
     ContractVersion ContractVersion)
 {
     public const string ContractId = "UMLCAD.Geometry.AxisAlignedBoxSolid";
+    public const string ContractSchema = "uml-cad-axis-aligned-box-solid/1.0.0";
 
     public AxisAlignedBoxSolidRequest
     {
         if (string.IsNullOrWhiteSpace(OperationIdentity))
             throw new ArgumentException("OperationIdentity is required.", nameof(OperationIdentity));
+
+        if (ContractVersion.Value != "1.0")
+            throw new ArgumentException("Unsupported axis-aligned box-solid contract version.", nameof(ContractVersion));
 
         if (Max.X <= Min.X || Max.Y <= Min.Y || Max.Z <= Min.Z)
             throw new ArgumentException("Axis-aligned box maximum must be strictly greater than minimum.", nameof(Max));
@@ -53,7 +57,7 @@ public sealed record AxisAlignedBoxSolidKernelTopology(
     }
 }
 
-public enum AxisAlignedBoxSolidKernelStatus
+public enum GeometryKernelStatus
 {
     Succeeded,
     Failed,
@@ -63,7 +67,7 @@ public enum AxisAlignedBoxSolidKernelStatus
 }
 
 public sealed record AxisAlignedBoxSolidKernelResult(
-    AxisAlignedBoxSolidKernelStatus Status,
+    GeometryKernelStatus Status,
     ContractResultId? ResultId,
     string? EvidenceHash,
     IReadOnlyList<AxisAlignedBoxSolidKernelTopology> Topology,
@@ -79,7 +83,7 @@ public sealed record AxisAlignedBoxSolidKernelResult(
         Diagnostics = Diagnostics?.ToArray() ??
             throw new ArgumentNullException(nameof(Diagnostics));
 
-        if (Status == AxisAlignedBoxSolidKernelStatus.Succeeded)
+        if (Status == GeometryKernelStatus.Succeeded)
         {
             if (ResultId is null || string.IsNullOrWhiteSpace(EvidenceHash))
                 throw new ArgumentException(

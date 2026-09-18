@@ -115,17 +115,32 @@ fn on_segment(a: Vec2, b: Vec2, p: Vec2, eps: f64) -> bool {
 }
 
 fn segment_intersects(a: Vec2, b: Vec2, c: Vec2, d: Vec2, eps: f64) -> bool {
-    let ab_c = orient(a, b, c);
-    let ab_d = orient(a, b, d);
-    let cd_a = orient(c, d, a);
-    let cd_b = orient(c, d, b);
-    if [ab_c, ab_d, cd_a, cd_b].iter().any(|v| !v.is_finite()) { return false; }
-    if ab_c.abs() <= eps && on_segment(a, b, c, eps) { return true; }
-    if ab_d.abs() <= eps && on_segment(a, b, d, eps) { return true; }
-    if cd_a.abs() <= eps && on_segment(c, d, a, eps) { return true; }
-    if cd_b.abs() <= eps && on_segment(c, d, b, eps) { return true; }
-    ((ab_c > eps && ab_d < -eps) || (ab_c < -eps && ab_d > eps))
-        && ((cd_a > eps && cd_b < -eps) || (cd_a < -eps && cd_b > eps))
+    let ab = b.sub(a);
+    let cd = d.sub(c);
+    let ab_c = ab.cross(c.sub(a));
+    let ab_d = ab.cross(d.sub(a));
+    let cd_a = cd.cross(a.sub(c));
+    let cd_b = cd.cross(b.sub(c));
+    if [ab_c, ab_d, cd_a, cd_b].iter().any(|v| !v.is_finite()) {
+        return false;
+    }
+    // Orientations have units of length². Scale the positional tolerance by
+    // the geometry involved rather than comparing an area directly to a length.
+    let geometric_scale = ab.length()
+        .max(cd.length())
+        .max(a.sub(c).length())
+        .max(a.sub(d).length())
+        .max(eps);
+    let orient_eps = eps * geometric_scale;
+    if !orient_eps.is_finite() {
+        return false;
+    }
+    if ab_c.abs() <= orient_eps && on_segment(a, b, c, eps) { return true; }
+    if ab_d.abs() <= orient_eps && on_segment(a, b, d, eps) { return true; }
+    if cd_a.abs() <= orient_eps && on_segment(c, d, a, eps) { return true; }
+    if cd_b.abs() <= orient_eps && on_segment(c, d, b, eps) { return true; }
+    ((ab_c > orient_eps && ab_d < -orient_eps) || (ab_c < -orient_eps && ab_d > orient_eps))
+        && ((cd_a > orient_eps && cd_b < -orient_eps) || (cd_a < -orient_eps && cd_b > orient_eps))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -204,7 +219,14 @@ impl PlanarPolygon {
                 self.vertices[(i + 1) % self.vertices.len()],
                 self.vertices[(i + 2) % self.vertices.len()],
             );
-            if value.abs() <= eps { return Ok(false); }
+            let edge_scale = self.vertices[(i + 1) % self.vertices.len()]
+                .sub(self.vertices[i])
+                .length()
+                .max(self.vertices[(i + 2) % self.vertices.len()]
+                    .sub(self.vertices[(i + 1) % self.vertices.len()])
+                    .length())
+                .max(eps);
+            if value.abs() <= eps * edge_scale { return Ok(false); }
             if sign == 0.0 { sign = value.signum(); }
             else if value.signum() != sign { return Ok(false); }
         }
@@ -223,7 +245,11 @@ fn line_intersection(
     if !denominator.is_finite() {
         return Err(ConstructionError::Overflow);
     }
-    if denominator.abs() <= eps {
+    let determinant_eps = eps * r.length().max(s.length()).max(eps);
+    if !determinant_eps.is_finite() {
+        return Err(ConstructionError::Overflow);
+    }
+    if denominator.abs() <= determinant_eps {
         return Err(ConstructionError::Degenerate);
     }
     let t = q.sub(p).cross(s) / denominator;
@@ -902,6 +928,26 @@ mod tests {
             Vec2::new(0.0, 0.0), Vec2::new(w, 0.0),
             Vec2::new(w, h), Vec2::new(0.0, h),
         ])
+    }
+
+    #[test]
+    fn determinant_and_orientation_tolerances_are_scale_consistent() {
+        let small = PlanarPolygon::new(vec![
+            Vec2::new(0.0, 0.0),
+            Vec2::new(1.0e-6, 0.0),
+            Vec2::new(1.0e-6, 1.0e-6),
+            Vec2::new(0.0, 1.0e-6),
+        ]);
+        let large = PlanarPolygon::new(vec![
+            Vec2::new(0.0, 0.0),
+            Vec2::new(1.0e6, 0.0),
+            Vec2::new(1.0e6, 1.0e6),
+            Vec2::new(0.0, 1.0e6),
+        ]);
+        assert!(small.validate(tol()).is_ok());
+        assert!(large.validate(tol()).is_ok());
+        assert!(offset_convex_polygon(&small, 1.0e-7, tol()).is_ok());
+        assert!(offset_convex_polygon(&large, 1.0e5, tol()).is_ok());
     }
 
     #[test]

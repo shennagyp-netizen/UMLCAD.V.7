@@ -25,7 +25,7 @@ public readonly record struct KernelVector3
     public KernelVector3 Normalize(string name)
     {
         if (!IsFinite || !double.IsFinite(Length) || Length <= 0d)
-            throw new ArgumentException(`${name} must be finite and non-zero.`);
+            throw new ArgumentException($"{name} must be finite and non-zero.");
 
         var length = Length;
         return new KernelVector3(X / length, Y / length, Z / length);

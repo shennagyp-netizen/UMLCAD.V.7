@@ -1,4 +1,10 @@
-use crate::api::{BoxSolidReport, BoxSolidTopology, KernelRequest, KernelResponse};
+use crate::api::{
+    BoxSolidReport,
+    BoxSolidTopology,
+    ExtrusionReport,
+    KernelRequest,
+    KernelResponse,
+};
 use crate::functions::{
     dimensions::evaluate_dimensions,
     dxf::export_dxf,
@@ -58,6 +64,19 @@ pub fn dispatch(request: KernelRequest) -> Result<KernelResponse, ServiceError> 
         )
         .map(KernelResponse::BoxSolid)
         .map_err(|error| ServiceError(error.to_string())),
+        KernelRequest::ExtrudeConvexPlanarProfile {
+            operation_identity,
+            region,
+            depth,
+            tolerance,
+        } => build_extrusion_report(
+            &operation_identity,
+            region,
+            depth,
+            tolerance,
+        )
+        .map(KernelResponse::Extrusion)
+        .map_err(|error| ServiceError(error.to_string())),
     }
 }
 
@@ -103,6 +122,70 @@ fn build_axis_aligned_box_solid_report(
         .collect::<Vec<_>>();
 
     Ok(BoxSolidReport {
+        result_id,
+        evidence_hash,
+        topology,
+        volume: solid.volume(tolerance)?,
+        surface_area: solid.surface_area(tolerance)?,
+        centroid: solid.centroid(tolerance)?,
+        solid,
+    })
+}
+
+fn build_extrusion_report(
+    operation_identity: &str,
+    region: crate::functions::brep::PlanarRegion3,
+    depth: f64,
+    tolerance: crate::functions::tolerance::Tolerance,
+) -> Result<ExtrusionReport, crate::functions::brep::BRepError> {
+    if operation_identity.trim().is_empty() {
+        return Err(crate::functions::brep::BRepError::MissingReference);
+    }
+
+    let solid = crate::functions::brep::extrude_convex_planar_region(
+        region.clone(),
+        depth,
+        tolerance,
+    )?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(b"uml-cad-extrude-convex-planar-profile/1|");
+    hasher.update(operation_identity.as_bytes());
+    hasher.update(b"|");
+    hasher.update(depth.to_bits().to_le_bytes());
+    hasher.update(region.origin.x.to_bits().to_le_bytes());
+    hasher.update(region.origin.y.to_bits().to_le_bytes());
+    hasher.update(region.origin.z.to_bits().to_le_bytes());
+    hasher.update(region.u_dir.x.to_bits().to_le_bytes());
+    hasher.update(region.u_dir.y.to_bits().to_le_bytes());
+    hasher.update(region.u_dir.z.to_bits().to_le_bytes());
+    hasher.update(region.v_dir.x.to_bits().to_le_bytes());
+    hasher.update(region.v_dir.y.to_bits().to_le_bytes());
+    hasher.update(region.v_dir.z.to_bits().to_le_bytes());
+
+    for point in &region.outer {
+        hasher.update(point.x.to_bits().to_le_bytes());
+        hasher.update(point.y.to_bits().to_le_bytes());
+    }
+
+    hasher.update(tolerance.absolute.to_bits().to_le_bytes());
+    hasher.update(tolerance.relative.to_bits().to_le_bytes());
+
+    let result_id = format!("solid:{:x}", hasher.finalize());
+
+    let mut evidence = Sha256::new();
+    evidence.update(b"uml-cad-extrude-convex-planar-profile-evidence/1|");
+    evidence.update(result_id.as_bytes());
+    let evidence_hash = format!("{:x}", evidence.finalize());
+
+    let topology = solid.faces.iter()
+        .map(|face| BoxSolidTopology {
+            kind: "Face".to_string(),
+            key: face.id.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    Ok(ExtrusionReport {
         result_id,
         evidence_hash,
         topology,

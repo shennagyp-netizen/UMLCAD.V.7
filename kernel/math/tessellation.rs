@@ -4,7 +4,7 @@
 //! intervals until caller-provided chord and angular errors are satisfied, or
 //! returns `MaxDepth` rather than silently returning a lower-quality result.
 
-use super::vec::Vec3;
+use super::{trim::{TrimCurve2, TrimLoop2}, vec::Vec3};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TessellationPolicy {
@@ -555,5 +555,329 @@ mod surface_tests {
             },
         );
         assert_eq!(r,Err(TessellationError::MaxDepth));
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TrimTessellationPolicy {
+    pub chord_error: f64,
+    pub angular_error: f64,
+    pub parameter_chord_error: f64,
+    pub max_depth: u32,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TessellatedTrimLoop3 {
+    pub points: Vec<Vec3>,
+    pub parameters: Vec<(f64, f64)>,
+    pub normals: Vec<Vec3>,
+    pub max_chord_error: f64,
+    pub max_angular_error: f64,
+    pub max_parameter_chord_error: f64,
+    pub max_depth: u32,
+}
+
+impl TrimTessellationPolicy {
+    pub fn validate(self) -> Result<(), TessellationError> {
+        if !self.chord_error.is_finite()
+            || !self.angular_error.is_finite()
+            || !self.parameter_chord_error.is_finite()
+            || self.chord_error <= 0.0
+            || self.angular_error <= 0.0
+            || self.parameter_chord_error <= 0.0
+        {
+            return Err(TessellationError::InvalidPolicy);
+        }
+        Ok(())
+    }
+}
+
+fn map_trim_point<F, G>(
+    curve_point: super::geometry::Point,
+    eval: &F,
+    normal: &G,
+) -> Result<SurfaceSample3, TessellationError>
+where
+    F: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+    G: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+{
+    let u = curve_point.x;
+    let v = curve_point.y;
+    let point = eval(u, v)?;
+    let normal = normal(u, v)?;
+    if !point.is_finite() || !normal.is_finite() {
+        return Err(TessellationError::NonFinite);
+    }
+    Ok(SurfaceSample3 {
+        parameter: (u, v),
+        point,
+        normal: normal.normalized().map_err(|_| TessellationError::Degenerate)?,
+    })
+}
+
+fn tessellate_trim_curve_recursive<F, G>(
+    curve: &TrimCurve2,
+    t0: f64,
+    t1: f64,
+    a: SurfaceSample3,
+    b: SurfaceSample3,
+    depth: u32,
+    policy: &TrimTessellationPolicy,
+    eval: &F,
+    normal: &G,
+    out: &mut Vec<SurfaceSample3>,
+) -> Result<(f64, f64, f64), TessellationError>
+where
+    F: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+    G: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+{
+    let tm = t0 + (t1 - t0) * 0.5;
+    if tm == t0 || tm == t1 {
+        return Err(TessellationError::MaxDepth);
+    }
+    let uv_mid = curve.point_at(tm)
+        .map_err(|_| TessellationError::EvaluationFailed)?;
+    let m = map_trim_point(uv_mid, eval, normal)?;
+    let chord_approx = a.point.add(b.point).scale(0.5);
+    let chord_error = m.point.sub(chord_approx).length();
+    let parameter_approx = a
+        .parameter
+        .0
+        .mul_add(0.5, b.parameter.0 * 0.5);
+    let parameter_approx_v = a
+        .parameter
+        .1
+        .mul_add(0.5, b.parameter.1 * 0.5);
+    let parameter_error = (
+        uv_mid.x - parameter_approx,
+        uv_mid.y - parameter_approx_v,
+    );
+    let parameter_chord_error =
+        parameter_error.0.hypot(parameter_error.1);
+    let angular_error = angle_between(a.normal, b.normal)?
+        .max(angle_between(a.normal, m.normal)?)
+        .max(angle_between(m.normal, b.normal)?);
+    if !chord_error.is_finite()
+        || !parameter_chord_error.is_finite()
+        || !angular_error.is_finite()
+    {
+        return Err(TessellationError::NonFinite);
+    }
+    if chord_error <= policy.chord_error
+        && parameter_chord_error <= policy.parameter_chord_error
+        && angular_error <= policy.angular_error
+    {
+        out.push(b);
+        return Ok((chord_error, angular_error, parameter_chord_error));
+    }
+    if depth >= policy.max_depth {
+        return Err(TessellationError::MaxDepth);
+    }
+
+    let mut left = Vec::new();
+    let left_metrics = tessellate_trim_curve_recursive(
+        curve, t0, tm, a, m, depth + 1, policy, eval, normal, &mut left
+    )?;
+    out.extend(left);
+    let mut right = Vec::new();
+    let right_metrics = tessellate_trim_curve_recursive(
+        curve, tm, t1, m, b, depth + 1, policy, eval, normal, &mut right
+    )?;
+    out.extend(right);
+
+    Ok((
+        left_metrics.0.max(right_metrics.0),
+        left_metrics.1.max(right_metrics.1),
+        left_metrics.2.max(right_metrics.2),
+    ))
+}
+
+fn tessellate_trim_curve3<F, G>(
+    curve: &TrimCurve2,
+    policy: &TrimTessellationPolicy,
+    eval: &F,
+    normal: &G,
+) -> Result<(Vec<SurfaceSample3>, (f64, f64, f64)), TessellationError>
+where
+    F: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+    G: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+{
+    curve.validate().map_err(|_| TessellationError::EvaluationFailed)?;
+    let a = map_trim_point(curve.point_at(0.0).map_err(|_| TessellationError::EvaluationFailed)?, eval, normal)?;
+    let b = map_trim_point(curve.point_at(1.0).map_err(|_| TessellationError::EvaluationFailed)?, eval, normal)?;
+    let mut out = Vec::new();
+    out.push(a);
+    let metrics = tessellate_trim_curve_recursive(
+        curve, 0.0, 1.0, a, b, 0, policy, eval, normal, &mut out
+    )?;
+    Ok((out, metrics))
+}
+
+pub fn tessellate_trim_loop3<F, G>(
+    trim: &TrimLoop2,
+    trim_tolerance: f64,
+    policy: TrimTessellationPolicy,
+    eval: F,
+    normal: G,
+) -> Result<TessellatedTrimLoop3, TessellationError>
+where
+    F: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+    G: Fn(f64, f64) -> Result<Vec3, TessellationError>,
+{
+    policy.validate()?;
+    trim.validate(trim_tolerance)
+        .map_err(|_| TessellationError::EvaluationFailed)?;
+
+    let mut points = Vec::new();
+    let mut parameters = Vec::new();
+    let mut normals = Vec::new();
+    let mut maximum_chord: f64 = 0.0;
+    let mut maximum_angular: f64 = 0.0;
+    let mut maximum_parameter: f64 = 0.0;
+
+    for curve in &trim.curves {
+        let (samples, metrics) =
+            tessellate_trim_curve3(curve, &policy, &eval, &normal)?;
+        for (i, sample) in samples.into_iter().enumerate() {
+            if !points.is_empty() && i == 0 {
+                continue;
+            }
+            points.push(sample.point);
+            parameters.push(sample.parameter);
+            normals.push(sample.normal);
+        }
+        maximum_chord = maximum_chord.max(metrics.0);
+        maximum_angular = maximum_angular.max(metrics.1);
+        maximum_parameter = maximum_parameter.max(metrics.2);
+    }
+
+    if points.len() < 2 {
+        return Err(TessellationError::Degenerate);
+    }
+
+    Ok(TessellatedTrimLoop3 {
+        points,
+        parameters,
+        normals,
+        max_chord_error: maximum_chord,
+        max_angular_error: maximum_angular,
+        max_parameter_chord_error: maximum_parameter,
+        max_depth: policy.max_depth,
+    })
+}
+
+#[cfg(test)]
+mod trim_tests {
+    use super::*;
+    use crate::math::geometry::{Arc, Point};
+
+    fn planar_eval(u: f64, v: f64) -> Result<Vec3, TessellationError> {
+        Ok(Vec3::new(u, v, 0.0))
+    }
+
+    fn planar_normal(_: f64, _: f64) -> Result<Vec3, TessellationError> {
+        Ok(Vec3::new(0.0, 0.0, 1.0))
+    }
+
+    fn square_loop() -> TrimLoop2 {
+        TrimLoop2 {
+            curves: vec![
+                TrimCurve2::Line {
+                    start: Point { x: 0.0, y: 0.0 },
+                    end: Point { x: 1.0, y: 0.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0, y: 0.0 },
+                    end: Point { x: 1.0, y: 1.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 1.0, y: 1.0 },
+                    end: Point { x: 0.0, y: 1.0 },
+                },
+                TrimCurve2::Line {
+                    start: Point { x: 0.0, y: 1.0 },
+                    end: Point { x: 0.0, y: 0.0 },
+                },
+            ],
+        }
+    }
+
+    #[test]
+    fn trim_boundary_preserves_exact_uv_samples() {
+        let policy = TrimTessellationPolicy {
+            chord_error: 1.0e-6,
+            angular_error: 1.0e-6,
+            parameter_chord_error: 1.0e-6,
+            max_depth: 8,
+        };
+        let result = tessellate_trim_loop3(
+            &square_loop(),
+            1.0e-9,
+            policy,
+            planar_eval,
+            planar_normal,
+        )
+        .unwrap();
+        assert_eq!(result.points.len(), 4);
+        assert_eq!(result.points.len(), result.parameters.len());
+        assert_eq!(result.points.len(), result.normals.len());
+        for (point, parameter) in result.points.iter().zip(&result.parameters) {
+            assert!((point.x - parameter.0).abs() <= 1.0e-12);
+            assert!((point.y - parameter.1).abs() <= 1.0e-12);
+            assert!(point.z.abs() <= 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn trim_arc_refines_in_parameter_and_surface_space() {
+        let loop_ = TrimLoop2 {
+            curves: vec![
+                TrimCurve2::Arc(Arc {
+                    center: Point { x: 0.0, y: 0.0 },
+                    radius: 1.0,
+                    start_angle: 0.0,
+                    end_angle: std::f64::consts::FRAC_PI_2,
+                }),
+                TrimCurve2::Line {
+                    start: Point { x: 0.0, y: 1.0 },
+                    end: Point { x: 0.0, y: 0.0 },
+                },
+            ],
+        };
+        let policy = TrimTessellationPolicy {
+            chord_error: 1.0e-4,
+            angular_error: 1.0e-4,
+            parameter_chord_error: 1.0e-2,
+            max_depth: 10,
+        };
+        let result = tessellate_trim_loop3(
+            &loop_,
+            1.0e-8,
+            policy,
+            planar_eval,
+            planar_normal,
+        );
+        assert!(result.is_err() || result.unwrap().points.len() > 2);
+    }
+
+    #[test]
+    fn invalid_trim_loop_fails_closed() {
+        let mut loop_ = square_loop();
+        loop_.curves.swap(1, 3);
+        assert_eq!(
+            tessellate_trim_loop3(
+                &loop_,
+                1.0e-9,
+                TrimTessellationPolicy {
+                    chord_error: 1.0e-4,
+                    angular_error: 1.0e-4,
+                    parameter_chord_error: 1.0e-4,
+                    max_depth: 8,
+                },
+                planar_eval,
+                planar_normal,
+            ),
+            Err(TessellationError::EvaluationFailed)
+        );
     }
 }

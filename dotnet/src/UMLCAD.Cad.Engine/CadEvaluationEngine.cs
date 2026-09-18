@@ -306,12 +306,17 @@ public static class EvaluationIdentity
 public sealed class CadEvaluationEngine
 {
     private readonly ICadKernelEvaluator _kernel;
+    private readonly ICadReferenceResolver _referenceResolver;
     private readonly IEvaluationCache _cache;
     private readonly Dictionary<CadId, CadFeatureEvaluationResult> _lastResults = new();
 
-    public CadEvaluationEngine(ICadKernelEvaluator kernel, IEvaluationCache? cache = null)
+    public CadEvaluationEngine(
+        ICadKernelEvaluator kernel,
+        IEvaluationCache? cache = null,
+        ICadReferenceResolver? referenceResolver = null)
     {
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
+        _referenceResolver = referenceResolver ?? new AuthoritativeCadReferenceResolver();
         _cache = cache ?? new InMemoryEvaluationCache();
     }
 
@@ -339,7 +344,7 @@ public sealed class CadEvaluationEngine
             var feature = graph.Features[featureId];
             var dependencies = graph.DependenciesOf(featureId).OrderBy(x => x.Value, StringComparer.Ordinal).ToArray();
             var upstream = dependencies.Where(current.ContainsKey).Select(x => current[x]).ToArray();
-            var references = await ResolveReferencesAsync(feature, current, graph, cancellationToken);
+            var references = ResolveReferences(feature, current, graph);
 
             var identity = EvaluationIdentity.Compute(
                 feature,
@@ -460,11 +465,10 @@ public sealed class CadEvaluationEngine
             failure);
     }
 
-    private async Task<IReadOnlyList<ReferenceResolution>> ResolveReferencesAsync(
+    private IReadOnlyList<ReferenceResolution> ResolveReferences(
         CadFeatureSpecification feature,
         IReadOnlyDictionary<CadId, CadFeatureEvaluationResult> current,
-        SpecificationGraph graph,
-        CancellationToken cancellationToken)
+        SpecificationGraph graph)
     {
         var references = feature switch
         {
@@ -489,7 +493,7 @@ public sealed class CadEvaluationEngine
                 continue;
             }
 
-            resolutions.Add(await _kernel.ResolveReferenceAsync(reference, target.AuthoritativeResult, cancellationToken));
+            resolutions.Add(_referenceResolver.Resolve(reference, target.AuthoritativeResult));
         }
 
         return resolutions;

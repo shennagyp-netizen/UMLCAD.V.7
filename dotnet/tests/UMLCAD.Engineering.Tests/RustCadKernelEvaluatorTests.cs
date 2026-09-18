@@ -69,7 +69,7 @@ public sealed class RustCadKernelEvaluatorTests
     }
 
     [Fact]
-    public async Task SemanticPlanarFaceReferenceResolvesIndependentOfTopologyArrayOrder()
+    public void SemanticPlanarFaceReferenceResolvesIndependentOfTopologyArrayOrder()
     {
         var box = new BoxFeatureSpecification(
             new CadId("box"),
@@ -117,14 +117,14 @@ public sealed class RustCadKernelEvaluatorTests
                 new CadVector3(1d, 1.5d, 4d)),
             new ReferenceContext(CadFrameKind.Part, "default", result.ResultId));
 
-        var resolution = await evaluator.ResolveReferenceAsync(reference, result);
+        var resolution = new AuthoritativeCadReferenceResolver().Resolve(reference, result);
 
         Assert.Equal(ReferenceResolutionStatus.Resolved, resolution.Status);
         Assert.Equal("f_top", resolution.Candidates.Single().Value);
     }
 
     [Fact]
-    public async Task DuplicateSemanticFaceEvidenceFailsClosedAsAmbiguous()
+    public void DuplicateSemanticFaceEvidenceFailsClosedAsAmbiguous()
     {
         var evaluator = new RustCadKernelEvaluator(
             new RecordingBoxGeometryService(
@@ -182,7 +182,7 @@ public sealed class RustCadKernelEvaluatorTests
                 new CadVector3(1d, 1.5d, 4d)),
             new ReferenceContext(CadFrameKind.Part, "default"));
 
-        var resolution = await evaluator.ResolveReferenceAsync(reference, ambiguous);
+        var resolution = new AuthoritativeCadReferenceResolver().Resolve(reference, ambiguous);
 
         Assert.Equal(ReferenceResolutionStatus.Ambiguous, resolution.Status);
         Assert.Equal(

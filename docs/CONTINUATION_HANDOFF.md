@@ -366,7 +366,7 @@ Next implementation boundary after infrastructure recovery:
 
 The current system-CAD implementation head is `977e8eb5f5aadcd9bd3774e075d776bfa871cd6b`.
 
-The .NET system-CAD boundary now contains a production `ICadKernelEvaluator` implementation:
+The .NET system-CAD boundary now contains a production `ICadKernelEvaluator` implementation and a separate CAD-owned semantic reference resolver:
 - `dotnet/src/UMLCAD.Kernel.Client/RustCadKernelEvaluator.cs`
 - registered by `AddRustKernel()` as the production evaluator;
 - delegates the first certified geometry subset (axis-aligned box solid) to the existing typed Rust geometry transport;
@@ -378,7 +378,7 @@ The .NET system-CAD boundary now contains a production `ICadKernelEvaluator` imp
 
 Tests added in `dotnet/tests/UMLCAD.Engineering.Tests/RustCadKernelEvaluatorTests.cs` cover production-adapter box evaluation, semantic face resolution, ambiguity fail-closed behavior, unsupported-feature fail-closed behavior, and CadEvaluationEngine integration.
 
-The adapter currently certifies only the axis-aligned box subset. The S1 semantic vertical slice still contains sketch/circle and extrusion concepts that do not yet have a direct production typed kernel transport contract in the existing mathematical authority. They remain contract-test coverage until those .NET-to-kernel contracts are explicitly established. No geometry is approximated or silently routed through the legacy build model.
+The adapter currently certifies only the axis-aligned box subset. Reference resolution has been separated from the adapter: `AuthoritativeCadReferenceResolver` resolves semantic planar-face evidence against authoritative results inside `UMLCAD.Cad.Engine`; the kernel adapter performs execution/result transport only. The S1 semantic vertical slice still contains sketch/circle and extrusion concepts that do not yet have a direct production typed kernel transport contract in the existing mathematical authority. They remain contract-test coverage until those .NET-to-kernel contracts are explicitly established. No geometry is approximated or silently routed through the legacy build model.
 
 Validation status:
 - local container: `dotnet` SDK unavailable;

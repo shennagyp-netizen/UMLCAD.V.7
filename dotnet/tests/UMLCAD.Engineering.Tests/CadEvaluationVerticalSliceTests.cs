@@ -247,16 +247,16 @@ public sealed class CadEvaluationVerticalSliceTests
         {
             var faces = new[]
             {
-                Face("face:-X", -1, 0, 0, 0, 0, 0),
-                Face("face:+X", 1, 0, 0, 100, 0, 0),
-                Face("face:-Y", 0, -1, 0, 0, 0, 0),
-                Face("face:+Y", 0, 1, 0, 0, 80, 0),
-                Face("face:-Z", 0, 0, -1, 0, 0, 0),
-                Face("face:+Z", 0, 0, 1, 50, 40, 10)
+                Face("face:-X", featureId, resultId, -1, 0, 0, 0, 0, 0),
+                Face("face:+X", featureId, resultId, 1, 0, 0, 100, 0, 0),
+                Face("face:-Y", featureId, resultId, 0, -1, 0, 0, 0, 0),
+                Face("face:+Y", featureId, resultId, 0, 1, 0, 0, 80, 0),
+                Face("face:-Z", featureId, resultId, 0, 0, -1, 0, 0, 0),
+                Face("face:+Z", featureId, resultId, 0, 0, 1, 50, 40, 10)
             };
 
             return new AuthoritativeCadResult(
-                new CadResultId($"result:{featureId.Value}"),
+                resultId,
                 CadContractVersions.KernelEvaluation,
                 new CadBoundingBox3(0, 0, 0, 100, 80, 10),
                 volume,
@@ -265,7 +265,11 @@ public sealed class CadEvaluationVerticalSliceTests
         }
 
         private static TopologyEntityResult Face(
-            string id, double nx, double ny, double nz, double x, double y, double z) =>
+            string id,
+            CadId producingFeatureId,
+            CadResultId resultId,
+            double nx, double ny, double nz,
+            double x, double y, double z) =>
             new(
                 new TopologyEntityId(id),
                 TopologyEntityKind.Face,
@@ -274,8 +278,8 @@ public sealed class CadEvaluationVerticalSliceTests
                 1_000,
                 4,
                 new TopologyProvenance(
-                    new CadId("source-feature"),
-                    new CadResultId("source-result"),
+                    producingFeatureId,
+                    resultId,
                     "OneToOne",
                     Array.Empty<TopologyEntityId>()));
     }

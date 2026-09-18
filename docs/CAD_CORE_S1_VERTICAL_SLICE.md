@@ -46,7 +46,7 @@ Incremental invalidation is the explicit transitive dependent closure of the cha
 
 ## Kernel boundary
 
-The production Rust kernel already contains authoritative B-Rep/topology mathematics. The new .NET contract deliberately does not reach into those implementation types. The concrete .NET Rust adapter now exists for the first certified geometry subset (axis-aligned box). It translates the typed kernel-evaluation contract through the existing geometry transport without routing CAD semantics through the legacy V4 build model.
+The production Rust kernel already contains authoritative B-Rep/topology mathematics. The .NET contract deliberately does not reach into those implementation types. The concrete .NET Rust adapter now exists for the first certified geometry subset (axis-aligned box). Semantic reference resolution is owned by the CAD Engine/Core and occurs before kernel evaluation. It translates the typed kernel-evaluation contract through the existing geometry transport without routing CAD semantics through the legacy V4 build model.
 
 ## Downstream
 

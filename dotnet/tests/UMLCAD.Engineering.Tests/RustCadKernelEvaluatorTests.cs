@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Options;
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Engine;
 using UMLCAD.Kernel.Client;
@@ -94,8 +93,7 @@ public sealed class RustCadKernelEvaluatorTests
                     24d,
                     52d,
                     new KernelVector3(1d, 1.5d, 2d),
-                    Array.Empty<string>())),
-            );
+                    Array.Empty<string>())));
 
         var evaluation = await evaluator.EvaluateAsync(
             new KernelEvaluationRequest(
@@ -142,8 +140,7 @@ public sealed class RustCadKernelEvaluatorTests
                     24d,
                     52d,
                     new KernelVector3(1d, 1.5d, 2d),
-                    Array.Empty<string>())),
-            new UnusedExtrusionGeometryService());
+                    Array.Empty<string>())));
 
         var feature = new BoxFeatureSpecification(
             new CadId("box"),
@@ -209,8 +206,7 @@ public sealed class RustCadKernelEvaluatorTests
                     24d,
                     52d,
                     new KernelVector3(1d, 1.5d, 2d),
-                    Array.Empty<string>())),
-            new UnusedExtrusionGeometryService());
+                    Array.Empty<string>())));
 
         var feature = new SketchFeatureSpecification(
             new CadId("sketch"),
@@ -268,8 +264,7 @@ public sealed class RustCadKernelEvaluatorTests
                     24d,
                     52d,
                     new KernelVector3(1d, 1.5d, 2d),
-                    Array.Empty<string>())),
-            new UnusedExtrusionGeometryService());
+                    Array.Empty<string>())));
 
         var engine = new CadEvaluationEngine(evaluator);
         var result = await engine.RecomputeAsync(

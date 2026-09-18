@@ -122,43 +122,23 @@ public sealed class ConvexProfileExtrusionFeatureEvaluator : IAuthoritativeFeatu
     }
 }
 
-public sealed class FeatureEvaluationExecutor : IAsyncEvaluationStepExecutor
+public sealed class AuthoritativeFeatureStepExecutor : IAsyncEvaluationStepExecutor
 {
     private readonly FeatureSpecificationCatalog _catalog;
-    private readonly IReadOnlyDictionary<string, IAuthoritativeFeatureEvaluator> _evaluators;
+    private readonly IAuthoritativeFeatureEvaluator _evaluator;
     private readonly FeatureEvaluationOptions _options;
 
-    public FeatureEvaluationExecutor(
+    public AuthoritativeFeatureStepExecutor(
         IEnumerable<FeatureSpecification> specifications,
-        IEnumerable<IAuthoritativeFeatureEvaluator> evaluators,
+        IAuthoritativeFeatureEvaluator evaluator,
         FeatureEvaluationOptions options)
     {
         _catalog = new FeatureSpecificationCatalog(specifications);
-        ArgumentNullException.ThrowIfNull(evaluators);
-        ArgumentNullException.ThrowIfNull(options);
-
-        var ordered = evaluators
-            .Where(x => x is not null)
-            .OrderBy(x => x.OperationKind, StringComparer.Ordinal)
-            .ToArray();
-
-        if (ordered.Length == 0)
-            throw new ArgumentException(
-                "At least one authoritative feature evaluator is required.",
-                nameof(evaluators));
-
-        if (ordered.GroupBy(x => x.OperationKind, StringComparer.Ordinal).Any(g => g.Count() != 1))
-            throw new ArgumentException(
-                "Feature evaluator operation kinds must be unique.",
-                nameof(evaluators));
-
-        _evaluators = ordered.ToDictionary(x => x.OperationKind, StringComparer.Ordinal);
-        _options = options;
+        _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
+        _options = options ?? throw new ArgumentNullException(nameof(options));
     }
 
-    public string OperationKind =>
-        throw new InvalidOperationException(
-            "FeatureEvaluationExecutor is a registry executor and does not represent a single operation kind.");
+    public string OperationKind => _evaluator.OperationKind;
 
     public async Task<EvaluationOutcome> ExecuteAsync(
         EvaluationStep step,
@@ -168,16 +148,6 @@ public sealed class FeatureEvaluationExecutor : IAsyncEvaluationStepExecutor
     {
         ArgumentNullException.ThrowIfNull(step);
         ArgumentNullException.ThrowIfNull(completed);
-
-        if (!_evaluators.TryGetValue(step.OperationKind, out var evaluator))
-        {
-            return new EvaluationOutcome(
-                step.StepId,
-                identity,
-                EvaluationOutcomeStatus.Unsupported,
-                null,
-                [$"No authoritative feature evaluator is registered for '{step.OperationKind}'."]);
-        }
 
         var specification = _catalog.Get(step.StepId);
 
@@ -191,7 +161,7 @@ public sealed class FeatureEvaluationExecutor : IAsyncEvaluationStepExecutor
                 ["Specification operation kind does not match evaluation step operation kind."]);
         }
 
-        var result = await evaluator.EvaluateAsync(
+        var result = await _evaluator.EvaluateAsync(
             specification,
             _options,
             cancellationToken);
@@ -203,16 +173,55 @@ public sealed class FeatureEvaluationExecutor : IAsyncEvaluationStepExecutor
             AuthoritativeResultStatus.Unsupported => EvaluationOutcomeStatus.Unsupported,
             AuthoritativeResultStatus.Ambiguous => EvaluationOutcomeStatus.Ambiguous,
             AuthoritativeResultStatus.Indeterminate => EvaluationOutcomeStatus.Indeterminate,
-            _ => throw new InvalidOperationException($"Unknown authoritative result status '{result.Status}'."),
+            _ => throw new InvalidOperationException(
+                $"Unknown authoritative result status '{result.Status}'."),
         };
 
-        var outcome = new EvaluationOutcome(
+        return new EvaluationOutcome(
             step.StepId,
             identity,
             status,
             status == EvaluationOutcomeStatus.Succeeded ? result.Identity : null,
-            result.Evidence.Diagnostics);
+            result.Evidence.Diagnostics)
+        {
+            Result = result,
+        };
+    }
+}
 
-        return outcome with { Result = result };
+public static class FeatureEvaluationExecutorFactory
+{
+    public static IReadOnlyList<IAsyncEvaluationStepExecutor> Create(
+        IEnumerable<FeatureSpecification> specifications,
+        IEnumerable<IAuthoritativeFeatureEvaluator> evaluators,
+        FeatureEvaluationOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(specifications);
+        ArgumentNullException.ThrowIfNull(evaluators);
+        ArgumentNullException.ThrowIfNull(options);
+
+        var specificationSnapshot = specifications.ToArray();
+        var evaluatorSnapshot = evaluators
+            .Where(x => x is not null)
+            .OrderBy(x => x.OperationKind, StringComparer.Ordinal)
+            .ToArray();
+
+        if (evaluatorSnapshot.Length == 0)
+            throw new ArgumentException(
+                "At least one authoritative feature evaluator is required.",
+                nameof(evaluators));
+
+        if (evaluatorSnapshot.GroupBy(x => x.OperationKind, StringComparer.Ordinal).Any(g => g.Count() != 1))
+            throw new ArgumentException(
+                "Feature evaluator operation kinds must be unique.",
+                nameof(evaluators));
+
+        return evaluatorSnapshot
+            .Select(evaluator => (IAsyncEvaluationStepExecutor)
+                new AuthoritativeFeatureStepExecutor(
+                    specificationSnapshot,
+                    evaluator,
+                    options))
+            .ToArray();
     }
 }

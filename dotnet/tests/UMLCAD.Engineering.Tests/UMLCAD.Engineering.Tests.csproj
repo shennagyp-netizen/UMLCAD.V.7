@@ -20,6 +20,7 @@
     <ProjectReference Include="../../src/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
     <ProjectReference Include="../../src/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
     <ProjectReference Include="../../src/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
+    <ProjectReference Include="../../src/UMLCAD.Kernel.Client/UMLCAD.Kernel.Client.csproj" />
     <ProjectReference Include="../../src/UMLCAD.Science/UMLCAD.Science.csproj" />
     <ProjectReference Include="../../src/UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj" />
     <ProjectReference Include="../../src/UMLCAD.Engineering.SheetMetal/UMLCAD.Engineering.SheetMetal.csproj" />

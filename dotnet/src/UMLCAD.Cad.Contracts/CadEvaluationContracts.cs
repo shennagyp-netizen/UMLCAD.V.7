@@ -28,7 +28,7 @@ public enum ReferenceResolutionStatus { Resolved, Missing, Ambiguous, Indetermin
 public enum TopologyEntityKind { Solid, Shell, Face, Edge, Vertex }
 public enum FeatureBooleanOperation { Add, Remove }
 public enum SketchConstraintKind { Fixed, FullyConstrained }
-public enum CadEvaluationStatus { Succeeded, InvalidSpecification, MissingReference, AmbiguousReference, Indeterminate, Unsupported, KernelFailure }
+public enum CadEvaluationStatus { Succeeded, InvalidSpecification, MissingReference, AmbiguousReference, AmbiguousEvaluation, Indeterminate, Unsupported, KernelFailure }
 
 public sealed record CadFrame(CadId Id, CadFrameKind Kind, double OriginX, double OriginY, double OriginZ)
 {

@@ -223,6 +223,8 @@ public static class RustKernelServiceCollectionExtensions
             client.Timeout = options.RequestTimeout;
         });
 
+        services.AddTransient<ICadKernelEvaluator, RustCadKernelEvaluator>();
+
         return services;
     }
 }

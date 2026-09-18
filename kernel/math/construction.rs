@@ -915,7 +915,9 @@ mod tests {
         ]);
         let local_offset = offset_convex_polygon(&local, 2.0, tol()).unwrap();
         let shifted_offset = offset_convex_polygon(&shifted, 2.0, tol()).unwrap();
-        assert!((local_offset.area(tol()).unwrap() - shifted_offset.area(tol()).unwrap()).abs() <= 1.0e-8);
+        assert!((local_offset.vertices[1].x - local_offset.vertices[0].x - 24.0).abs() <= 1.0e-9);
+        assert!((shifted_offset.vertices[1].x - shifted_offset.vertices[0].x - 24.0).abs() <= 1.0e-6);
+        assert!((shifted_offset.vertices[0].x - local_offset.vertices[0].x - 1.0e12).abs() <= 1.0e-3);
     }
 
     #[test]

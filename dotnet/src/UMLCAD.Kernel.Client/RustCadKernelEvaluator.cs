@@ -10,10 +10,19 @@ namespace UMLCAD.Kernel.Client;
 public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
 {
     private readonly IAuthoritativeGeometryService _boxGeometry;
+    private readonly ISketchConstraintService? _sketchSolver;
 
     public RustCadKernelEvaluator(IAuthoritativeGeometryService boxGeometry)
+        : this(boxGeometry, null)
+    {
+    }
+
+    public RustCadKernelEvaluator(
+        IAuthoritativeGeometryService boxGeometry,
+        ISketchConstraintService? sketchSolver)
     {
         _boxGeometry = boxGeometry ?? throw new ArgumentNullException(nameof(boxGeometry));
+        _sketchSolver = sketchSolver;
     }
 
     public async Task<KernelEvaluationResponse> EvaluateAsync(
@@ -27,7 +36,94 @@ public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
         {
             BoxFeatureSpecification box =>
                 await EvaluateBoxAsync(request, box, cancellationToken),
+            SketchFeatureSpecification sketch when _sketchSolver is not null =>
+                await EvaluateSketchAsync(request, sketch, cancellationToken),
+            SketchFeatureSpecification =>
+                UnsupportedFeature(request.Feature),
             _ => UnsupportedFeature(request.Feature)
+        };
+    }
+
+    private async Task<KernelEvaluationResponse> EvaluateSketchAsync(
+        KernelEvaluationRequest request,
+        SketchFeatureSpecification specification,
+        CancellationToken cancellationToken)
+    {
+        if (specification.Constraints.Any(x => x.Kind != SketchConstraintKind.Fixed))
+        {
+            return new KernelEvaluationResponse(
+                CadEvaluationStatus.Unsupported,
+                null,
+                new[]
+                {
+                    new CadDiagnostic(
+                        "KERNEL_SKETCH_CONSTRAINT_UNSUPPORTED",
+                        CadEvaluationStatus.Unsupported,
+                        "The certified sketch solver transport currently supports only Fixed constraints.")
+                });
+        }
+
+        SketchSolveKernelResult kernelResult;
+        try
+        {
+            kernelResult = await _sketchSolver!.SolveAsync(
+                new SketchSolveRequest(
+                    request.EvaluationId.Value,
+                    specification.Circles
+                        .Select(circle => new SketchKernelCircle(
+                            circle.Id.Value,
+                            circle.X,
+                            circle.Y,
+                            circle.Radius))
+                        .ToArray(),
+                    specification.Constraints
+                        .Select(constraint => new SketchKernelFixedConstraint(
+                            constraint.Id.Value,
+                            constraint.GeometryId.Value))
+                        .ToArray(),
+                    request.Tolerance,
+                    KernelSolveOptions.Default),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return new KernelEvaluationResponse(
+                CadEvaluationStatus.KernelFailure,
+                null,
+                new[]
+                {
+                    new CadDiagnostic(
+                        "KERNEL_SKETCH_TRANSPORT",
+                        CadEvaluationStatus.KernelFailure,
+                        exception.Message)
+                });
+        }
+
+        var status = kernelResult.Status switch
+        {
+            GeometryKernelStatus.Succeeded => CadEvaluationStatus.Succeeded,
+            GeometryKernelStatus.Failed => CadEvaluationStatus.KernelFailure,
+            GeometryKernelStatus.Unsupported => CadEvaluationStatus.Unsupported,
+            GeometryKernelStatus.Ambiguous => CadEvaluationStatus.AmbiguousEvaluation,
+            GeometryKernelStatus.Indeterminate => CadEvaluationStatus.Indeterminate,
+            _ => throw new InvalidOperationException(
+                $"Unknown sketch-kernel status '{kernelResult.Status}'.")
+        };
+
+        var diagnostics = kernelResult.Diagnostics
+            .Select(message => new CadDiagnostic(
+                "KERNEL_SKETCH_RESULT",
+                status,
+                message))
+            .ToArray();
+
+        return new KernelEvaluationResponse(status, null, diagnostics)
+        {
+            SketchSolve = kernelResult
         };
     }
 

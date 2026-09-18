@@ -5,4 +5,17 @@ node_modules/
 **/obj/
 **/target/
 projects/demo/debug/
+tests/e2e/artifacts/
 .DS_Store
+
+# LaTeX build products
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex
+*.synctex.gz

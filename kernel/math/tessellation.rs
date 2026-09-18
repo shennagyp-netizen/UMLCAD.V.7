@@ -755,6 +755,22 @@ where
         return Err(TessellationError::Degenerate);
     }
 
+    // A closed loop's final curve ends where the first curve starts. Keep one
+    // semantic boundary sample at that location rather than duplicating it.
+    if parameters.len() >= 2 {
+        let first = parameters[0];
+        let last = *parameters.last().expect("length checked");
+        if (last.0 - first.0).hypot(last.1 - first.1) <= trim_tolerance {
+            points.pop();
+            parameters.pop();
+            normals.pop();
+        }
+    }
+
+    if points.len() < 2 {
+        return Err(TessellationError::Degenerate);
+    }
+
     Ok(TessellatedTrimLoop3 {
         points,
         parameters,
@@ -819,6 +835,7 @@ mod trim_tests {
         )
         .unwrap();
         assert_eq!(result.points.len(), 4);
+        assert_eq!(result.parameters.first(), result.parameters.last());
         assert_eq!(result.points.len(), result.parameters.len());
         assert_eq!(result.points.len(), result.normals.len());
         for (point, parameter) in result.points.iter().zip(&result.parameters) {

@@ -227,6 +227,6 @@ public sealed record ExtrusionFeatureSpecification : FeatureSpecification
             $"depth={DepthMm:R}",
             $"origin=({Profile.OriginMm.X:R},{Profile.OriginMm.Y:R},{Profile.OriginMm.Z:R})",
             $"u=({Profile.UDirection.X:R},{Profile.UDirection.Y:R},{Profile.UDirection.Z:R})",
-            $"v=({Profile.VDirection.X:R},{Profile.VDirection.Y:R},{Profile.UDirection.Z:R})",
+            $"v=({Profile.VDirection.X:R},{Profile.VDirection.Y:R},{Profile.VDirection.Z:R})",
             $"points={string.Join(",", Profile.Points.Select(p => $"({p.U:R},{p.V:R})"))}");
 }

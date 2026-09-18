@@ -11,6 +11,7 @@ use umlcad_kernel_rust::{Arc, Circle, Geometry, Line, Point};
 const ADDRESS: &str = "127.0.0.1:8080";
 const BUILD_SCHEMA: &str = "uml-cad-build-package/1.0.0";
 const MODEL_SCHEMA: &str = "uml-cad-compiled-model/1.1.0";
+const BOX_SOLID_SCHEMA: &str = "uml-cad-axis-aligned-box-solid/1.0.0";
 const MAX_REQUEST_BYTES: usize = 32 * 1024 * 1024;
 
 fn main() {
@@ -27,6 +28,7 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
     let (method, path, body) = parse_request(&request)?;
     let (status, response) = match (method.as_str(), path.as_str()) {
         ("POST", "/v1/build/evaluate") => evaluate(&body),
+        ("POST", "/v1/geometry/box-solid") => box_solid(&body),
         ("GET", "/health") => (200, json!({"status":"ok"})),
         _ => (404, failure("KERNEL_NOT_FOUND", "Unknown kernel endpoint.")),
     };
@@ -188,6 +190,113 @@ fn write_response(stream: &mut TcpStream, status: u16, body: &[u8]) -> std::io::
     );
     stream.write_all(header.as_bytes())?;
     stream.write_all(body)
+}
+
+fn box_solid(body: &[u8]) -> (u16, Value) {
+    let root: Value = match serde_json::from_slice(body) {
+        Ok(value) => value,
+        Err(error) => {
+            return (
+                422,
+                failure("KERNEL_INVALID_JSON", &format!("The request is not valid JSON: {error}.")),
+            )
+        }
+    };
+
+    if root.get("schema").and_then(Value::as_str) != Some(BOX_SOLID_SCHEMA) {
+        return (422, failure("KERNEL_BOX_SOLID_SCHEMA", "Unsupported box-solid schema."));
+    }
+
+    let operation_identity = match root.get("operationIdentity").and_then(Value::as_str) {
+        Some(value) if !value.trim().is_empty() => value.to_string(),
+        _ => return (422, failure("KERNEL_BOX_SOLID_SCHEMA", "operationIdentity is required.")),
+    };
+
+    let min = match vector3(root.get("min")) {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_BOX_SOLID_GEOMETRY", message)),
+    };
+    let max = match vector3(root.get("max")) {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_BOX_SOLID_GEOMETRY", message)),
+    };
+
+    let tolerance_value = root.get("tolerance").and_then(Value::as_object);
+    let absolute = tolerance_value
+        .and_then(|object| object.get("absolute"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-9);
+    let relative = tolerance_value
+        .and_then(|object| object.get("relative"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-9);
+
+    let tolerance = match umlcad_kernel_rust::math::tolerance::Tolerance::new(absolute, relative) {
+        Ok(value) => value,
+        Err(_) => return (422, failure("KERNEL_BOX_SOLID_TOLERANCE", "Tolerance must be finite and non-negative.")),
+    };
+
+    let response = dispatch(KernelRequest::BuildAxisAlignedBoxSolid {
+        operation_identity,
+        bounds: umlcad_kernel_rust::math::brep::AxisAlignedBox { min, max },
+        tolerance,
+    });
+
+    match response {
+        Ok(KernelResponse::BoxSolid(report)) => (
+            200,
+            json!({
+                "schema": BOX_SOLID_SCHEMA,
+                "succeeded": true,
+                "resultId": report.result_id,
+                "evidenceHash": report.evidence_hash,
+                "topology": report.topology.iter().map(|entry| json!({
+                    "kind": entry.kind,
+                    "key": entry.key
+                })).collect::<Vec<_>>(),
+                "volume": report.volume,
+                "surfaceArea": report.surface_area,
+                "centroid": {
+                    "x": report.centroid.x,
+                    "y": report.centroid.y,
+                    "z": report.centroid.z
+                },
+                "diagnostics": []
+            }),
+        ),
+        Ok(_) => (500, failure("KERNEL_DISPATCH", "Box-solid dispatch returned the wrong response.")),
+        Err(error) => (
+            200,
+            json!({
+                "schema": BOX_SOLID_SCHEMA,
+                "succeeded": false,
+                "resultId": null,
+                "evidenceHash": null,
+                "topology": [],
+                "volume": null,
+                "surfaceArea": null,
+                "centroid": null,
+                "diagnostics": [{
+                    "code": "KERNEL_BOX_SOLID",
+                    "severity": "error",
+                    "message": error.to_string()
+                }]
+            }),
+        ),
+    }
+}
+
+fn vector3(value: Option<&Value>) -> Result<umlcad_kernel_rust::math::vec::Vec3, &'static str> {
+    let object = value
+        .and_then(Value::as_object)
+        .ok_or("3D vector object is required.")?;
+    let x = object.get("x").and_then(Value::as_f64).ok_or("Vector x must be numeric.")?;
+    let y = object.get("y").and_then(Value::as_f64).ok_or("Vector y must be numeric.")?;
+    let z = object.get("z").and_then(Value::as_f64).ok_or("Vector z must be numeric.")?;
+    if !x.is_finite() || !y.is_finite() || !z.is_finite() {
+        return Err("Vector components must be finite.");
+    }
+    Ok(umlcad_kernel_rust::math::vec::Vec3::new(x, y, z))
 }
 
 fn evaluate(body: &[u8]) -> (u16, Value) {

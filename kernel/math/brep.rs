@@ -878,6 +878,458 @@ impl BRepSolid {
     }
 }
 
+
+
+pub fn extrude_convex_planar_region(
+    region: PlanarRegion3,
+    depth: f64,
+    tolerance: Tolerance,
+) -> Result<BRepSolid, BRepError> {
+    region.validate(tolerance)?;
+    if !depth.is_finite() {
+        return Err(BRepError::NonFinite);
+    }
+
+    let scale = region.outer
+        .windows(2)
+        .map(|pair| pair[1].sub(pair[0]).length())
+        .fold(depth.abs(), f64::max)
+        .max(1.0);
+    let eps = tolerance.threshold(scale).map_err(|_| BRepError::InvalidTolerance)?;
+    if depth <= eps {
+        return Err(BRepError::Degenerate);
+    }
+    if !region.holes.is_empty() {
+        return Err(BRepError::UnsupportedBoolean);
+    }
+
+    let winding = signed_area2(&region.outer).signum();
+    if winding == 0.0 {
+        return Err(BRepError::Degenerate);
+    }
+
+    let base_points = region.outer_points_3d(tolerance)?;
+    let normal = region.u_dir.cross(region.v_dir);
+    let solid_normal = normal.scale(winding);
+    let extrusion = solid_normal.scale(depth);
+    let n = base_points.len();
+
+    let mut vertices = Vec::with_capacity(2 * n);
+    for (i, point) in base_points.iter().enumerate() {
+        vertices.push(BRepVertex {
+            id: format!("v_bottom_{i}"),
+            point: *point,
+        });
+    }
+    for (i, point) in base_points.iter().enumerate() {
+        vertices.push(BRepVertex {
+            id: format!("v_top_{i}"),
+            point: point.add(extrusion),
+        });
+    }
+
+    let mut edges = Vec::with_capacity(3 * n);
+    for i in 0..n {
+        let next = (i + 1) % n;
+        edges.push(BRepEdge {
+            id: format!("e_bottom_{i}"),
+            start_vertex: format!("v_bottom_{i}"),
+            end_vertex: format!("v_bottom_{next}"),
+        });
+    }
+    for i in 0..n {
+        let next = (i + 1) % n;
+        edges.push(BRepEdge {
+            id: format!("e_top_{i}"),
+            start_vertex: format!("v_top_{i}"),
+            end_vertex: format!("v_top_{next}"),
+        });
+    }
+    for i in 0..n {
+        edges.push(BRepEdge {
+            id: format!("e_vertical_{i}"),
+            start_vertex: format!("v_bottom_{i}"),
+            end_vertex: format!("v_top_{i}"),
+        });
+    }
+
+    let mut coedges = Vec::with_capacity(6 * n);
+    let mut wires = Vec::with_capacity(n + 2);
+    let mut faces = Vec::with_capacity(n + 2);
+
+    let bottom_coedges = (0..n)
+        .map(|i| format!("c_bottom_{i}"))
+        .collect::<Vec<_>>();
+    for i in 0..n {
+        coedges.push(BRepCoedge {
+            id: format!("c_bottom_{i}"),
+            edge: format!("e_bottom_{i}"),
+            wire: "w_bottom".into(),
+            face: "f_bottom".into(),
+            forward: true,
+        });
+    }
+    wires.push(BRepWire {
+        id: "w_bottom".into(),
+        coedges: bottom_coedges,
+        closed: true,
+    });
+    faces.push(BRepFace {
+        id: "f_bottom".into(),
+        outer_wire: "w_bottom".into(),
+        inner_wires: Vec::new(),
+        region: region.clone(),
+        orientation: false,
+    });
+
+    let top_origin = region.origin.add(extrusion);
+    let top_region = PlanarRegion3 {
+        origin: top_origin,
+        u_dir: region.u_dir,
+        v_dir: region.v_dir,
+        outer: region.outer.clone(),
+        holes: Vec::new(),
+    };
+    let top_coedges = (0..n)
+        .map(|i| format!("c_top_{i}"))
+        .collect::<Vec<_>>();
+    for i in 0..n {
+        coedges.push(BRepCoedge {
+            id: format!("c_top_{i}"),
+            edge: format!("e_top_{i}"),
+            wire: "w_top".into(),
+            face: "f_top".into(),
+            forward: true,
+        });
+    }
+    wires.push(BRepWire {
+        id: "w_top".into(),
+        coedges: top_coedges,
+        closed: true,
+    });
+    faces.push(BRepFace {
+        id: "f_top".into(),
+        outer_wire: "w_top".into(),
+        inner_wires: Vec::new(),
+        region: top_region,
+        orientation: true,
+    });
+
+    for i in 0..n {
+        let next = (i + 1) % n;
+        let p0 = base_points[i];
+        let p1 = base_points[next];
+        let edge = p1.sub(p0);
+        let length = edge.length();
+        if !length.is_finite() || length <= eps {
+            return Err(BRepError::Degenerate);
+        }
+
+        let u = edge.scale(1.0 / length);
+        let face_id = format!("f_side_{i}");
+        let wire_id = format!("w_side_{i}");
+
+        let side_coedges = vec![
+            format!("c_side_bottom_{i}"),
+            format!("c_side_vertical_{next}"),
+            format!("c_side_top_{i}"),
+            format!("c_side_vertical_{i}"),
+        ];
+
+        coedges.push(BRepCoedge {
+            id: side_coedges[0].clone(),
+            edge: format!("e_bottom_{i}"),
+            wire: wire_id.clone(),
+            face: face_id.clone(),
+            forward: true,
+        });
+        coedges.push(BRepCoedge {
+            id: side_coedges[1].clone(),
+            edge: format!("e_vertical_{next}"),
+            wire: wire_id.clone(),
+            face: face_id.clone(),
+            forward: true,
+        });
+        coedges.push(BRepCoedge {
+            id: side_coedges[2].clone(),
+            edge: format!("e_top_{i}"),
+            wire: wire_id.clone(),
+            face: face_id.clone(),
+            forward: false,
+        });
+        coedges.push(BRepCoedge {
+            id: side_coedges[3].clone(),
+            edge: format!("e_vertical_{i}"),
+            wire: wire_id.clone(),
+            face: face_id.clone(),
+            forward: false,
+        });
+
+        wires.push(BRepWire {
+            id: wire_id.clone(),
+            coedges: side_coedges,
+            closed: true,
+        });
+
+        faces.push(BRepFace {
+            id: face_id.clone(),
+            outer_wire: wire_id,
+            inner_wires: Vec::new(),
+            region: PlanarRegion3 {
+                origin: p0,
+                u_dir: u,
+                v_dir: solid_normal,
+                outer: vec![
+                    Vec2::new(0.0, 0.0),
+                    Vec2::new(length, 0.0),
+                    Vec2::new(length, depth),
+                    Vec2::new(0.0, depth),
+                ],
+                holes: Vec::new(),
+            },
+            orientation: true,
+        });
+    }
+
+    let solid = BRepSolid {
+        vertices,
+        edges,
+        coedges,
+        wires,
+        faces,
+        shells: vec![BRepShell {
+            id: "shell_0".into(),
+            faces: (0..n + 2)
+                .map(|i| if i == 0 {
+                    "f_bottom".into()
+                } else if i == 1 {
+                    "f_top".into()
+                } else {
+                    format!("f_side_{}", i - 2)
+                })
+                .collect(),
+        }],
+    };
+
+    solid.validate(tolerance)?;
+    Ok(solid)
+}
+
+pub fn build_axis_aligned_box_solid(
+    bounds: AxisAlignedBox,
+    tolerance: Tolerance,
+) -> Result<BRepSolid, BRepError> {
+    bounds.validate(tolerance)?;
+
+    let min = bounds.min;
+    let max = bounds.max;
+
+    let vertices = vec![
+        BRepVertex { id: "v000".into(), point: Vec3::new(min.x, min.y, min.z) },
+        BRepVertex { id: "v100".into(), point: Vec3::new(max.x, min.y, min.z) },
+        BRepVertex { id: "v110".into(), point: Vec3::new(max.x, max.y, min.z) },
+        BRepVertex { id: "v010".into(), point: Vec3::new(min.x, max.y, min.z) },
+        BRepVertex { id: "v001".into(), point: Vec3::new(min.x, min.y, max.z) },
+        BRepVertex { id: "v101".into(), point: Vec3::new(max.x, min.y, max.z) },
+        BRepVertex { id: "v111".into(), point: Vec3::new(max.x, max.y, max.z) },
+        BRepVertex { id: "v011".into(), point: Vec3::new(min.x, max.y, max.z) },
+    ];
+
+    let edges = vec![
+        BRepEdge { id: "ex00".into(), start_vertex: "v000".into(), end_vertex: "v100".into() },
+        BRepEdge { id: "ey10".into(), start_vertex: "v100".into(), end_vertex: "v110".into() },
+        BRepEdge { id: "ex10".into(), start_vertex: "v010".into(), end_vertex: "v110".into() },
+        BRepEdge { id: "ey00".into(), start_vertex: "v000".into(), end_vertex: "v010".into() },
+        BRepEdge { id: "ex01".into(), start_vertex: "v001".into(), end_vertex: "v101".into() },
+        BRepEdge { id: "ey11".into(), start_vertex: "v101".into(), end_vertex: "v111".into() },
+        BRepEdge { id: "ex11".into(), start_vertex: "v011".into(), end_vertex: "v111".into() },
+        BRepEdge { id: "ey01".into(), start_vertex: "v001".into(), end_vertex: "v011".into() },
+        BRepEdge { id: "ez00".into(), start_vertex: "v000".into(), end_vertex: "v001".into() },
+        BRepEdge { id: "ez10".into(), start_vertex: "v100".into(), end_vertex: "v101".into() },
+        BRepEdge { id: "ez11".into(), start_vertex: "v110".into(), end_vertex: "v111".into() },
+        BRepEdge { id: "ez01".into(), start_vertex: "v010".into(), end_vertex: "v011".into() },
+    ];
+
+    let wires = vec![
+        BRepWire { id: "w_bottom".into(), coedges: vec!["c_bottom_0".into(),"c_bottom_1".into(),"c_bottom_2".into(),"c_bottom_3".into()], closed: true },
+        BRepWire { id: "w_top".into(), coedges: vec!["c_top_0".into(),"c_top_1".into(),"c_top_2".into(),"c_top_3".into()], closed: true },
+        BRepWire { id: "w_back".into(), coedges: vec!["c_back_0".into(),"c_back_1".into(),"c_back_2".into(),"c_back_3".into()], closed: true },
+        BRepWire { id: "w_front".into(), coedges: vec!["c_front_0".into(),"c_front_1".into(),"c_front_2".into(),"c_front_3".into()], closed: true },
+        BRepWire { id: "w_left".into(), coedges: vec!["c_left_0".into(),"c_left_1".into(),"c_left_2".into(),"c_left_3".into()], closed: true },
+        BRepWire { id: "w_right".into(), coedges: vec!["c_right_0".into(),"c_right_1".into(),"c_right_2".into(),"c_right_3".into()], closed: true },
+    ];
+
+    let coedges = vec![
+        BRepCoedge { id: "c_bottom_0".into(), edge: "ex00".into(), wire: "w_bottom".into(), face: "f_bottom".into(), forward: true },
+        BRepCoedge { id: "c_bottom_1".into(), edge: "ey10".into(), wire: "w_bottom".into(), face: "f_bottom".into(), forward: true },
+        BRepCoedge { id: "c_bottom_2".into(), edge: "ex10".into(), wire: "w_bottom".into(), face: "f_bottom".into(), forward: false },
+        BRepCoedge { id: "c_bottom_3".into(), edge: "ey00".into(), wire: "w_bottom".into(), face: "f_bottom".into(), forward: false },
+
+        BRepCoedge { id: "c_top_0".into(), edge: "ex01".into(), wire: "w_top".into(), face: "f_top".into(), forward: true },
+        BRepCoedge { id: "c_top_1".into(), edge: "ey11".into(), wire: "w_top".into(), face: "f_top".into(), forward: true },
+        BRepCoedge { id: "c_top_2".into(), edge: "ex11".into(), wire: "w_top".into(), face: "f_top".into(), forward: false },
+        BRepCoedge { id: "c_top_3".into(), edge: "ey01".into(), wire: "w_top".into(), face: "f_top".into(), forward: false },
+
+        BRepCoedge { id: "c_back_0".into(), edge: "ex00".into(), wire: "w_back".into(), face: "f_back".into(), forward: true },
+        BRepCoedge { id: "c_back_1".into(), edge: "ez10".into(), wire: "w_back".into(), face: "f_back".into(), forward: true },
+        BRepCoedge { id: "c_back_2".into(), edge: "ex01".into(), wire: "w_back".into(), face: "f_back".into(), forward: false },
+        BRepCoedge { id: "c_back_3".into(), edge: "ez00".into(), wire: "w_back".into(), face: "f_back".into(), forward: false },
+
+        BRepCoedge { id: "c_front_0".into(), edge: "ex10".into(), wire: "w_front".into(), face: "f_front".into(), forward: false },
+        BRepCoedge { id: "c_front_1".into(), edge: "ez01".into(), wire: "w_front".into(), face: "f_front".into(), forward: true },
+        BRepCoedge { id: "c_front_2".into(), edge: "ex11".into(), wire: "w_front".into(), face: "f_front".into(), forward: true },
+        BRepCoedge { id: "c_front_3".into(), edge: "ez11".into(), wire: "w_front".into(), face: "f_front".into(), forward: false },
+
+        BRepCoedge { id: "c_left_0".into(), edge: "ez00".into(), wire: "w_left".into(), face: "f_left".into(), forward: true },
+        BRepCoedge { id: "c_left_1".into(), edge: "ey01".into(), wire: "w_left".into(), face: "f_left".into(), forward: true },
+        BRepCoedge { id: "c_left_2".into(), edge: "ez01".into(), wire: "w_left".into(), face: "f_left".into(), forward: false },
+        BRepCoedge { id: "c_left_3".into(), edge: "ey00".into(), wire: "w_left".into(), face: "f_left".into(), forward: false },
+
+        BRepCoedge { id: "c_right_0".into(), edge: "ey10".into(), wire: "w_right".into(), face: "f_right".into(), forward: true },
+        BRepCoedge { id: "c_right_1".into(), edge: "ez11".into(), wire: "w_right".into(), face: "f_right".into(), forward: true },
+        BRepCoedge { id: "c_right_2".into(), edge: "ey11".into(), wire: "w_right".into(), face: "f_right".into(), forward: false },
+        BRepCoedge { id: "c_right_3".into(), edge: "ez10".into(), wire: "w_right".into(), face: "f_right".into(), forward: false },
+    ];
+
+    let dx = max.x - min.x;
+    let dy = max.y - min.y;
+    let dz = max.z - min.z;
+    let zero = Vec2::new(0.0, 0.0);
+
+    let faces = vec![
+        BRepFace {
+            id: "f_bottom".into(),
+            outer_wire: "w_bottom".into(),
+            inner_wires: Vec::new(),
+            region: PlanarRegion3 {
+                origin: Vec3::new(min.x, min.y, min.z),
+                u_dir: Vec3::new(1.0, 0.0, 0.0),
+                v_dir: Vec3::new(0.0, 1.0, 0.0),
+                outer: vec![
+                    zero,
+                    Vec2::new(dx, 0.0),
+                    Vec2::new(dx, dy),
+                    Vec2::new(0.0, dy),
+                ],
+                holes: Vec::new(),
+            },
+            orientation: false,
+        },
+        BRepFace {
+            id: "f_top".into(),
+            outer_wire: "w_top".into(),
+            inner_wires: Vec::new(),
+            region: PlanarRegion3 {
+                origin: Vec3::new(min.x, min.y, max.z),
+                u_dir: Vec3::new(1.0, 0.0, 0.0),
+                v_dir: Vec3::new(0.0, 1.0, 0.0),
+                outer: vec![
+                    zero,
+                    Vec2::new(dx, 0.0),
+                    Vec2::new(dx, dy),
+                    Vec2::new(0.0, dy),
+                ],
+                holes: Vec::new(),
+            },
+            orientation: true,
+        },
+        BRepFace {
+            id: "f_back".into(),
+            outer_wire: "w_back".into(),
+            inner_wires: Vec::new(),
+            region: PlanarRegion3 {
+                origin: Vec3::new(min.x, min.y, min.z),
+                u_dir: Vec3::new(1.0, 0.0, 0.0),
+                v_dir: Vec3::new(0.0, 0.0, 1.0),
+                outer: vec![
+                    zero,
+                    Vec2::new(dx, 0.0),
+                    Vec2::new(dx, dz),
+                    Vec2::new(0.0, dz),
+                ],
+                holes: Vec::new(),
+            },
+            orientation: true,
+        },
+        BRepFace {
+            id: "f_front".into(),
+            outer_wire: "w_front".into(),
+            inner_wires: Vec::new(),
+            region: PlanarRegion3 {
+                origin: Vec3::new(max.x, max.y, min.z),
+                u_dir: Vec3::new(-1.0, 0.0, 0.0),
+                v_dir: Vec3::new(0.0, 0.0, 1.0),
+                outer: vec![
+                    zero,
+                    Vec2::new(dx, 0.0),
+                    Vec2::new(dx, dz),
+                    Vec2::new(0.0, dz),
+                ],
+                holes: Vec::new(),
+            },
+            orientation: true,
+        },
+        BRepFace {
+            id: "f_left".into(),
+            outer_wire: "w_left".into(),
+            inner_wires: Vec::new(),
+            region: PlanarRegion3 {
+                origin: Vec3::new(min.x, min.y, min.z),
+                u_dir: Vec3::new(0.0, 0.0, 1.0),
+                v_dir: Vec3::new(0.0, 1.0, 0.0),
+                outer: vec![
+                    zero,
+                    Vec2::new(dz, 0.0),
+                    Vec2::new(dz, dy),
+                    Vec2::new(0.0, dy),
+                ],
+                holes: Vec::new(),
+            },
+            orientation: true,
+        },
+        BRepFace {
+            id: "f_right".into(),
+            outer_wire: "w_right".into(),
+            inner_wires: Vec::new(),
+            region: PlanarRegion3 {
+                origin: Vec3::new(max.x, min.y, min.z),
+                u_dir: Vec3::new(0.0, 1.0, 0.0),
+                v_dir: Vec3::new(0.0, 0.0, 1.0),
+                outer: vec![
+                    zero,
+                    Vec2::new(dy, 0.0),
+                    Vec2::new(dy, dz),
+                    Vec2::new(0.0, dz),
+                ],
+                holes: Vec::new(),
+            },
+            orientation: true,
+        },
+    ];
+
+    let solid = BRepSolid {
+        vertices,
+        edges,
+        coedges,
+        wires,
+        faces,
+        shells: vec![BRepShell {
+            id: "shell_0".into(),
+            faces: vec![
+                "f_bottom".into(),
+                "f_top".into(),
+                "f_back".into(),
+                "f_front".into(),
+                "f_left".into(),
+                "f_right".into(),
+            ],
+        }],
+    };
+
+    solid.validate(tolerance)?;
+    Ok(solid)
+}
+
 #[derive(Clone, Copy)]
 struct Triangle3Ref { a: Vec3, b: Vec3, c: Vec3 }
 

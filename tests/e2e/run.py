@@ -17,6 +17,7 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_URL = "http://127.0.0.1:8080"
 FRAMEWORK_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Framework.Tests/UMLCAD.Framework.Tests.csproj"
+ENGINEERING_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Engineering.Tests/UMLCAD.Engineering.Tests.csproj"
 BLACKBOX_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Kernel.Integration.Tests/UMLCAD.Kernel.Integration.Tests.csproj"
 DEMO_PROJECT = ROOT / "projects/demo/Demo.csproj"
 RUST_MANIFEST = ROOT / "kernel/native/Cargo.toml"
@@ -105,6 +106,7 @@ class Runner:
             "repository root": ROOT,
             "Rust manifest": RUST_MANIFEST,
             "Framework test project": FRAMEWORK_TEST_PROJECT,
+            "Engineering test project": ENGINEERING_TEST_PROJECT,
             "black-box test project": BLACKBOX_TEST_PROJECT,
             "demo project": DEMO_PROJECT,
         }
@@ -246,6 +248,363 @@ def status_and_body(response: bytes) -> tuple[int, bytes]:
     return int(head.splitlines()[0].decode("ascii").split()[1]), body
 
 
+
+def box_solid_geometry_checks(runner: Runner) -> bool:
+    checks = [
+        (
+            "valid bounded box solid",
+            {
+                "schema": "uml-cad-axis-aligned-box-solid/1.0.0",
+                "operationIdentity": "python-box-seed-001",
+                "min": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "max": {"x": 2.0, "y": 3.0, "z": 4.0},
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            },
+            True,
+        ),
+        (
+            "degenerate box solid",
+            {
+                "schema": "uml-cad-axis-aligned-box-solid/1.0.0",
+                "operationIdentity": "python-box-invalid-001",
+                "min": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "max": {"x": 0.0, "y": 3.0, "z": 4.0},
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            },
+            False,
+        ),
+    ]
+
+    passed = True
+    for name, payload, expected_success in checks:
+        body = json.dumps(payload).encode()
+        request = (
+            "POST /v1/geometry/box-solid HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        )
+        try:
+            status, response_body = status_and_body(http_request(body, request))
+            value = json.loads(response_body.decode("utf-8"))
+            actual_success = value.get("succeeded") is True
+            if expected_success:
+                ok = (
+                    status == 200
+                    and actual_success
+                    and value.get("volume") == 24.0
+                    and value.get("surfaceArea") == 52.0
+                    and len(value.get("topology", [])) == 6
+                    and value.get("centroid") == {"x": 1.0, "y": 1.5, "z": 2.0}
+                )
+            else:
+                ok = (
+                    status == 200
+                    and not actual_success
+                    and bool(value.get("diagnostics"))
+                )
+        except Exception as exc:
+            ok = False
+            response_body = str(exc).encode()
+
+        runner.results.append(
+            Result(
+                f"python-box-solid/{name}",
+                ["raw-socket-http-probe", name],
+                0 if ok else 1,
+                0.0,
+                response_body.decode("utf-8", errors="replace")[-2000:],
+            )
+        )
+        runner.log(("PASS" if ok else "FAIL") + f" python-box-solid/{name}")
+        passed &= ok
+
+    return passed
+
+
+
+def convex_extrusion_geometry_checks(runner: Runner) -> bool:
+    cases = [
+        (
+            "valid rectangle extrusion",
+            {
+                "schema": "uml-cad-extrude-convex-planar-profile/1.0.0",
+                "operationIdentity": "python-extrusion-001",
+                "origin": {"x": 1.0, "y": 2.0, "z": 3.0},
+                "uDirection": {"x": 1.0, "y": 0.0, "z": 0.0},
+                "vDirection": {"x": 0.0, "y": 1.0, "z": 0.0},
+                "profile": [
+                    {"u": 0.0, "v": 0.0},
+                    {"u": 4.0, "v": 0.0},
+                    {"u": 4.0, "v": 5.0},
+                    {"u": 0.0, "v": 5.0},
+                ],
+                "depth": 6.0,
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            },
+            True,
+        ),
+        (
+            "self-invalid frame extrusion",
+            {
+                "schema": "uml-cad-extrude-convex-planar-profile/1.0.0",
+                "operationIdentity": "python-extrusion-invalid-001",
+                "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "uDirection": {"x": 1.0, "y": 0.0, "z": 0.0},
+                "vDirection": {"x": 1.0, "y": 0.0, "z": 0.0},
+                "profile": [
+                    {"u": 0.0, "v": 0.0},
+                    {"u": 1.0, "v": 0.0},
+                    {"u": 1.0, "v": 1.0},
+                    {"u": 0.0, "v": 1.0},
+                ],
+                "depth": 2.0,
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            },
+            False,
+        ),
+    ]
+
+    passed = True
+    for name, payload, expected_success in cases:
+        body = json.dumps(payload).encode()
+        request = (
+            "POST /v1/geometry/extrude-convex-planar-profile HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        )
+        try:
+            status, response_body = status_and_body(http_request(body, request))
+            value = json.loads(response_body.decode("utf-8"))
+            actual_success = value.get("succeeded") is True
+            if expected_success:
+                ok = (
+                    status == 200
+                    and actual_success
+                    and value.get("volume") == 120.0
+                    and value.get("surfaceArea") == 148.0
+                    and len(value.get("topology", [])) == 6
+                    and value.get("centroid") == {"x": 3.0, "y": 4.5, "z": 6.0}
+                )
+            else:
+                ok = status == 200 and not actual_success and bool(value.get("diagnostics"))
+        except Exception as exc:
+            ok = False
+            response_body = str(exc).encode()
+
+        runner.results.append(
+            Result(
+                f"python-extrusion/{name}",
+                ["raw-socket-http-probe", name],
+                0 if ok else 1,
+                0.0,
+                response_body.decode("utf-8", errors="replace")[-2000:],
+            )
+        )
+        runner.log(("PASS" if ok else "FAIL") + f" python-extrusion/{name}")
+        passed &= ok
+
+    return passed
+
+
+def sketch_solve_geometry_checks(runner: Runner) -> bool:
+    cases = [
+        (
+            "valid fixed-circle sketch",
+            {
+                "schema": "uml-cad-sketch-solve/1.0.0",
+                "operationIdentity": "python-sketch-001",
+                "sketchId": "sketch-001",
+                "frame": {
+                    "origin": {"x": 0.0, "y": 0.0, "z": 10.0},
+                    "xAxis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "yAxis": {"x": 0.0, "y": 1.0, "z": 0.0},
+                    "zAxis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                },
+                "circles": [
+                    {"id": "circle-a", "x": 20.0, "y": 20.0, "radius": 5.0},
+                    {"id": "circle-b", "x": 70.0, "y": 30.0, "radius": 4.0}
+                ],
+                "constraints": [
+                    {"id": "fixed-a", "kind": "fixed", "geometryId": "circle-a"},
+                    {"id": "fixed-b", "kind": "fixed", "geometryId": "circle-b"}
+                ],
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9}
+            },
+            200,
+            True
+        ),
+        (
+            "unsupported semantic constraint",
+            {
+                "schema": "uml-cad-sketch-solve/1.0.0",
+                "operationIdentity": "python-sketch-invalid-constraint",
+                "sketchId": "sketch-001",
+                "frame": {
+                    "origin": {"x": 0.0, "y": 0.0, "z": 10.0},
+                    "xAxis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "yAxis": {"x": 0.0, "y": 1.0, "z": 0.0},
+                    "zAxis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                },
+                "circles": [
+                    {"id": "circle-a", "x": 20.0, "y": 20.0, "radius": 5.0}
+                ],
+                "constraints": [
+                    {"id": "fully-constrained", "kind": "fully-constrained", "geometryId": "circle-a"}
+                ],
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9}
+            },
+            422,
+            False
+        ),
+        (
+            "invalid frame",
+            {
+                "schema": "uml-cad-sketch-solve/1.0.0",
+                "operationIdentity": "python-sketch-invalid-frame",
+                "sketchId": "sketch-001",
+                "frame": {
+                    "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+                    "xAxis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "yAxis": {"x": 1.0, "y": 0.0, "z": 0.0},
+                    "zAxis": {"x": 0.0, "y": 0.0, "z": 1.0}
+                },
+                "circles": [
+                    {"id": "circle-a", "x": 20.0, "y": 20.0, "radius": 5.0}
+                ],
+                "constraints": [],
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9}
+            },
+            422,
+            False
+        )
+    ]
+
+    passed = True
+    for name, payload, expected_status, expected_success in cases:
+        body = json.dumps(payload).encode()
+        request = (
+            "POST /v1/sketch/solve HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        )
+        try:
+            status, response_body = status_and_body(http_request(body, request))
+            value = json.loads(response_body.decode("utf-8"))
+            actual_success = value.get("succeeded") is True
+            ok = status == expected_status and actual_success == expected_success
+            if expected_success:
+                ok = (
+                    ok
+                    and isinstance(value.get("resultId"), str)
+                    and value.get("resultId", "").startswith("sketch:")
+                    and value.get("evidenceHash") is not None
+                    and value.get("converged") is True
+                    and len(value.get("circles", [])) == 2
+                    and value.get("degreesOfFreedom") == 0
+                )
+            else:
+                ok = ok and bool(value.get("diagnostics"))
+        except Exception as exc:
+            ok = False
+            response_body = str(exc).encode()
+
+        runner.results.append(
+            Result(
+                f"python-sketch-solve/{name}",
+                ["raw-socket-http-probe", name],
+                0 if ok else 1,
+                0.0,
+                response_body.decode("utf-8", errors="replace")[-3000:]
+            )
+        )
+        runner.log(("PASS" if ok else "FAIL") + f" python-sketch-solve/{name}")
+        passed &= ok
+
+    # Determinism/metamorphic check: submitting the same semantic payload twice
+    # must return byte-identical authoritative JSON.
+    deterministic_payload = cases[0][1]
+    deterministic_body = json.dumps(deterministic_payload).encode()
+    deterministic_request = (
+        "POST /v1/sketch/solve HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Type: application/json\r\n"
+        f"Content-Length: {len(deterministic_body)}\r\n"
+        "Connection: close\r\n\r\n"
+    )
+    try:
+        _, first = status_and_body(http_request(deterministic_body, deterministic_request))
+        _, second = status_and_body(http_request(deterministic_body, deterministic_request))
+        ok = first == second
+        detail = second
+    except Exception as exc:
+        ok = False
+        detail = str(exc).encode()
+    runner.results.append(
+        Result(
+            "python-sketch-solve/repeat-determinism",
+            ["raw-socket-http-probe", "repeat-determinism"],
+            0 if ok else 1,
+            0.0,
+            detail.decode("utf-8", errors="replace")[-3000:]
+        )
+    )
+    runner.log(("PASS" if ok else "FAIL") + " python-sketch-solve/repeat-determinism")
+    passed &= ok
+
+    # Metamorphic scale check: uniform geometric scaling should preserve the
+    # solved dimensionless sketch shape while scaling coordinates/radii.
+    scaled_payload = json.loads(json.dumps(deterministic_payload))
+    scale = 1000.0
+    for circle in scaled_payload["circles"]:
+        circle["x"] *= scale
+        circle["y"] *= scale
+        circle["radius"] *= scale
+    scaled_body = json.dumps(scaled_payload).encode()
+    scaled_request = (
+        "POST /v1/sketch/solve HTTP/1.1\r\n"
+        "Host: localhost\r\n"
+        "Content-Type: application/json\r\n"
+        f"Content-Length: {len(scaled_body)}\r\n"
+        "Connection: close\r\n\r\n"
+    )
+    try:
+        _, base_response = status_and_body(http_request(deterministic_body, deterministic_request))
+        _, scaled_response = status_and_body(http_request(scaled_body, scaled_request))
+        base_value = json.loads(base_response.decode("utf-8"))
+        scaled_value = json.loads(scaled_response.decode("utf-8"))
+        base_circles = {x["id"]: x for x in base_value["circles"]}
+        scaled_circles = {x["id"]: x for x in scaled_value["circles"]}
+        ok = set(base_circles) == set(scaled_circles)
+        for circle_id in base_circles:
+            a = base_circles[circle_id]
+            b = scaled_circles[circle_id]
+            ok = ok and abs((b["x"] / scale) - a["x"]) <= 1e-8
+            ok = ok and abs((b["y"] / scale) - a["y"]) <= 1e-8
+            ok = ok and abs((b["radius"] / scale) - a["radius"]) <= 1e-8
+        detail = scaled_response
+    except Exception as exc:
+        ok = False
+        detail = str(exc).encode()
+    runner.results.append(
+        Result(
+            "python-sketch-solve/scale-metamorphic",
+            ["raw-socket-http-probe", "scale-metamorphic"],
+            0 if ok else 1,
+            0.0,
+            detail.decode("utf-8", errors="replace")[-3000:]
+        )
+    )
+    runner.log(("PASS" if ok else "FAIL") + " python-sketch-solve/scale-metamorphic")
+    passed &= ok
+
+    return passed
+
 def raw_redteam_checks(runner: Runner) -> bool:
     checks = [
         (
@@ -347,6 +706,11 @@ def main() -> int:
     try:
         runner.validate_paths()
         passed &= runner.run(
+            "system-architecture-contract",
+            ["python3", str(ROOT / "tests/e2e/architecture_contract.py"), "--check"],
+            120,
+        )
+        passed &= runner.run(
             "rust-regression-debug",
             ["cargo", "test", "--manifest-path", str(RUST_MANIFEST)],
             900,
@@ -377,9 +741,15 @@ def main() -> int:
         passed &= runner.discover_framework_tests()
         runner.start_kernel()
         os.environ["UMLCAD_KERNEL_URL"] = DEFAULT_URL + "/"
+        passed &= sketch_solve_geometry_checks(runner)
         passed &= runner.run(
             "dotnet-framework-full-suite",
             ["dotnet", "test", str(FRAMEWORK_TEST_PROJECT)],
+            900,
+        )
+        passed &= runner.run(
+            "dotnet-engineering-foundation-suite",
+            ["dotnet", "test", str(ENGINEERING_TEST_PROJECT)],
             900,
         )
         passed &= runner.run(
@@ -394,6 +764,8 @@ def main() -> int:
             900,
         )
         runner.start_kernel()
+        passed &= box_solid_geometry_checks(runner)
+        passed &= convex_extrusion_geometry_checks(runner)
         passed &= raw_redteam_checks(runner)
     except Exception as exc:
         runner.log(f"HARNESS ERROR: {exc}")

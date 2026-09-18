@@ -248,3 +248,195 @@ The final M16 red-team matrix covers:
 M16 CUDA status remains **hardware-unverified** because no NVIDIA runner was available for execution. No claim of CUDA hardware performance or CUDA hardware conformance is made.
 
 M0-M16 is now closed as a roadmap of certified mathematical capabilities, not as a claim that every conceivable CAD operation is complete. Future changes to the mathematical authority layer require new explicit capability contracts and fresh gates.
+
+## System CAD transition — M-S0
+
+The mathematical-authority roadmap M0-M16 is closed at main commit `f1ab581140453c087beb50aac2216684196d4bdf`. System-CAD implementation now begins from a separate architecture track.
+
+The governing system documents are:
+
+- `docs/CATIA_SYSTEM_IMPLEMENTATION_ROADMAP.md`
+- `docs/UMLCAD_V7_IMPLEMENTATION_PROMPT.md`
+
+The first system milestone is M-S0 — boundary/dependency architecture. It does not expand mathematical authority. It establishes repository-level enforcement for the new .NET layer split:
+
+```
+Cad.Expressions
+      ↓
+Cad.Semantics
+
+Cad.Engine → Cad.Expressions + Cad.Semantics + Cad.Contracts
+
+Kernel.Client → Cad.Contracts
+```
+
+The existing `Kernel.Client → Framework` dependency is retained only as an explicit transitional legacy edge until the later legacy-elimination milestone. No new CAD semantic/engine code may depend on Framework or Kernel.Client.
+
+M-S0 acceptance evidence is owned by `tests/e2e/architecture_contract.py` and the authoritative Python E2E runner.
+
+
+## System-CAD architecture and engineering foundation snapshot
+
+The system-CAD track now includes a normative abstraction/dependency architecture plus C4 documentation:
+
+- `docs/architecture/ABSTRACTION_AND_DEPENDENCY_MODEL.md`
+- `docs/architecture/architecture.json`
+- `docs/architecture/c4/01-system-context.md`
+- `docs/architecture/c4/02-containers.md`
+- `docs/architecture/c4/03-components.md`
+- `docs/architecture/c4/04-critical-flows.md`
+
+The governing abstraction is:
+
+```
+Platform Foundation
+    ↓
+Mathematics
+    ↓
+Science
+    ↓
+CAD Engineering Core
+    ↓
+Engineering Resource Model
+    ↓
+Specialized Engineering Domains
+    ↓
+Application / Workflow / Presentation
+```
+
+External technology is reached through outward provider/adapters. The architecture distinguishes semantic ownership, reusable service dependency, published result/data flow, and private implementation dependency.
+
+Key ownership decisions now recorded:
+- Science owns material identity/properties, physical models, quantities/units, and the Phenomena Simulation Service.
+- Phenomena Simulation is a reusable scientific service with multiple interchangeable providers, including external-application adapters. CAM may consume the service.
+- CAD Product Structure owns Product/Occurrence relationships and the BOM service/view.
+- Machine, Tool, Fixture, Process, and capability models are shared Engineering Resource semantics.
+- Sheet Metal is a bounded engineering domain and a strong independent library boundary.
+- CAM is a manufacturing domain and must terminate in deterministic machine-specific postprocessing to G-code/NC.
+- Drawing is a bounded drafting domain with associative views, sections/details/clipping, dimensions, GD&T/annotations, dress-up, BOM, standards, and related CATIA-mapped capability families.
+- The viewer and downstream representations are never semantic authorities.
+- Rust remains the mathematical authority only.
+
+Current implementation projects added on the system branch:
+```
+UMLCAD.Science
+UMLCAD.Engineering.Resources
+UMLCAD.Engineering.SheetMetal
+UMLCAD.Engineering.Cam
+UMLCAD.Engineering.Drawing
+UMLCAD.Integration.Simulation
+UMLCAD.Engineering.Tests
+```
+
+Implemented foundation slice:
+- immutable arithmetic expression AST and deterministic SHA-256 expression identity;
+- typed scientific Quantity/QuantityDimension and Material model;
+- provider-backed PhenomenaSimulationService with deterministic provider selection and result identity checks;
+- Machine/Tool/Process compatibility rules;
+- typed Product Structure and deterministic BOM grouping/order;
+- Sheet Metal material/machine/tool/process validation plus shared bend-allowance expression;
+- CAM toolpath and machine-aware deterministic G-code/NC generator with content hashing and fail-closed compatibility checks;
+- CAM use of the Phenomena Simulation Service;
+- Drawing capability enums/profile plus associative view state, display mode, occurrence filters, drawing BOM, and sheet presentation semantics;
+- outward SimulationApplicationProvider adapter boundary;
+- .NET engineering foundation tests executed by the authoritative E2E runner.
+
+Important CATIA drafting capability mapping is documented from the official Dassault Systèmes Generative Drafting and Interactive Drafting capability descriptions. The mapped surface includes associative 3D-to-2D drafting, front/side/top/isometric views, sections and aligned/offset sections, detail/circular/profiled detail views, clipping, associative dimensions, GD&T, annotations, BOM, assembly filtering, standards, and DXF/DWG interoperability.
+
+Current system-CAD branch:
+- branch: `milestone/cad-system-s0-boundaries`
+- current implementation head: `c0c22cb590195c9fc95bc317cd6102923b5dbe91`
+- PR #38 remains open and unmerged.
+
+Validation status at this snapshot:
+- Logical architecture manifest validation found no upward dependency or logical dependency cycle.
+- Repository project references were inspected against the architecture projection.
+- Local container does not provide the .NET SDK, so local C# compilation could not be executed.
+- GitHub Actions for the branch repeatedly fail before any job step executes: jobs have zero steps, runner_id 0, and terminate within seconds. The job-log endpoint currently returns `BlobNotFound`. This is recorded as CI infrastructure/unavailable execution evidence, not as proof that the new C# code compiles.
+- Do not merge the PR or claim a green milestone until the authoritative Rust, comprehensive E2E, Metal, and performance workflows execute normally and pass on the exact head.
+
+Next implementation boundary after infrastructure recovery:
+1. Integrate the new typed CAD specification/reference/result contracts with the real Rust kernel through a dedicated ICadKernelEvaluator adapter; do not route them through the legacy V4 build model.
+2. Replace the contract-test kernel in the S1 tests with real kernel-backed evaluation for the first certified geometry subset.
+3. Establish authoritative B-Rep/topology provenance and semantic reference resolution from the real kernel result.
+4. Connect Sheet Metal/CAM/Drawing/BOM to authoritative CAD results, preserving their existing domain boundaries.
+5. Execute the authoritative Rust/.NET/E2E/Metal/performance gates on the exact branch head before declaring S1/S0 green or merging PR #38.
+
+## System-CAD S1 production adapter progress
+
+The current system-CAD implementation head is `6bc7641f2a7b2f6997e134c3469e8841e876181e`.
+
+The .NET system-CAD boundary now contains a production `ICadKernelEvaluator` implementation and a separate CAD-owned semantic reference resolver:
+- `dotnet/src/UMLCAD.Kernel.Client/RustCadKernelEvaluator.cs`
+- registered by `AddRustKernel()` as the production evaluator;
+- delegates the first certified geometry subset (axis-aligned box solid) to the existing typed Rust geometry transport;
+- maps the kernel result into the new `Cad.Contracts.AuthoritativeCadResult` with deterministic bounds and topology provenance;
+- resolves semantic planar-face references independently of topology-array ordering;
+- fails closed on expected-result mismatch, malformed/unsupported selectors, ambiguous topology evidence, incomplete kernel results, and unsupported feature types;
+- does not use or disguise the legacy `uml-cad-build-package/1.0.0` route.
+
+Tests added in `dotnet/tests/UMLCAD.Engineering.Tests/RustCadKernelEvaluatorTests.cs` cover production-adapter box evaluation, semantic face resolution, ambiguity fail-closed behavior, unsupported-feature fail-closed behavior, and CadEvaluationEngine integration.
+
+The production adapter currently certifies the axis-aligned box through the new S1 `ICadKernelEvaluator` path. A typed convex-planar-extrusion transport also exists, but it is not yet composed through that canonical S1 evaluator path and accepts polygonal profiles only. The mandatory circle-sketch → additive/subtractive solid composition therefore remains incomplete. No geometry is approximated and no CAD semantic operation is routed through the legacy `uml-cad-build-package/1.0.0` path.
+
+Validation status:
+- local container: `dotnet` SDK unavailable;
+- exact-head authoritative workflows for `c0c22cb...`: all failed before job execution with `runner_id=0` and zero steps, matching the existing GitHub Actions infrastructure failure pattern;
+- therefore the adapter is **Implemented / Test-authored; compilation and runtime E2E remain unverified**.
+
+Next .NET implementation boundary:
+1. establish the typed sketch/constraint transport required for the S1 semantic sketch without using the legacy build route;
+2. establish a certified profile/result contract that can feed the existing convex-planar-extrusion authority without geometric approximation;
+3. replace the remaining S1 contract-test kernel only when the corresponding production contracts exist;
+4. then connect result provenance and downstream Sheet Metal/CAM/Drawing/BOM consumers to the real authoritative CAD-result graph.
+
+
+## System-CAD coordinate-frame hardening
+
+Commit `75dc2ea...` separated semantic reference resolution from kernel execution. The follow-on frame-hardening work adds explicit immutable right-handed `XAxis/YAxis/ZAxis` basis vectors to `CadFrame`, validates orthonormality/handedness, and includes the complete basis in deterministic evaluation identity.
+
+This remains a .NET semantic contract change only. The existing Rust mathematical authority is unchanged.
+
+
+## System-CAD tolerance authority
+
+The .NET S1 evaluation path now carries document-level tolerance semantics end-to-end. `CadDocumentSpecification.EvaluationTolerance` participates in deterministic document/feature identity, and `KernelEvaluationRequest.Tolerance` is consumed by the production box adapter. The kernel remains unchanged.
+
+
+## System-CAD frame transformation progress
+
+The oriented `CadFrame` contract now provides deterministic local/world point and vector transforms. This makes frame orientation operational for future sketch planes, occurrence transforms, drawing views, and semantic reference context rather than storing orientation as passive metadata.
+
+## System-CAD correction — kernel changes from previous pass reverted
+
+A prior implementation pass incorrectly broadened the Rust/native transport with additional face-evidence fields and corresponding kernel-host/test changes. That violated the current system-CAD instruction that the existing Rust mathematical authority remain unchanged during .NET system development.
+
+Those changes were reverted from the system branch. The code branch is restored to `c0c22cb590195c9fc95bc317cd6102923b5dbe91`, with the correction documentation committed at `6bc7641f2a7b2f6997e134c3469e8841e876181e`. The existing Rust commits already present in the branch before that point are retained; no new mathematical algorithm or Rust semantic authority was introduced by the correction.
+
+The next implementation work must remain in the .NET semantic/evaluation/application layers unless a narrowly scoped transport exposure of an already-existing Rust capability is demonstrably required by an explicit contract.
+## System-CAD runtime composition correction
+
+A follow-on experiment briefly composed the new CAD Engine directly inside `projects/demo/Program.cs` and added a dedicated Python E2E invocation. This was also reverted because `projects/demo` remains the legacy/demo application composition root and is not yet the normative Application Host boundary defined by the C4 architecture.
+
+No runtime composition changes from that experiment remain on the branch.
+
+The correct current state is therefore:
+- `UMLCAD.Cad.Engine` remains the system-CAD orchestration layer.
+- `UMLCAD.Kernel.Client` remains the outward adapter to explicit kernel contracts, with its documented transitional Framework dependency.
+- `UMLCAD.Framework` / `projects/demo` remains the legacy application path until a deliberate application-host migration milestone establishes the replacement root.
+- S1 production execution is still incomplete beyond the certified box operation.
+- No new Rust kernel/math change was introduced by the current correction work.
+
+## S1 sketch/constraint transport station
+
+- Current system-CAD branch head: `f39bd1a43ebf5bd515edd95e63eb53d9b7fa30d9`.
+- The next S1 boundary is now implemented as a typed sketch-solver transport around the existing Rust constraint solver; no new solver or geometric approximation was introduced.
+- `uml-cad-sketch-solve/1.0.0` is an explicit contract for circular sketch geometry, sketch frame metadata, fixed constraints, tolerance, solver terminal evidence, result identity, and diagnostics.
+- `RustSketchGeometryService` provides the .NET adapter, and `RustCadKernelEvaluator` now accepts an optional typed sketch service while retaining the existing box-only constructor for compatibility.
+- `CadFeatureEvaluationResult` and `KernelEvaluationResponse` can now carry `CadSketchEvaluationResult` without pretending a sketch is a solid B-Rep.
+- Sketch result identity is content-addressed by operation identity, sketch identity, frame, sorted circle geometry, sorted constraint content, and tolerance. Repeated identical requests therefore have a deterministic result identity/evidence contract.
+- Existing Rust solver authority remains the source of constraint mathematics. The transport supports only `Fixed` circle constraints and rejects `FullyConstrained` until a dedicated mathematical/semantic contract exists.
+- Test paradigms added: contract/unit tests, transport mapping tests, Rust endpoint unit tests, protocol-level Python E2E, fail-closed negative tests, repeated-request determinism, scale metamorphic testing, and result-identity mismatch tests.
+- The production circular-sketch result is intentionally **not** yet promoted to a solid B-Rep. The existing certified extrusion contract is polygonal, while the current mathematical B-Rep construction set does not certify exact circular-profile solid construction. No polygonal approximation is introduced to bridge that gap.
+- Next S1 gap: establish the exact analytic profile-to-solid operation required for circle-driven additive/subtractive features, through an explicit mathematical contract only after verifying/reusing an existing Rust authority capability. Then integrate additive/subtractive feature composition, topology evolution, and the mandatory full vertical slice.
+- CI status at this head: repository Actions jobs are still failing before executable steps are exposed (job step lists empty and log endpoint returns GitHub `BlobNotFound`). Therefore this head is **Implemented / Test-authored / CI-unverified**, not GREEN.

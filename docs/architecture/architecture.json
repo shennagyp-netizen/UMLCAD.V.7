@@ -307,6 +307,32 @@
       "logicalUnits": [
         "kernelClientAdapter"
       ]
+    },
+    "UMLCAD.Science": {
+      "logicalUnits": [
+        "science",
+        "phenomenaSimulationService"
+      ]
+    },
+    "UMLCAD.Engineering.Resources": {
+      "logicalUnits": [
+        "engineeringResources"
+      ]
+    },
+    "UMLCAD.Engineering.SheetMetal": {
+      "logicalUnits": [
+        "sheetMetal"
+      ]
+    },
+    "UMLCAD.Engineering.Cam": {
+      "logicalUnits": [
+        "cam"
+      ]
+    },
+    "UMLCAD.Engineering.Drawing": {
+      "logicalUnits": [
+        "drawing"
+      ]
     }
   }
 }

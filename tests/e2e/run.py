@@ -323,6 +323,92 @@ def box_solid_geometry_checks(runner: Runner) -> bool:
     return passed
 
 
+
+def convex_extrusion_geometry_checks(runner: Runner) -> bool:
+    cases = [
+        (
+            "valid rectangle extrusion",
+            {
+                "schema": "uml-cad-extrude-convex-planar-profile/1.0.0",
+                "operationIdentity": "python-extrusion-001",
+                "origin": {"x": 1.0, "y": 2.0, "z": 3.0},
+                "uDirection": {"x": 1.0, "y": 0.0, "z": 0.0},
+                "vDirection": {"x": 0.0, "y": 1.0, "z": 0.0},
+                "profile": [
+                    {"u": 0.0, "v": 0.0},
+                    {"u": 4.0, "v": 0.0},
+                    {"u": 4.0, "v": 5.0},
+                    {"u": 0.0, "v": 5.0},
+                ],
+                "depth": 6.0,
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            },
+            True,
+        ),
+        (
+            "self-invalid frame extrusion",
+            {
+                "schema": "uml-cad-extrude-convex-planar-profile/1.0.0",
+                "operationIdentity": "python-extrusion-invalid-001",
+                "origin": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "uDirection": {"x": 1.0, "y": 0.0, "z": 0.0},
+                "vDirection": {"x": 1.0, "y": 0.0, "z": 0.0},
+                "profile": [
+                    {"u": 0.0, "v": 0.0},
+                    {"u": 1.0, "v": 0.0},
+                    {"u": 1.0, "v": 1.0},
+                    {"u": 0.0, "v": 1.0},
+                ],
+                "depth": 2.0,
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            },
+            False,
+        ),
+    ]
+
+    passed = True
+    for name, payload, expected_success in cases:
+        body = json.dumps(payload).encode()
+        request = (
+            "POST /v1/geometry/extrude-convex-planar-profile HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        )
+        try:
+            status, response_body = status_and_body(http_request(body, request))
+            value = json.loads(response_body.decode("utf-8"))
+            actual_success = value.get("succeeded") is True
+            if expected_success:
+                ok = (
+                    status == 200
+                    and actual_success
+                    and value.get("volume") == 120.0
+                    and value.get("surfaceArea") == 148.0
+                    and len(value.get("topology", [])) == 6
+                    and value.get("centroid") == {"x": 3.0, "y": 4.5, "z": 6.0}
+                )
+            else:
+                ok = status == 200 and not actual_success and bool(value.get("diagnostics"))
+        except Exception as exc:
+            ok = False
+            response_body = str(exc).encode()
+
+        runner.results.append(
+            Result(
+                f"python-extrusion/{name}",
+                ["raw-socket-http-probe", name],
+                0 if ok else 1,
+                0.0,
+                response_body.decode("utf-8", errors="replace")[-2000:],
+            )
+        )
+        runner.log(("PASS" if ok else "FAIL") + f" python-extrusion/{name}")
+        passed &= ok
+
+    return passed
+
 def raw_redteam_checks(runner: Runner) -> bool:
     checks = [
         (
@@ -482,6 +568,7 @@ def main() -> int:
         )
         runner.start_kernel()
         passed &= box_solid_geometry_checks(runner)
+        passed &= convex_extrusion_geometry_checks(runner)
         passed &= raw_redteam_checks(runner)
     except Exception as exc:
         runner.log(f"HARNESS ERROR: {exc}")

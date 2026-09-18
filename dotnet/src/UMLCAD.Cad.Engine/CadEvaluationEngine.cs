@@ -446,10 +446,13 @@ public sealed class CadEvaluationEngine
                 featureId,
                 identity,
                 response.Status,
-                response.AuthoritativeResult?.ResultId,
+                response.AuthoritativeResult?.ResultId ?? response.SketchResult?.ResultId,
                 references,
                 response.Diagnostics,
-                response.AuthoritativeResult);
+                response.AuthoritativeResult)
+            {
+                SketchResult = response.SketchResult
+            };
 
             current[featureId] = featureResult;
             _cache.Put(featureResult);

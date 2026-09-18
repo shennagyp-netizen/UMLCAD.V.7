@@ -75,6 +75,7 @@ impl MetalBackend {
 #[cfg(target_os = "macos")]
 mod imp {
     use super::*;
+    use crate::functions::vec::Vec3;
     use objc2::rc::Retained;
     use objc2_foundation::{ns_string, NSString};
     use objc2_metal::{
@@ -407,7 +408,7 @@ kernel void candidate_pairs(
         }
     }
 
-    pub(super) use MetalBackend;
+    // implementation type remains private to this module
 }
 
 #[cfg(target_os = "macos")]
@@ -439,7 +440,7 @@ mod tests {
     fn metal_candidate_pairs_match_cpu_overlap_subset() {
         let boxes = vec![
             Aabb3::new(
-                super::Vec3::new(0.0, 0.0, 0.0),
+                Vec3::new(0.0, 0.0, 0.0),
                 super::Vec3::new(1.0, 1.0, 1.0),
             )
             .unwrap(),

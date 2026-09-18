@@ -6,60 +6,100 @@ using UMLCAD.Engineering.Resources;
 
 namespace UMLCAD.Engineering.Cam;
 
-public sealed record ToolpathPoint(double X, double Y, double Z)
+public sealed record ToolpathPoint
 {
-    public ToolpathPoint
+    public double X { get; }
+    public double Y { get; }
+    public double Z { get; }
+
+    public ToolpathPoint(double x, double y, double z)
     {
-        if (!double.IsFinite(X) || !double.IsFinite(Y) || !double.IsFinite(Z))
-            throw new ArgumentOutOfRangeException(nameof(X), "Toolpath coordinates must be finite.");
+        if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(z))
+            throw new ArgumentOutOfRangeException(
+                nameof(x),
+                "Toolpath coordinates must be finite.");
+
+        X = x;
+        Y = y;
+        Z = z;
     }
 }
 
-public sealed record ManufacturingOperation(
-    SemanticId OperationId,
-    ManufacturingProcessKind Process,
-    string ToolId,
-    double StockThicknessMm,
-    IReadOnlyList<ToolpathPoint> Path)
+public sealed record ManufacturingOperation
 {
-    public ManufacturingOperation
-    {
-        if (OperationId.Value == Guid.Empty)
-            throw new ArgumentException("OperationId is required.", nameof(OperationId));
-        if (string.IsNullOrWhiteSpace(ToolId))
-            throw new ArgumentException("ToolId is required.", nameof(ToolId));
-        if (!double.IsFinite(StockThicknessMm) || StockThicknessMm <= 0d)
-            throw new ArgumentOutOfRangeException(nameof(StockThicknessMm));
+    public SemanticId OperationId { get; }
+    public ManufacturingProcessKind Process { get; }
+    public string ToolId { get; }
+    public double StockThicknessMm { get; }
+    public IReadOnlyList<ToolpathPoint> Path { get; }
 
-        Path = Path?.ToArray() ??
-            throw new ArgumentNullException(nameof(Path));
+    public ManufacturingOperation(
+        SemanticId operationId,
+        ManufacturingProcessKind process,
+        string toolId,
+        double stockThicknessMm,
+        IReadOnlyList<ToolpathPoint> path)
+    {
+        if (operationId.Value == Guid.Empty)
+            throw new ArgumentException(
+                "OperationId is required.",
+                nameof(operationId));
+        if (string.IsNullOrWhiteSpace(toolId))
+            throw new ArgumentException(
+                "ToolId is required.",
+                nameof(toolId));
+        if (!double.IsFinite(stockThicknessMm) || stockThicknessMm <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(stockThicknessMm));
+
+        Path = path?.ToArray()
+            ?? throw new ArgumentNullException(nameof(path));
 
         if (Path.Count == 0)
-            throw new ArgumentException("A manufacturing operation requires at least one toolpath point.", nameof(Path));
+            throw new ArgumentException(
+                "A manufacturing operation requires at least one toolpath point.",
+                nameof(path));
+
+        OperationId = operationId;
+        Process = process;
+        ToolId = toolId;
+        StockThicknessMm = stockThicknessMm;
     }
 }
 
-public sealed record NcProgram(
-    string ProgramId,
-    string MachineId,
-    IReadOnlyList<string> Lines)
+public sealed record NcProgram
 {
-    public NcProgram
-    {
-        if (string.IsNullOrWhiteSpace(ProgramId))
-            throw new ArgumentException("ProgramId is required.", nameof(ProgramId));
-        if (string.IsNullOrWhiteSpace(MachineId))
-            throw new ArgumentException("MachineId is required.", nameof(MachineId));
+    public string ProgramId { get; }
+    public string MachineId { get; }
+    public IReadOnlyList<string> Lines { get; }
 
-        Lines = Lines?.ToArray() ??
-            throw new ArgumentNullException(nameof(Lines));
+    public NcProgram(
+        string programId,
+        string machineId,
+        IReadOnlyList<string> lines)
+    {
+        if (string.IsNullOrWhiteSpace(programId))
+            throw new ArgumentException(
+                "ProgramId is required.",
+                nameof(programId));
+        if (string.IsNullOrWhiteSpace(machineId))
+            throw new ArgumentException(
+                "MachineId is required.",
+                nameof(machineId));
+
+        Lines = lines?.ToArray()
+            ?? throw new ArgumentNullException(nameof(lines));
+
+        ProgramId = programId;
+        MachineId = machineId;
     }
 
     public string Serialize() => string.Join("\n", Lines);
 
     public string ContentHash() =>
         Convert.ToHexString(
-            SHA256.HashData(Encoding.UTF8.GetBytes(Serialize()))).ToLowerInvariant();
+            SHA256.HashData(
+                Encoding.UTF8.GetBytes(Serialize())))
+            .ToLowerInvariant();
 }
 
 public interface INcPostprocessor
@@ -89,17 +129,31 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
             throw new NotSupportedException(
                 $"The deterministic G-code postprocessor currently supports only Milling; process '{operation.Process}' requires a dedicated postprocessor.");
 
-        if (!machine.SupportsProcess(operation.Process, operation.StockThicknessMm))
+        if (!machine.SupportsProcess(
+                operation.Process,
+                operation.StockThicknessMm))
+        {
             throw new InvalidOperationException(
                 $"Machine '{machine.MachineId}' does not support process '{operation.Process}' at stock thickness {operation.StockThicknessMm.ToString(CultureInfo.InvariantCulture)} mm.");
+        }
 
-        if (!string.Equals(operation.ToolId, tool.ToolId, StringComparison.Ordinal))
+        if (!string.Equals(
+                operation.ToolId,
+                tool.ToolId,
+                StringComparison.Ordinal))
+        {
             throw new InvalidOperationException(
                 $"Operation references tool '{operation.ToolId}', but tool definition '{tool.ToolId}' was supplied.");
+        }
 
-        if (!MachineToolCompatibility.IsCompatible(machine, tool, operation.Process))
+        if (!MachineToolCompatibility.IsCompatible(
+                machine,
+                tool,
+                operation.Process))
+        {
             throw new InvalidOperationException(
                 "Machine, tool, and manufacturing process are incompatible.");
+        }
 
         var lines = new List<string>
         {
@@ -115,9 +169,10 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
         {
             var prefix = first ? "G00" : "G01";
             first = false;
-            lines.Add(string.Create(
-                CultureInfo.InvariantCulture,
-                $"{prefix} X{point.X:0.##########} Y{point.Y:0.##########} Z{point.Z:0.##########}"));
+            lines.Add(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{prefix} X{point.X:0.##########} Y{point.Y:0.##########} Z{point.Z:0.##########}"));
         }
 
         lines.Add("M30");
@@ -130,14 +185,15 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
     }
 }
 
-
 public sealed class CamPhenomenaAdvisor
 {
     private readonly UMLCAD.Science.IPhenomenaSimulationService _simulation;
 
-    public CamPhenomenaAdvisor(UMLCAD.Science.IPhenomenaSimulationService simulation)
+    public CamPhenomenaAdvisor(
+        UMLCAD.Science.IPhenomenaSimulationService simulation)
     {
-        _simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
+        _simulation = simulation
+            ?? throw new ArgumentNullException(nameof(simulation));
     }
 
     public UMLCAD.Science.PhenomenaSimulationResult SimulateCuttingProcess(

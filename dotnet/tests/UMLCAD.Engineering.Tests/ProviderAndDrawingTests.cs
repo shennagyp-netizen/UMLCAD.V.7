@@ -67,6 +67,41 @@ public sealed class ProviderAndDrawingTests
         Assert.Contains(occurrence, view.IncludedOccurrences);
     }
 
+
+    [Fact]
+    public void GCodeRejectsMachineToolProcessMismatch()
+    {
+        var machine = new MachineDefinition(
+            "PB-01",
+            MachineKind.PressBrake,
+            "PRESS-BRAKE-01",
+            new[]
+            {
+                new MachineCapability(
+                    ManufacturingProcessKind.SheetMetalBending,
+                    0.5d,
+                    10d),
+            });
+
+        var tool = new ToolDefinition(
+            "BAD-TOOL",
+            ToolKind.EndMill,
+            "PRESS-BRAKE-01",
+            10d,
+            5d,
+            20d);
+
+        var operation = new ManufacturingOperation(
+            SemanticId.New(),
+            ManufacturingProcessKind.Milling,
+            "BAD-TOOL",
+            2d,
+            new[] { new ToolpathPoint(0d, 0d, 0d) });
+
+        Assert.Throws<InvalidOperationException>(() =>
+            new DeterministicGCodePostprocessor().Generate(operation, machine, tool));
+    }
+
     private sealed class TestAdapter(string id) : ISimulationApplicationAdapter
     {
         public string ApplicationId => id;

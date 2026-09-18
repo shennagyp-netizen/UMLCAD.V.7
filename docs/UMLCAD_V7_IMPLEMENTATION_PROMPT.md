@@ -38,11 +38,11 @@ The Python E2E project is the authoritative system integration and red-team boun
 
 Before implementing any capability, treat the following as normative:
 
-⟦BT⟧
+`
 docs/architecture/ABSTRACTION_AND_DEPENDENCY_MODEL.md
 docs/architecture/architecture.json
 docs/architecture/c4/
-⟦BT⟧
+`
 
 The C4 model describes system/runtime boundaries. The abstraction model describes dependency and ownership direction. The machine-readable manifest is the executable architectural description consumed by the E2E architecture guard.
 
@@ -52,19 +52,19 @@ The project tree is an implementation projection of the logical architecture.
 
 The key dependency law is:
 
-⟦BT⟧
+`
 Foundation → Mathematics → Science → CAD Core
                                       ↓
                            Engineering Resources
                                       ↓
                            Engineering Domains
-⟦BT⟧
+`
 
 with outward integration:
 
-⟦BT⟧
+`
 UMLCAD-owned service/contract → adapter/provider → external technology
-⟦BT⟧
+`
 
 Lower layers provide facts/services. Upper layers interpret them as engineering meaning.
 
@@ -135,20 +135,20 @@ A domain module owns engineering meaning, rules, parameterization, semantic comp
 
 It consumes lower-level facts and services:
 
-⟦BT⟧
+`
 Domain
   → Science services
   → CAD Core services/results
   → Engineering Resource services where applicable
   → shared expression/quantity services
   → Phenomena Simulation Service where applicable
-⟦BT⟧
+`
 
 It does not own the concrete kernel.
 
 Exact geometry follows:
 
-⟦BT⟧
+`
 Domain Definition
       ↓
 Domain Evaluator
@@ -158,21 +158,21 @@ Evaluation Engine
 explicit mathematical contract
       ↓
 Rust mathematical authority
-⟦BT⟧
+`
 
 ### Result flow versus dependency
 
 A domain may consume a stable published result from another domain:
 
-⟦BT⟧
+`
 Sheet Metal → published FlatPatternResult → CAM
-⟦BT⟧
+`
 
 This does not authorize:
 
-⟦BT⟧
+`
 CAM → private SheetMetal implementation/state
-⟦BT⟧
+`
 
 Data/result flow and compile-time implementation dependency are separate architectural concepts.
 
@@ -182,13 +182,13 @@ Sheet Metal is a bounded engineering discipline and should be implemented as a s
 
 Preferred boundary:
 
-⟦BT⟧
+`
 UMLCAD.Engineering.SheetMetal
-⟦BT⟧
+`
 
 It owns:
 
-⟦BT⟧
+`
 SheetMetalPart
 Thickness
 BendDefinition
@@ -204,15 +204,15 @@ CornerDefinition
 FoldDefinition
 UnfoldDefinition
 FlatPatternDefinition
-⟦BT⟧
+`
 
 It uses shared Science material facts, Engineering Resource machine/tool capabilities, the expression system, CAD Core references/results, and the Phenomena Simulation Service when applicable.
 
 Example semantic equation:
 
-⟦BT⟧
+`
 BendAllowance = ((pi / 180) * (R + (K * T)) * A)
-⟦BT⟧
+`
 
 The expression subsystem owns AST, units, dimensions, dependency extraction, canonicalization, and evaluation mechanics.
 
@@ -542,7 +542,7 @@ Phenomena simulation is a reusable scientific capability, not a peer application
 
 The architecture is:
 
-⟦BT⟧
+`
 Phenomena Simulation Service
         ↓
 provider contract
@@ -550,25 +550,25 @@ provider contract
 multiple implementations/providers
         ↓
 internal solver or external scientific application
-⟦BT⟧
+`
 
 The service models physical phenomena, subject to explicit scientific contracts.
 
 Examples include, where contracted:
 
-⟦BT⟧
+`
 deformation
 stress/strain response
 thermal response
 vibration
 cutting-process response
-⟦BT⟧
+`
 
 CAM may consume the service:
 
-⟦BT⟧
+`
 CAM → Phenomena Simulation Service
-⟦BT⟧
+`
 
 Sheet Metal and other engineering domains may also consume it.
 
@@ -582,7 +582,7 @@ Material identity and scientifically defined material properties belong to the S
 
 A shared material model may include:
 
-⟦BT⟧
+`
 composition/classification
 density
 elastic properties
@@ -591,13 +591,13 @@ thermal properties
 electrical properties
 hardness
 other scientifically defined properties
-⟦BT⟧
+`
 
 Engineering domains interpret those facts.
 
 For example:
 
-⟦BT⟧
+`
 Science:
     "This material has these properties."
 
@@ -607,7 +607,7 @@ Sheet Metal:
 CAM:
     "Given those properties, this manufacturing process is feasible
      under these machine/tool conditions."
-⟦BT⟧
+`
 
 The system must not duplicate material truth independently in Sheet Metal, CAM, or simulation implementations.
 
@@ -618,7 +618,7 @@ Drawing is an upper engineering domain.
 
 For a dimension:
 
-⟦BT⟧
+`
 Drawing
    ↓
 Reference Resolution
@@ -630,16 +630,16 @@ Science Measurement / Quantity / Unit services
 Drawing applies drafting rules
    ↓
 dimension representation
-⟦BT⟧
+`
 
 Authority is separated:
 
-⟦BT⟧
+`
 CAD      → authoritative geometry/topology
 Science  → measurement/unit/scientific calculation
 Drawing  → drafting meaning and rules
 Viewer   → presentation
-⟦BT⟧
+`
 
 Therefore Science does not depend on Drawing. Drawing consumes scientific services.
 # 17. Freeform
@@ -672,6 +672,72 @@ surface quality diagnostics
 Do not reduce all of this to generic `GeometrySemantic` data.
 
 ---
+
+## CAM / G-code rule
+
+CAM is a manufacturing engineering domain, not just a toolpath exporter.
+
+Required production flow:
+
+\`\`\`
+CAD Result
+  ↓
+Manufacturing interpretation
+  ↓
+Material + Machine + Tool + Fixture capabilities
+  ↓
+Process planning
+  ↓
+optional Phenomena Simulation Service
+  ↓
+Toolpath
+  ↓
+Machine-specific postprocessor
+  ↓
+deterministic G-code / NC
+\`\`\`
+
+G-code/NC is an explicit manufacturing result. A postprocessor is an outward adapter/provider translating a UMLCAD-owned manufacturing-output contract into a machine/controller dialect.
+
+The NC generator must never emit plausible output for an invalid/unsupported/ambiguous machine, tool, unit, or operation state. It must fail closed with structured diagnostics.
+
+
+## CATIA-level drawing capability mapping
+
+Drawing implementation must explicitly cover the CATIA drafting capability families relevant to UMLCAD.
+
+At minimum map:
+
+\`\`\`
+projection/front/side/top/isometric views
+sections
+aligned/offset sections
+detail views
+circular/profiled details
+clipping
+auxiliary/unfolded/broken views where contracted
+view axis/orientation/display mode
+associative generation and update state
+dimensions: linear/angular/radius/diameter/coordinate/baseline/chain
+tolerances/limits/precision/units
+texts/notes/leaders/balloons
+GD&T
+datums and datum targets
+surface roughness
+welding symbols
+centerlines/axes/symmetry/thread lines
+hatching/area-fill
+2D dress-up geometry
+sheet/border/title block/revision zones
+BOM table from CAD Product Structure
+assembly filtering in generated views
+drawing standards such as ISO/ANSI/JIS
+DXF/DWG boundary
+2D structure editing/reuse
+Knowledgeware/formula association and drafting validation
+\`\`\`
+
+These are capability targets, not permission to reproduce CATIA's internal object model.
 
 # 18. Specialized-domain implementation template
 
@@ -973,7 +1039,7 @@ Never invent missing repository facts.
 
 Build UMLCAD V7 as:
 
-⟦BT⟧
+`
 one immutable CAD semantic/product model
 + shared mathematical/expression services
 + shared scientific/material/phenomena services
@@ -988,11 +1054,11 @@ one immutable CAD semantic/product model
 + outward adapters/providers
 + semantic viewer/client
 + Python authoritative E2E/red-team
-⟦BT⟧
+`
 
 For any new domain:
 
-⟦BT⟧
+`
 1. identify the semantic owner;
 2. identify reusable lower-level services;
 3. identify the published result/contract;
@@ -1000,7 +1066,7 @@ For any new domain:
 5. prohibit private peer implementation coupling;
 6. identify external adapters/providers;
 7. identify the authoritative layer for disagreements.
-⟦BT⟧
+`
 
 The product is the engineering system. The mathematical kernel is one authority inside it.
 

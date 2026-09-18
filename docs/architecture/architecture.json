@@ -8,37 +8,266 @@
     "flows": "docs/architecture/c4/04-critical-flows.md"
   },
   "layers": [
-    {"id":"foundation","name":"Platform Foundation","rank":0,"canDependOn":[]},
-    {"id":"mathematics","name":"Mathematics","rank":1,"canDependOn":["foundation"]},
-    {"id":"science","name":"Science","rank":2,"canDependOn":["foundation","mathematics"]},
-    {"id":"cadCore","name":"CAD Engineering Core","rank":3,"canDependOn":["foundation","mathematics","science"]},
-    {"id":"resources","name":"Engineering Resource Model","rank":4,"canDependOn":["foundation","mathematics","science","cadCore"]},
-    {"id":"domains","name":"Specialized Engineering Domains","rank":5,"canDependOn":["foundation","mathematics","science","cadCore","resources"]},
-    {"id":"application","name":"Application / Workflow / Presentation","rank":6,"canDependOn":["foundation","mathematics","science","cadCore","resources","domains"]},
-    {"id":"integration","name":"External Integration / Provider Boundary","rank":6,"canDependOn":["foundation","mathematics","science","cadCore","resources","domains"]}
+    {
+      "id": "foundation",
+      "name": "Platform Foundation",
+      "rank": 0,
+      "canDependOn": []
+    },
+    {
+      "id": "mathematics",
+      "name": "Mathematics",
+      "rank": 1,
+      "canDependOn": [
+        "foundation"
+      ]
+    },
+    {
+      "id": "science",
+      "name": "Science",
+      "rank": 2,
+      "canDependOn": [
+        "foundation",
+        "mathematics"
+      ]
+    },
+    {
+      "id": "cadCore",
+      "name": "CAD Engineering Core",
+      "rank": 3,
+      "canDependOn": [
+        "foundation",
+        "mathematics",
+        "science"
+      ]
+    },
+    {
+      "id": "resources",
+      "name": "Engineering Resource Model",
+      "rank": 4,
+      "canDependOn": [
+        "foundation",
+        "mathematics",
+        "science",
+        "cadCore"
+      ]
+    },
+    {
+      "id": "domains",
+      "name": "Specialized Engineering Domains",
+      "rank": 5,
+      "canDependOn": [
+        "foundation",
+        "mathematics",
+        "science",
+        "cadCore",
+        "resources"
+      ]
+    },
+    {
+      "id": "application",
+      "name": "Application / Workflow / Presentation",
+      "rank": 6,
+      "canDependOn": [
+        "foundation",
+        "mathematics",
+        "science",
+        "cadCore",
+        "resources",
+        "domains"
+      ]
+    },
+    {
+      "id": "integration",
+      "name": "External Integration / Provider Boundary",
+      "rank": 6,
+      "canDependOn": [
+        "foundation",
+        "mathematics",
+        "science",
+        "cadCore",
+        "resources",
+        "domains"
+      ]
+    }
   ],
   "logicalUnits": {
-    "foundation": {"layer":"foundation","kind":"foundation","canDependOn":[]},
-    "expressions": {"layer":"mathematics","kind":"service","canDependOn":["foundation"]},
-    "mathContracts": {"layer":"mathematics","kind":"boundary-contracts","canDependOn":["foundation","expressions"]},
-    "science": {"layer":"science","kind":"semantic-and-service-foundation","canDependOn":["foundation","expressions"]},
-    "phenomenaSimulationService": {"layer":"science","kind":"service","canDependOn":["foundation","expressions"]},
-    "cadCore": {"layer":"cadCore","kind":"engineering-core","canDependOn":["foundation","expressions","mathContracts","science"]},
-    "productStructureBom": {"layer":"cadCore","kind":"semantic-service","canDependOn":["cadCore"]},
-    "evaluationEngine": {"layer":"cadCore","kind":"orchestration-service","canDependOn":["foundation","expressions","mathContracts","science","cadCore"]},
-    "engineeringResources": {"layer":"resources","kind":"engineering-resource-model","canDependOn":["science","cadCore","expressions"]},
-    "partDesign": {"layer":"domains","kind":"domain","canDependOn":["expressions","science","cadCore"]},
-    "sheetMetal": {"layer":"domains","kind":"domain","canDependOn":["expressions","science","cadCore","engineeringResources","phenomenaSimulationService"]},
-    "assembly": {"layer":"domains","kind":"domain","canDependOn":["science","cadCore"]},
-    "kinematics": {"layer":"domains","kind":"domain","canDependOn":["expressions","science","cadCore"]},
-    "freeform": {"layer":"domains","kind":"domain","canDependOn":["expressions","science","cadCore"]},
-    "cam": {"layer":"domains","kind":"domain","canDependOn":["expressions","science","cadCore","engineeringResources","phenomenaSimulationService"]},
-    "drawing": {"layer":"domains","kind":"domain","canDependOn":["expressions","science","cadCore"]},
-    "pmi": {"layer":"domains","kind":"domain","canDependOn":["expressions","science","cadCore"]},
-    "kernelClientAdapter": {"layer":"integration","kind":"adapter","canDependOn":["mathContracts"]},
-    "simulationProviderAdapter": {"layer":"integration","kind":"adapter","canDependOn":["phenomenaSimulationService"]},
-    "machineControllerAdapter": {"layer":"integration","kind":"adapter","canDependOn":["engineeringResources"]},
-    "plmProviderAdapter": {"layer":"integration","kind":"adapter","canDependOn":["productStructureBom"]}
+    "foundation": {
+      "layer": "foundation",
+      "kind": "foundation",
+      "canDependOn": []
+    },
+    "expressions": {
+      "layer": "mathematics",
+      "kind": "service",
+      "canDependOn": [
+        "foundation"
+      ]
+    },
+    "mathContracts": {
+      "layer": "mathematics",
+      "kind": "boundary-contracts",
+      "canDependOn": [
+        "foundation",
+        "expressions"
+      ]
+    },
+    "science": {
+      "layer": "science",
+      "kind": "semantic-and-service-foundation",
+      "canDependOn": [
+        "foundation",
+        "expressions"
+      ]
+    },
+    "phenomenaSimulationService": {
+      "layer": "science",
+      "kind": "service",
+      "canDependOn": [
+        "foundation",
+        "expressions"
+      ]
+    },
+    "cadCore": {
+      "layer": "cadCore",
+      "kind": "engineering-core",
+      "canDependOn": [
+        "foundation",
+        "expressions",
+        "mathContracts",
+        "science"
+      ]
+    },
+    "productStructureBom": {
+      "layer": "cadCore",
+      "kind": "semantic-service",
+      "canDependOn": [
+        "cadCore"
+      ]
+    },
+    "evaluationEngine": {
+      "layer": "cadCore",
+      "kind": "orchestration-service",
+      "canDependOn": [
+        "foundation",
+        "expressions",
+        "mathContracts",
+        "science",
+        "cadCore"
+      ]
+    },
+    "engineeringResources": {
+      "layer": "resources",
+      "kind": "engineering-resource-model",
+      "canDependOn": [
+        "science",
+        "cadCore",
+        "expressions"
+      ]
+    },
+    "partDesign": {
+      "layer": "domains",
+      "kind": "domain",
+      "canDependOn": [
+        "expressions",
+        "science",
+        "cadCore"
+      ]
+    },
+    "sheetMetal": {
+      "layer": "domains",
+      "kind": "domain",
+      "canDependOn": [
+        "expressions",
+        "science",
+        "cadCore",
+        "engineeringResources",
+        "phenomenaSimulationService"
+      ]
+    },
+    "assembly": {
+      "layer": "domains",
+      "kind": "domain",
+      "canDependOn": [
+        "science",
+        "cadCore"
+      ]
+    },
+    "kinematics": {
+      "layer": "domains",
+      "kind": "domain",
+      "canDependOn": [
+        "expressions",
+        "science",
+        "cadCore"
+      ]
+    },
+    "freeform": {
+      "layer": "domains",
+      "kind": "domain",
+      "canDependOn": [
+        "expressions",
+        "science",
+        "cadCore"
+      ]
+    },
+    "cam": {
+      "layer": "domains",
+      "kind": "domain",
+      "canDependOn": [
+        "expressions",
+        "science",
+        "cadCore",
+        "engineeringResources",
+        "phenomenaSimulationService"
+      ]
+    },
+    "drawing": {
+      "layer": "domains",
+      "kind": "domain",
+      "canDependOn": [
+        "expressions",
+        "science",
+        "cadCore"
+      ]
+    },
+    "pmi": {
+      "layer": "domains",
+      "kind": "domain",
+      "canDependOn": [
+        "expressions",
+        "science",
+        "cadCore"
+      ]
+    },
+    "kernelClientAdapter": {
+      "layer": "integration",
+      "kind": "adapter",
+      "canDependOn": [
+        "mathContracts"
+      ]
+    },
+    "simulationProviderAdapter": {
+      "layer": "integration",
+      "kind": "adapter",
+      "canDependOn": [
+        "phenomenaSimulationService"
+      ]
+    },
+    "machineControllerAdapter": {
+      "layer": "integration",
+      "kind": "adapter",
+      "canDependOn": [
+        "engineeringResources"
+      ]
+    },
+    "plmProviderAdapter": {
+      "layer": "integration",
+      "kind": "adapter",
+      "canDependOn": [
+        "productStructureBom"
+      ]
+    }
   },
   "rules": {
     "layerGraphMustBeAcyclic": true,
@@ -52,10 +281,32 @@
     "representationIsDerived": true
   },
   "repositoryProjection": {
-    "UMLCAD.Cad.Expressions": {"logicalUnits":["expressions"]},
-    "UMLCAD.Cad.Semantics": {"logicalUnits":["science","cadCore","productStructureBom"]},
-    "UMLCAD.Cad.Contracts": {"logicalUnits":["mathContracts"]},
-    "UMLCAD.Cad.Engine": {"logicalUnits":["evaluationEngine"]},
-    "UMLCAD.Kernel.Client": {"logicalUnits":["kernelClientAdapter"]}
+    "UMLCAD.Cad.Expressions": {
+      "logicalUnits": [
+        "expressions"
+      ]
+    },
+    "UMLCAD.Cad.Semantics": {
+      "logicalUnits": [
+        "cadCore",
+        "productStructureBom"
+      ],
+      "notes": "Transitional shared semantic implementation; Science remains a logical architecture boundary until its dedicated implementation boundary is introduced."
+    },
+    "UMLCAD.Cad.Contracts": {
+      "logicalUnits": [
+        "mathContracts"
+      ]
+    },
+    "UMLCAD.Cad.Engine": {
+      "logicalUnits": [
+        "evaluationEngine"
+      ]
+    },
+    "UMLCAD.Kernel.Client": {
+      "logicalUnits": [
+        "kernelClientAdapter"
+      ]
+    }
   }
 }

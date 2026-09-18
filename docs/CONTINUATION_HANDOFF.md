@@ -10,7 +10,7 @@
 - Latest merged M8 closure PR: #28, `math: complete M8 construction authority`
 - PR #28 merge commit: `fdb34d5a1e03ed399f900848b6dbe96da71d1a13`
 - M9 closure PR: #30, `math: complete M8/M9 authority hardening`
-- PR #30 validated head: `5d8b77f1c00ae31a9b22abb1187c1710f267923e`
+- PR #30 validated implementation head: `9d04c05f67f4e5542df56b8612806fe8296f624b`
 
 ## Completed mathematical-authority state
 PR #30 completes M9 for the declared certified domains. M0-M16 remains active; M11 is the next incomplete roadmap family after PR #30 post-merge verification.
@@ -97,18 +97,19 @@ M10 family status: **Implemented / Tested / CPU-validated by authoritative CI**.
 
 M8 family status: **Implemented / Tested / CPU-validated by authoritative CI** for its declared certified construction domains.
 
-M9 family status at PR #30 head: **Implemented / Tested / CPU-validated by authoritative CI** for its declared certified B-Rep/solid domains. Exact-head Rust + E2E are green; post-merge main gates remain mandatory.
+M9 family status at PR #30 head: **Implemented / Tested** for its declared certified B-Rep/solid domains. The implementation head `9d04c05f67f4e5542df56b8612806fe8296f624b` includes bounded AABB tolerance hardening; its post-change Rust + E2E gates are now mandatory before merge.
 
 The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, black-box HTTP, Demo, raw HTTP red-team, release-path, and ignored-test checks.
 
 ## Immediate continuation
-1. Verify PR #30's post-merge main Rust kernel gate and comprehensive E2E/red-team gate on the resulting main commit.
-2. After post-merge green, begin M11 tessellation/spatial mathematics from the updated main head.
+1. Verify PR #30's final exact-head Rust and comprehensive E2E/red-team gates on the documentation head, then merge it.
+2. Verify post-merge main Rust and comprehensive E2E/red-team gates on the resulting main commit.
+3. After post-merge green, begin M11 tessellation/spatial mathematics from the updated main head.
 3. Keep GPU work deferred until the CPU mathematical families are closed; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 
 ## M9 completion boundary
 
-M9 is closed for the certified explicit-topology planar-face/solid domains recorded in `kernel/math/GAP_MATRIX.md`. General curved-face sewing, unrestricted topology-aware Boolean construction, and exact holed-solid decomposition require separate mathematical contracts and are fail-closed where not certified.
+M9 is closed for the certified explicit-topology planar-face/solid domains recorded in `kernel/math/GAP_MATRIX.md`. General curved-face sewing, unrestricted topology-aware Boolean construction, and exact holed-solid decomposition require separate mathematical contracts and are fail-closed where not certified. Bounded AABB Boolean/split/imprint math is certified, including sub-unit and translated-scale tolerance behavior.
 
 ## M8 completion boundary
 

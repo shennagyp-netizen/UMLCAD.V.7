@@ -23,7 +23,7 @@ jobs:
           RUST_TEST_THREADS: "1"
         run: |
           set -o pipefail
-          cargo test --manifest-path kernel/native/Cargo.toml gpu::cuda -- --ignored --nocapture 2>&1 | tee cuda-test.log
+          cargo test --manifest-path kernel/native/Cargo.toml --features cuda-hardware gpu::cuda -- --nocapture 2>&1 | tee cuda-test.log
       - name: Upload CUDA test log
         if: always()
         uses: actions/upload-artifact@v4

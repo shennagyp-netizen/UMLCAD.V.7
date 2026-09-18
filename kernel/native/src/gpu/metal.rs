@@ -441,27 +441,27 @@ mod tests {
         let boxes = vec![
             Aabb3::new(
                 Vec3::new(0.0, 0.0, 0.0),
-                super::Vec3::new(1.0, 1.0, 1.0),
+                crate::functions::vec::Vec3::new(1.0, 1.0, 1.0),
             )
             .unwrap(),
             Aabb3::new(
-                super::Vec3::new(0.5, 0.5, 0.5),
-                super::Vec3::new(2.0, 2.0, 2.0),
+                crate::functions::vec::Vec3::new(0.5, 0.5, 0.5),
+                crate::functions::vec::Vec3::new(2.0, 2.0, 2.0),
             )
             .unwrap(),
             Aabb3::new(
-                super::Vec3::new(3.0, 3.0, 3.0),
-                super::Vec3::new(4.0, 4.0, 4.0),
+                crate::functions::vec::Vec3::new(3.0, 3.0, 3.0),
+                crate::functions::vec::Vec3::new(4.0, 4.0, 4.0),
             )
             .unwrap(),
             Aabb3::new(
-                super::Vec3::new(1.0e12, 1.0e12, 1.0e12),
-                super::Vec3::new(1.0e12 + 1.0e5, 1.0e12 + 1.0e5, 1.0e12 + 1.0e5),
+                crate::functions::vec::Vec3::new(1.0e12, 1.0e12, 1.0e12),
+                crate::functions::vec::Vec3::new(1.0e12 + 1.0e5, 1.0e12 + 1.0e5, 1.0e12 + 1.0e5),
             )
             .unwrap(),
             Aabb3::new(
-                super::Vec3::new(1.0e12 + 5.0e4, 1.0e12 + 5.0e4, 1.0e12 + 5.0e4),
-                super::Vec3::new(1.0e12 + 2.0e5, 1.0e12 + 2.0e5, 1.0e12 + 2.0e5),
+                crate::functions::vec::Vec3::new(1.0e12 + 5.0e4, 1.0e12 + 5.0e4, 1.0e12 + 5.0e4),
+                crate::functions::vec::Vec3::new(1.0e12 + 2.0e5, 1.0e12 + 2.0e5, 1.0e12 + 2.0e5),
             )
             .unwrap(),
         ];

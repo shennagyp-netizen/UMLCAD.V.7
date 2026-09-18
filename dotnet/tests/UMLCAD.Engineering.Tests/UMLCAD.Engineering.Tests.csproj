@@ -23,5 +23,6 @@
     <ProjectReference Include="../../src/UMLCAD.Engineering.SheetMetal/UMLCAD.Engineering.SheetMetal.csproj" />
     <ProjectReference Include="../../src/UMLCAD.Engineering.Cam/UMLCAD.Engineering.Cam.csproj" />
     <ProjectReference Include="../../src/UMLCAD.Engineering.Drawing/UMLCAD.Engineering.Drawing.csproj" />
+    <ProjectReference Include="../../src/UMLCAD.Integration.Simulation/UMLCAD.Integration.Simulation.csproj" />
   </ItemGroup>
 </Project>

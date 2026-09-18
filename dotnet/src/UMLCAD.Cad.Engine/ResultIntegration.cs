@@ -8,11 +8,13 @@ public static class ResultIntegrator
     public static AuthoritativeCadResult Integrate(
         SemanticId producingSemanticId,
         AuthoritativeResultKind resultKind,
+        KernelRequest request,
         KernelResult kernelResult)
     {
         if (producingSemanticId.Value == Guid.Empty)
             throw new ArgumentException("ProducingSemanticId is required.", nameof(producingSemanticId));
 
+        ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(kernelResult);
 
         var status = kernelResult.Status switch
@@ -29,27 +31,27 @@ public static class ResultIntegrator
         if (kernelResult.ResultId is null)
         {
             return new AuthoritativeCadResult(
-                new AuthoritativeResultIdentity(
-                    $"failed:{producingSemanticId.Value:D}"),
+                new AuthoritativeResultIdentity($"failed:{producingSemanticId.Value:D}"),
                 resultKind,
                 status,
                 producingSemanticId,
                 Array.Empty<TopologyBinding>(),
                 new ResultEvidence(
-                    ContractId: "unknown",
-                    ContractVersion: "unknown",
-                    EvidenceHash: kernelResult.EvidenceHash,
-                    TopologyEvolution: Array.Empty<TopologyEvolution>(),
-                    Diagnostics: kernelResult.Diagnostics));
+                    request.ContractId,
+                    request.ContractVersion.Value,
+                    kernelResult.EvidenceHash,
+                    Array.Empty<TopologyEvolution>(),
+                    kernelResult.Diagnostics));
         }
 
         var topologyBindings = kernelResult.Topology
             .OrderBy(x => x.ResultId.Value, StringComparer.Ordinal)
+            .ThenBy(x => x.TopologyKind, StringComparer.Ordinal)
             .ThenBy(x => x.TopologyKey, StringComparer.Ordinal)
             .Select(x => new TopologyBinding(
-                TopologyKind: ExtractTopologyKind(x.TopologyKey),
-                TopologyKey: x.TopologyKey,
-                SourceSemanticId: producingSemanticId))
+                x.TopologyKind,
+                x.TopologyKey,
+                producingSemanticId))
             .ToArray();
 
         if (status == AuthoritativeResultStatus.Succeeded &&
@@ -68,21 +70,10 @@ public static class ResultIntegrator
             producingSemanticId,
             topologyBindings,
             new ResultEvidence(
-                ContractId: kernelResultContractIdFallback(kernelResult),
-                ContractVersion: "transport",
-                EvidenceHash: kernelResult.EvidenceHash,
-                TopologyEvolution: Array.Empty<TopologyEvolution>(),
-                Diagnostics: kernelResult.Diagnostics));
+                request.ContractId,
+                request.ContractVersion.Value,
+                kernelResult.EvidenceHash,
+                Array.Empty<TopologyEvolution>(),
+                kernelResult.Diagnostics));
     }
-
-    private static string ExtractTopologyKind(string topologyKey)
-    {
-        var separator = topologyKey.IndexOf(':');
-        return separator > 0
-            ? topologyKey[..separator]
-            : "Unknown";
-    }
-
-    private static string kernelResultContractIdFallback(KernelResult result) =>
-        result.ResultId is null ? "unknown" : "UMLCAD.KernelResult";
 }

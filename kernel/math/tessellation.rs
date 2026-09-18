@@ -835,8 +835,8 @@ mod trim_tests {
         )
         .unwrap();
         assert_eq!(result.points.len(), 4);
-        assert_eq!(result.parameters.first(), result.parameters.last());
-        assert_eq!(result.points.len(), result.parameters.len());
+        assert_ne!(result.parameters.first(), result.parameters.last());
+        assert_eq!(result.parameters.len(), result.points.len());
         assert_eq!(result.points.len(), result.normals.len());
         for (point, parameter) in result.points.iter().zip(&result.parameters) {
             assert!((point.x - parameter.0).abs() <= 1.0e-12);

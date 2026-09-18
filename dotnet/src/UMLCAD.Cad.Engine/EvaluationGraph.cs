@@ -95,10 +95,6 @@ public sealed record EvaluationPlan(IReadOnlyList<EvaluationStep> Steps)
 
         var changed = changedSteps.ToHashSet();
         var affected = new HashSet<SemanticId>(changed);
-        var reverse = Steps.ToDictionary(
-            step => step.StepId,
-            step => step.Dependencies.ToArray());
-
         var expanded = true;
         while (expanded)
         {

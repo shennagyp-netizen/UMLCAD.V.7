@@ -107,6 +107,10 @@ The comprehensive E2E gate exercises the repository's Rust, typed API, .NET, bla
 3. After post-merge green, begin M11 tessellation/spatial mathematics from the updated main head.
 3. Keep GPU work deferred until the CPU mathematical families are closed; CPU `f64` remains the semantic reference and no precision/fast-math shortcut may redefine authority.
 
+## M11 work-in-progress boundary
+
+M11 is now active from `main` commit `59b8f7849bd5d094b31088631006505e2eda61b6`. Head `d400ecefdf5d35a4f88f4917c3f6e07dd551bf01` adds the first surface-tessellation authority slice. It is not yet M11-complete and is awaiting exact-head CI validation.
+
 ## M9 completion boundary
 
 M9 is closed for the certified explicit-topology planar-face/solid domains recorded in `kernel/math/GAP_MATRIX.md`. General curved-face sewing, unrestricted topology-aware Boolean construction, and exact holed-solid decomposition require separate mathematical contracts and are fail-closed where not certified. Bounded AABB Boolean/split/imprint math is certified, including sub-unit and translated-scale tolerance behavior.

@@ -12,7 +12,7 @@
 
 use std::fmt;
 
-use umlcad_kernel_rust::functions::{
+use crate::functions::{
     gpu::{
         BackendCapability, BackendKind, ExecutionDeterminism, GpuOperation, Precision,
     },
@@ -45,7 +45,7 @@ impl fmt::Display for MetalError {
 impl std::error::Error for MetalError {}
 
 #[cfg(not(target_os = "macos"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct MetalBackend;
 
 #[cfg(not(target_os = "macos"))]
@@ -367,7 +367,7 @@ kernel void candidate_pairs(
             if command_buffer.status() != objc2_metal::MTLCommandBufferStatus::Completed {
                 let message = command_buffer
                     .error()
-                    .map(|error| error.to_string())
+                    .map(|error| format!("{error:?}"))
                     .unwrap_or_else(|| "Metal command buffer failed".into());
                 return Err(MetalError::CommandFailed(message));
             }

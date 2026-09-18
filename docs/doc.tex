@@ -1335,3 +1335,305 @@ This handbook was rewritten to eliminate unstable two-column layout, stale archi
 The mathematical authority record remains anchored to M0-M16 and its explicit certified domains. The active System-CAD implementation state must always be re-audited from the exact \texttt{main} repository head and its current evidence.
 
 \end{document}
+
+\begin{itemize}
+\item rejection of whitespace identifiers;
+\item global definition ID uniqueness;
+\item occurrence uniqueness and reference resolution;
+\item nested assemblies;
+\item metadata and parameters;
+\item deterministic node identity even when user IDs contain slashes/colons;
+\item duplicate geometry rejection;
+\item stable kernel HTTP/transport/JSON diagnostics;
+\item application/build identity round-trips;
+\item real Rust kernel E2E responses.
+\end{itemize}
+
+\section{Python E2E runner}
+
+\pathref{tests/e2e/run.py} is the authoritative local integration harness. It:
+
+\begin{enumerate}
+\item resolves the repository root from the runner location;
+\item validates the Rust manifest, both .NET test projects, and the demo project;
+\item runs the Rust debug suite and Rust kernel API E2E;
+\item optionally runs the full Rust release suite;
+\item discovers the Framework test inventory and rejects a zero-test project or missing expected real-kernel tests;
+\item starts \texttt{kernel\_host} on 127.0.0.1:8080;
+\item runs the complete Framework test project;
+\item runs the Kernel black-box integration project;
+\item stops the kernel;
+\item runs the demo E2E path;
+\item restarts the kernel and executes raw HTTP red-team probes;
+\item writes a machine-readable \texttt{uml-cad-e2e-report/1.0.0} report;
+\item force-cleans the kernel process tree on timeout and always cleans up.
+\end{enumerate}
+
+\section{Raw red-team probes}
+
+The current harness attacks at least:
+\begin{itemize}
+\item unknown endpoint -> 404 and \texttt{KERNEL\_NOT\_FOUND};
+\item invalid JSON -> 422 and \texttt{KERNEL\_INVALID\_JSON};
+\item wrong build schema -> 422 and \texttt{KERNEL\_BUILD\_SCHEMA};
+\item missing semantic section -> 422 and \texttt{KERNEL\_BUILD\_SCHEMA};
+\item unsupported geometry kind -> 422 and \texttt{KERNEL\_UNSUPPORTED\_GEOMETRY}.
+\end{itemize}
+
+\chapter{CI and Hardware Validation}
+
+The current repository workflows are:
+
+\begin{tabularx}{\textwidth}{@{}p{0.31\textwidth}X@{}}
+\toprule
+Workflow & Current purpose \\
+\midrule
+\pathref{.github/workflows/rust-kernel.yml} & Ubuntu Rust kernel test suite. \\
+\pathref{.github/workflows/e2e.yml} & Comprehensive Python E2E/red-team gate on Ubuntu with Rust, .NET 10, and Python 3.13. \\
+\pathref{.github/workflows/metal-hardware.yml} & Apple Silicon Metal validation on macOS-14. \\
+\pathref{.github/workflows/cuda-hardware.yml} & Feature-gated NVIDIA hardware validation on a self-hosted CUDA runner. \\
+\pathref{.github/workflows/m16-performance.yml} & Release performance evidence on Apple Silicon. \\
+\bottomrule
+\end{tabularx}
+
+A workflow that does not execute is neither product PASS nor product FAIL. It is \status{Not validated - infrastructure execution unavailable}. Hardware claims require actual hardware execution.
+
+\section{M16 Apple Silicon evidence}
+
+The recorded M16 evidence on macOS-14 is:
+
+\begin{tabular}{@{}rrrrrrr@{}}
+\toprule
+Batch & CPU median us & Metal median us & CPU Mpair/s & Metal Mpair/s & Setup/transfer & Efficiency \\
+\midrule
+32  & 1.25  & 745.79  & 396.8000 & 0.6651  & 13.16\% & 4.15\% \\
+64  & 4.79  & 1260.67 & 420.7012 & 1.5992  & 11.37\% & 9.97\% \\
+128 & 17.33 & 1136.58 & 468.9321 & 7.1513  & 7.41\%  & 44.59\% \\
+256 & 61.88 & 2035.33 & 527.5152 & 16.0367 & 6.23\%  & 100.00\% \\
+512 & 229.75 & 10602.17& 569.3841 & 12.3386 & 2.08\%  & 76.94\% \\
+\bottomrule
+\end{tabular}
+
+No CPU/Metal crossover occurred in the tested range. CUDA hardware remains unverified.
+
+\chapter{Red-Team and Failure-Closed Engineering}
+
+The repository's red-team philosophy is not limited to malformed JSON. Every authoritative boundary must be attacked with the following classes where applicable:
+
+\begin{longtable}{@{}p{0.29\textwidth}p{0.61\textwidth}@{}}
+\toprule
+Attack class & Required engineering assertion \\
+\midrule
+Malformed input & Reject explicitly; never parse into plausible defaults. \\
+Unsupported input & Return Unsupported or equivalent explicit non-success. \\
+Missing reference & Do not invent a target. \\
+Ambiguous reference & Do not pick an arbitrary candidate. \\
+Stale identity & Reject mismatched producer/result/build identity. \\
+Frame mismatch & Reject or explicitly transform through a declared frame contract. \\
+Invalid orientation & Do not infer orientation from presentation. \\
+Non-finite value & Fail closed. \\
+Degenerate geometry & Fail closed unless the contract explicitly defines a valid degenerate case. \\
+Tolerance boundary & Test both sides of the declared tolerance; no hidden global epsilon. \\
+Cache contamination & Verify cache identity cannot reuse unrelated semantic results. \\
+Full/incremental divergence & Require semantic equivalence for the same model state. \\
+Dependency order error & Verify deterministic topological evaluation order. \\
+Incomplete kernel result & Reject the result as authoritative. \\
+Unexpected kernel status & Preserve failure semantics; do not downgrade to success. \\
+Transport corruption & Reject invalid HTTP/body/JSON/size states. \\
+Provider failure & Preserve provider failure and provenance. \\
+Duplicate identity & Reject duplicate semantic/compiled IDs. \\
+\bottomrule
+\end{longtable}
+
+\chapter{Deterministic Recompute and Cache Model}
+
+The architectural invariants are:
+
+\begin{lstlisting}
+FreshEvaluation(EvaluationIdentity)
+    ==
+CacheHit(EvaluationIdentity)
+
+AuthoritativeResult(FullRecompute(M, Delta))
+    ==
+AuthoritativeResult(IncrementalRecompute(M, Delta))
+\end{lstlisting}
+
+The current Framework already demonstrates canonical ordering and identity. The target System-CAD evaluation engine must extend the same discipline to feature graphs, reference resolution, kernel inputs, topology evolution, downstream domains, and representation deltas.
+
+Incremental recompute is not an alternate semantics. It is an optimization of the same semantic function.
+
+\chapter{Engineering Domain Interfaces - Target Contract Shape}
+
+These interfaces are architectural shapes, not claims that all corresponding projects already exist on \texttt{main}.
+
+\section{Simulation}
+\begin{lstlisting}
+IPhenomenaSimulationService
+    -> IPhenomenaSimulationProvider
+    -> Provider implementation
+\end{lstlisting}
+
+\section{Manufacturing resources}
+\begin{lstlisting}
+IEngineeringResourceCatalog
+    -> Machine / Tool / Fixture / Process / Capability
+\end{lstlisting}
+
+\section{CAM}
+\begin{lstlisting}
+ICamEngine
+    -> ManufacturingDefinition
+    -> Toolpath
+    -> IPostprocessor
+    -> Deterministic G-code / NC
+\end{lstlisting}
+
+\section{Product structure and BOM}
+\begin{lstlisting}
+IAuthoritativeProductStructure
+    -> IBomView
+    -> Drawing / CAM / PLM consumers
+\end{lstlisting}
+
+\section{Drawing}
+\begin{lstlisting}
+IAuthoritativeCadResult
+    -> IDrawingEngine
+    -> Derived drawing details / PMI / BOM view
+\end{lstlisting}
+
+\section{Reference resolver}
+\begin{lstlisting}
+IAuthoritativeReferenceResolver
+    -> Resolved | Missing | Ambiguous | Indeterminate | Unsupported
+\end{lstlisting}
+
+A domain contract should not expose a concrete Rust pointer, a viewer object, or a provider-specific data structure as its semantic model.
+
+\chapter{CATIA Capability Traceability}
+
+CATIA is used as a functional capability reference, not an implementation blueprint.
+
+\begin{longtable}{@{}p{0.27\textwidth}p{0.61\textwidth}@{}}
+\toprule
+Capability family & UMLCAD system-level trace \\
+\midrule
+Part Design & Sketch + feature semantics + authoritative evaluation + B-Rep result + derived representation. \\
+Sketcher & Geometry, constraints, relations, solver status, frames, profile validity, publications. \\
+Hybrid / GSD / Freeform & Curve/surface/NURBS mathematical authority plus higher-level semantic feature orchestration. \\
+Sheet Metal & Thickness/bend/flange/relief/fold/flat-pattern semantics plus resource/process validation. \\
+Product / Assembly & Product definitions, occurrences, transforms, configurations, engineering relationships, BOM. \\
+Kinematics & Constraint-driven motion/behavior services using the mathematical authority. \\
+CAM & Manufacturing definitions, operations, toolpaths, simulation integration, postprocessors, deterministic NC. \\
+Drawing / PMI & Projection, sections, details, dimensions, tolerances, GD\&T, annotations, BOM views, standards. \\
+Knowledge / Configuration & Expressions, checks, reactions, rules, variants, templates, reuse. \\
+Lifecycle / PLM / Integration & Product identity, revisions, lifecycle/workflow, PLM/PDM/ERP boundaries. \\
+\bottomrule
+\end{longtable}
+
+The mapping is by capability. UMLCAD does not need to copy CATIA's internal kernel or module architecture.
+
+\chapter{Current File-Level Reference}
+
+This chapter records the verified source tree in compact groups. Paths that appeared only in older handbook drafts are intentionally not listed as current implementation.
+
+\section{Documentation}
+\begin{itemize}
+\item \pathref{README.md}
+\item \pathref{docs/doc.tex}
+\item \pathref{docs/MATH_AUTHORITY_ROADMAP.md}
+\item \pathref{docs/CONTINUATION_HANDOFF.md}
+\item \pathref{docs/UMLCAD_V7_MAIN_BRANCH_DEVELOPMENT_PROMPT.md}
+\item \pathref{kernel/math/GAP_MATRIX.md}
+\end{itemize}
+
+The old handbook referenced additional architecture/roadmap files that are not present on the audited current \texttt{main} tree. This revision removes those paths from the claim of current documentation and instead records the architectural target directly.
+
+\section{Native Rust}
+\begin{itemize}
+\item \pathref{kernel/native/Cargo.toml}
+\item \pathref{kernel/native/src/lib.rs}
+\item \pathref{kernel/native/src/api/mod.rs}
+\item \pathref{kernel/native/src/api/parity_contract.rs}
+\item \pathref{kernel/native/src/bin/kernel_host.rs}
+\item \pathref{kernel/native/src/services/engine.rs}
+\item \pathref{kernel/native/src/services/mod.rs}
+\item \pathref{kernel/native/src/gpu/mod.rs}
+\item \pathref{kernel/native/src/gpu/conformance.rs}
+\item \pathref{kernel/native/src/gpu/metal.rs}
+\item \pathref{kernel/native/src/gpu/cuda.rs}
+\end{itemize}
+
+\section{OCCT}
+\begin{itemize}
+\item \pathref{kernel/occt/Cargo.toml}
+\item \pathref{kernel/occt/CMakeLists.txt}
+\item \pathref{kernel/occt/build.rs}
+\item \pathref{kernel/occt/src/lib.rs}
+\item \pathref{kernel/occt/cpp/bridge.cpp}
+\item \pathref{kernel/occt/cpp/bridge.hpp}
+\item \pathref{kernel/occt/cpp/boolean.cpp}
+\item \pathref{kernel/occt/cpp/extrusion.cpp}
+\item \pathref{kernel/occt/cpp/revolution.cpp}
+\item \pathref{kernel/occt/cpp/loft.cpp}
+\item \pathref{kernel/occt/cpp/fillet.cpp}
+\end{itemize}
+
+\section{Contracts}
+\begin{itemize}
+\item \pathref{kernel/contracts/crates/geometry-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/geometry-contract-tests/src/lib.rs}
+\item \pathref{kernel/contracts/crates/kernel-integration-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/topology-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/mesh-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/exchange-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/freeform-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/fillet-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/offset-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/sweep-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/shell-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/draft-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/reference-evolution-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/reference-migration-api/src/lib.rs}
+\item \pathref{kernel/contracts/crates/surface-operations-api/src/lib.rs}
+\end{itemize}
+
+\section{Current .NET source}
+\begin{itemize}
+\item \pathref{dotnet/src/UMLCAD.Framework/CadApplication.cs}
+\item \pathref{dotnet/src/UMLCAD.Framework/Configuration/CadConfiguration.cs}
+\item \pathref{dotnet/src/UMLCAD.Framework/Semantics/BuildHistory.cs}
+\item \pathref{dotnet/src/UMLCAD.Framework/Semantics/BuildPackage.cs}
+\item \pathref{dotnet/src/UMLCAD.Framework/Semantics/CompiledModel.cs}
+\item \pathref{dotnet/src/UMLCAD.Framework/Semantics/ISemanticRegistry.cs}
+\item \pathref{dotnet/src/UMLCAD.Framework/Semantics/SemanticEntity.cs}
+\item \pathref{dotnet/src/UMLCAD.Framework/Semantics/SemanticModels.cs}
+\item \pathref{dotnet/src/UMLCAD.Framework/Semantics/SemanticServices.cs}
+\item \pathref{dotnet/src/UMLCAD.Kernel.Client/RustKernelService.cs}
+\end{itemize}
+
+\section{Current .NET project constraints}
+\begin{itemize}
+\item Target framework: \texttt{net10.0}.
+\item Nullable reference types enabled.
+\item Implicit usings enabled.
+\item \texttt{TreatWarningsAsErrors=true}.
+\item Framework uses Microsoft.Extensions configuration, dependency injection, hosting abstractions, options.
+\item Kernel Client uses Microsoft.Extensions HTTP/options and references Framework.
+\end{itemize}
+
+\section{Tests}
+\begin{itemize}
+\item \pathref{dotnet/tests/UMLCAD.Framework.Tests/AdversarialEdgeCaseTests.cs}
+\item \pathref{dotnet/tests/UMLCAD.Framework.Tests/CompiledModelTests.cs}
+\item \pathref{dotnet/tests/UMLCAD.Framework.Tests/IdentityCollisionTests.cs}
+\item \pathref{dotnet/tests/UMLCAD.Framework.Tests/RustKernelClientTests.cs}
+\item \pathref{dotnet/tests/UMLCAD.Framework.Tests/RustKernelEndToEndTests.cs}
+\item \pathref{dotnet/tests/UMLCAD.Framework.Tests/SemanticBuildTests.cs}
+\item \pathref{dotnet/tests/UMLCAD.Kernel.Integration.Tests/KernelBlackBoxE2ETests.cs}
+\item \pathref{tests/e2e/COVERAGE.md}
+\item \pathref{tests/e2e/run.py}
+\end{itemize}
+
+\section{CI}

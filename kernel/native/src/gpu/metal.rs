@@ -10,7 +10,7 @@
 //! AABB predicate is the acceptance/reference authority. The GPU never defines
 //! topology or geometry identity.
 
-use std::fmt;
+use std::{fmt, time::{Duration, Instant}};
 
 use crate::functions::{
     gpu::{
@@ -21,6 +21,14 @@ use crate::functions::{
 
 const MAX_ITEMS: usize = 4096;
 const OPS: &[GpuOperation] = &[GpuOperation::CandidatePairBatch];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MetalCandidateTiming {
+    pub host_prepare: Duration,
+    pub gpu_round_trip: Duration,
+    pub cpu_postprocess: Duration,
+}
+
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MetalError {
@@ -297,8 +305,20 @@ kernel void candidate_pairs(
             }
         }
 
-        pub fn candidate_pairs(&self, boxes: &[Aabb3]) -> Result<Vec<(usize, usize)>, MetalError> {
+        pub fn candidate_pairs(
+            &self,
+            boxes: &[Aabb3],
+        ) -> Result<Vec<(usize, usize)>, MetalError> {
+            self.candidate_pairs_timed(boxes).map(|(pairs, _)| pairs)
+        }
+
+        pub fn candidate_pairs_timed(
+            &self,
+            boxes: &[Aabb3],
+        ) -> Result<(Vec<(usize, usize)>, MetalCandidateTiming), MetalError> {
+            let prepare_start = Instant::now();
             let (mins, maxs) = to_conservative_buffers(boxes)?;
+            let host_prepare = prepare_start.elapsed();
             let n = boxes.len();
             let pair_count = n
                 .checked_mul(n - 1)
@@ -328,6 +348,7 @@ kernel void candidate_pairs(
                     .ok_or(MetalError::OutputOverflow)?,
             )?;
 
+            let gpu_start = Instant::now();
             let command_buffer = self
                 .queue
                 .commandBuffer()
@@ -362,6 +383,7 @@ kernel void candidate_pairs(
 
             command_buffer.commit();
             command_buffer.waitUntilCompleted();
+            let gpu_round_trip = gpu_start.elapsed();
 
             if command_buffer.status() != objc2_metal::MTLCommandBufferStatus::Completed {
                 let message = command_buffer
@@ -388,6 +410,8 @@ kernel void candidate_pairs(
                 }
             }
 
+            let postprocess_start = Instant::now();
+
             // The Metal pass is a broad-phase accelerator only. Verify the
             // no-false-negative invariant against the authoritative f64 predicate
             // before exposing any candidate set to callers.
@@ -401,8 +425,13 @@ kernel void candidate_pairs(
                     }
                 }
             }
+            let cpu_postprocess = postprocess_start.elapsed();
 
-            Ok(candidates)
+            Ok((candidates, MetalCandidateTiming {
+                host_prepare,
+                gpu_round_trip,
+                cpu_postprocess,
+            }))
         }
     }
 

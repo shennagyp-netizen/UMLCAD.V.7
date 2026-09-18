@@ -1069,6 +1069,12 @@ Drawing must be mapped against the real CATIA drafting capability surface, not r
 
 Dassault Systèmes documents Generative Drafting capabilities including associative generation from 3D parts, assemblies, surfaces, hybrid parts and sheet-metal definitions; front/side/top/isometric views; section, aligned/offset section, detail, circular/profiled detail and clipping views; associative dimensions and annotations; dress-up; assembly filtering; BOM generation in drawings; and standards/interoperability such as ANSI/ISO/JIS and DXF/DWG. Interactive Drafting adds interactive 2D design, dimensioning, associative annotations, GD&T, balloons, roughness symbols, notes, centerlines/axes/thread lines/area-fill/mark-up arrows, and drawing structure editing. These are treated as capability requirements to map into UMLCAD's own semantics, not as a command-by-command CATIA object model.
 
+Primary official capability references used for this drafting map:
+
+- Dassault Systèmes, CATIA Generative Drafting 2: https://3dswym.3dexperience.3ds.com/wiki/catia-user-community/catia-generative-drafting-2-gdr_zMnLy9wbSG6u6Euasa7Phg
+- Dassault Systèmes, CATIA Generative Drafting 1: https://3dswym.3dexperience.3ds.com/wiki/catia-user-community/catia-generative-drafting-1-gd1_kuGmLGQBQFWcFzrkm4kQBA
+- Dassault Systèmes, CATIA Interactive Drafting 1: https://3dswym.3dexperience.3ds.com/wiki/catia-user-community/catia-interactive-drafting-1-id1_o8zKcIvWRcm7_cIj98_vDQ
+
 The UMLCAD Drawing domain therefore needs, by capability family:
 
 ### Drawing document structure

@@ -17,6 +17,7 @@ pub mod distance;
 pub mod dxf;
 pub mod engineering;
 pub mod geometry;
+pub mod gpu;
 pub mod interval;
 pub mod intersections;
 pub mod jacobian;

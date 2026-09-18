@@ -12,6 +12,7 @@ const ADDRESS: &str = "127.0.0.1:8080";
 const BUILD_SCHEMA: &str = "uml-cad-build-package/1.0.0";
 const MODEL_SCHEMA: &str = "uml-cad-compiled-model/1.1.0";
 const BOX_SOLID_SCHEMA: &str = "uml-cad-axis-aligned-box-solid/1.0.0";
+const SKETCH_SOLVE_SCHEMA: &str = "uml-cad-sketch-solve/1.0.0";
 const MAX_REQUEST_BYTES: usize = 32 * 1024 * 1024;
 
 fn main() {
@@ -29,6 +30,7 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
     let (status, response) = match (method.as_str(), path.as_str()) {
         ("POST", "/v1/build/evaluate") => evaluate(&body),
         ("POST", "/v1/geometry/box-solid") => box_solid(&body),
+        ("POST", "/v1/geometry/solve-sketch") => solve_sketch(&body),
         ("POST", "/v1/geometry/extrude-convex-planar-profile") => extrude_convex_planar_profile(&body),
         ("GET", "/health") => (200, json!({"status":"ok"})),
         _ => (404, failure("KERNEL_NOT_FOUND", "Unknown kernel endpoint.")),
@@ -372,6 +374,400 @@ fn extrude_convex_planar_profile(body: &[u8]) -> (u16, Value) {
     }
 }
 
+
+fn solve_sketch(body: &[u8]) -> (u16, Value) {
+    let root: Value = match serde_json::from_slice(body) {
+        Ok(value) => value,
+        Err(error) => {
+            return (
+                422,
+                failure(
+                    "KERNEL_SKETCH_SOLVE_JSON",
+                    &format!("The sketch-solve request is not valid JSON: {error}."),
+                ),
+            )
+        }
+    };
+
+    if root.get("schema").and_then(Value::as_str) != Some(SKETCH_SOLVE_SCHEMA) {
+        return (
+            422,
+            failure("KERNEL_SKETCH_SOLVE_SCHEMA", "Unsupported sketch-solve schema."),
+        );
+    }
+
+    let operation_identity = match root.get("operationIdentity").and_then(Value::as_str) {
+        Some(value) if !value.trim().is_empty() => value.to_string(),
+        _ => {
+            return (
+                422,
+                failure(
+                    "KERNEL_SKETCH_SOLVE_INPUT",
+                    "operationIdentity is required.",
+                ),
+            )
+        }
+    };
+
+    let circle_values = match root.get("circles").and_then(Value::as_array) {
+        Some(values) if !values.is_empty() => values,
+        _ => {
+            return (
+                422,
+                failure(
+                    "KERNEL_SKETCH_SOLVE_INPUT",
+                    "circles must be a non-empty array.",
+                ),
+            )
+        }
+    };
+
+    let mut geometry = Vec::with_capacity(circle_values.len());
+    let mut circle_ids = std::collections::BTreeSet::new();
+    for circle in circle_values {
+        let id = match circle.get("id").and_then(Value::as_str) {
+            Some(value) if !value.trim().is_empty() => value.to_string(),
+            _ => {
+                return (
+                    422,
+                    failure(
+                        "KERNEL_SKETCH_SOLVE_INPUT",
+                        "Sketch circle id is required.",
+                    ),
+                )
+            }
+        };
+        if !circle_ids.insert(id.clone()) {
+            return (
+                422,
+                failure(
+                    "KERNEL_SKETCH_SOLVE_INPUT",
+                    "Duplicate sketch circle id.",
+                ),
+            );
+        }
+
+        let x = match finite_json_number(circle.get("x")) {
+            Ok(value) => value,
+            Err(message) => {
+                return (422, failure("KERNEL_SKETCH_SOLVE_INPUT", message));
+            }
+        };
+        let y = match finite_json_number(circle.get("y")) {
+            Ok(value) => value,
+            Err(message) => {
+                return (422, failure("KERNEL_SKETCH_SOLVE_INPUT", message));
+            }
+        };
+        let radius = match finite_json_number(circle.get("radius")) {
+            Ok(value) if value > 0.0 => value,
+            Ok(_) => {
+                return (
+                    422,
+                    failure(
+                        "KERNEL_SKETCH_SOLVE_INPUT",
+                        "Sketch circle radius must be positive.",
+                    ),
+                )
+            }
+            Err(message) => {
+                return (422, failure("KERNEL_SKETCH_SOLVE_INPUT", message));
+            }
+        };
+
+        geometry.push(GeometryItem {
+            id,
+            geometry: Geometry::Circle(Circle {
+                center: Point { x, y },
+                radius,
+            }),
+            parameter_dependencies: vec![],
+        });
+    }
+
+    let constraint_values = match root.get("fixedConstraints") {
+        Some(value) => match value.as_array() {
+            Some(values) => values,
+            None => {
+                return (
+                    422,
+                    failure(
+                        "KERNEL_SKETCH_SOLVE_INPUT",
+                        "fixedConstraints must be an array.",
+                    ),
+                )
+            }
+        },
+        None => &[],
+    };
+
+    let mut constraints = Vec::with_capacity(constraint_values.len());
+    let mut constraint_ids = std::collections::BTreeSet::new();
+    for constraint in constraint_values {
+        let id = match constraint.get("id").and_then(Value::as_str) {
+            Some(value) if !value.trim().is_empty() => value.to_string(),
+            _ => {
+                return (
+                    422,
+                    failure(
+                        "KERNEL_SKETCH_SOLVE_INPUT",
+                        "Sketch fixed-constraint id is required.",
+                    ),
+                )
+            }
+        };
+        if !constraint_ids.insert(id.clone()) {
+            return (
+                422,
+                failure(
+                    "KERNEL_SKETCH_SOLVE_INPUT",
+                    "Duplicate sketch constraint id.",
+                ),
+            );
+        }
+
+        let geometry_id = match constraint.get("geometryId").and_then(Value::as_str) {
+            Some(value) if circle_ids.contains(value) => value.to_string(),
+            _ => {
+                return (
+                    422,
+                    failure(
+                        "KERNEL_SKETCH_SOLVE_INPUT",
+                        "Sketch fixed constraint references an unknown circle.",
+                    ),
+                )
+            }
+        };
+
+        constraints.push((
+            id,
+            Constraint::Fixed {
+                entity_id: geometry_id,
+            },
+        ));
+    }
+
+    let tolerance_value = root.get("tolerance").and_then(Value::as_object);
+    let absolute = tolerance_value
+        .and_then(|object| object.get("absolute"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-9);
+    let relative = tolerance_value
+        .and_then(|object| object.get("relative"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-9);
+
+    let tolerance = match umlcad_kernel_rust::math::tolerance::Tolerance::new(absolute, relative) {
+        Ok(value) => value,
+        Err(_) => {
+            return (
+                422,
+                failure(
+                    "KERNEL_SKETCH_SOLVE_TOLERANCE",
+                    "Tolerance must be finite and non-negative.",
+                ),
+            )
+        }
+    };
+
+    let option_value = root.get("options").and_then(Value::as_object);
+    let max_iterations = option_value
+        .and_then(|object| object.get("maxIterations"))
+        .and_then(Value::as_u64)
+        .unwrap_or(100) as usize;
+    let residual_tolerance = option_value
+        .and_then(|object| object.get("residualTolerance"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-8);
+    let step_tolerance = option_value
+        .and_then(|object| object.get("stepTolerance"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-10);
+    let initial_damping = option_value
+        .and_then(|object| object.get("initialDamping"))
+        .and_then(Value::as_f64)
+        .unwrap_or(1.0e-3);
+
+    let options = umlcad_kernel_rust::math::solver::SolveOptions {
+        max_iterations,
+        residual_tolerance,
+        step_tolerance,
+        initial_damping,
+        finite_difference_step: 1.0e-7,
+    };
+
+    let snapshot = SemanticSnapshot {
+        parameters: vec![],
+        geometry,
+        constraints,
+        relations: vec![],
+    }
+    .deterministic();
+
+    let validation = dispatch(KernelRequest::Validate {
+        snapshot: snapshot.clone(),
+    });
+    let diagnostics = match validation {
+        Ok(KernelResponse::Diagnostics(value)) => value,
+        Ok(_) => {
+            return (
+                500,
+                failure(
+                    "KERNEL_DISPATCH",
+                    "Sketch validation dispatch returned the wrong response.",
+                ),
+            )
+        }
+        Err(error) => {
+            return (
+                200,
+                json!({
+                    "schema": SKETCH_SOLVE_SCHEMA,
+                    "status": "failed",
+                    "succeeded": false,
+                    "reason": "invalid-domain",
+                    "iterations": 0,
+                    "initialResidualNorm": 0.0,
+                    "finalResidualNorm": 0.0,
+                    "initialScaledResidualNorm": 0.0,
+                    "finalScaledResidualNorm": 0.0,
+                    "finalStepNorm": 0.0,
+                    "variableCount": 0,
+                    "equationCount": 0,
+                    "rank": 0,
+                    "degreesOfFreedom": 0,
+                    "conditionEstimate": 0.0,
+                    "geometry": [],
+                    "diagnostics": [error.to_string()]
+                }),
+            )
+        }
+    };
+
+    if diagnostics.iter().any(|diagnostic| diagnostic.severity == Severity::Error) {
+        return (
+            200,
+            json!({
+                "schema": SKETCH_SOLVE_SCHEMA,
+                "status": "failed",
+                "succeeded": false,
+                "reason": "invalid-domain",
+                "iterations": 0,
+                "initialResidualNorm": 0.0,
+                "finalResidualNorm": 0.0,
+                "initialScaledResidualNorm": 0.0,
+                "finalScaledResidualNorm": 0.0,
+                "finalStepNorm": 0.0,
+                "variableCount": 0,
+                "equationCount": 0,
+                "rank": 0,
+                "degreesOfFreedom": 0,
+                "conditionEstimate": 0.0,
+                "geometry": [],
+                "diagnostics": diagnostics
+                    .iter()
+                    .map(|diagnostic| format!("{}: {}", diagnostic.code, diagnostic.message))
+                    .collect::<Vec<_>>()
+            }),
+        );
+    }
+
+    match dispatch(KernelRequest::Solve {
+        snapshot,
+        options,
+    }) {
+        Ok(KernelResponse::Solve(report)) => {
+            let status = if report.converged {
+                "succeeded"
+            } else {
+                "failed"
+            };
+            let reason = match report.reason {
+                umlcad_kernel_rust::math::solver::SolveReason::Converged => "converged",
+                umlcad_kernel_rust::math::solver::SolveReason::MaxIterations => "max-iterations",
+                umlcad_kernel_rust::math::solver::SolveReason::Singular => "singular",
+                umlcad_kernel_rust::math::solver::SolveReason::InvalidDomain => "invalid-domain",
+            };
+
+            let solved_geometry = report
+                .geometry
+                .iter()
+                .filter_map(|(id, value)| match value {
+                    Geometry::Circle(circle) => Some(json!({
+                        "id": id,
+                        "kind": "circle",
+                        "x": circle.center.x,
+                        "y": circle.center.y,
+                        "radius": circle.radius
+                    })),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+
+            (
+                200,
+                json!({
+                    "schema": SKETCH_SOLVE_SCHEMA,
+                    "status": status,
+                    "succeeded": report.converged,
+                    "reason": reason,
+                    "iterations": report.iterations,
+                    "initialResidualNorm": report.initial_residual_norm,
+                    "finalResidualNorm": report.final_residual_norm,
+                    "initialScaledResidualNorm": report.initial_scaled_residual_norm,
+                    "finalScaledResidualNorm": report.final_scaled_residual_norm,
+                    "finalStepNorm": report.final_step_norm,
+                    "variableCount": report.analysis.variable_count,
+                    "equationCount": report.analysis.equation_count,
+                    "rank": report.analysis.rank,
+                    "degreesOfFreedom": report.analysis.degrees_of_freedom,
+                    "conditionEstimate": report.analysis.condition_estimate,
+                    "geometry": solved_geometry,
+                    "diagnostics": []
+                }),
+            )
+        }
+        Ok(_) => (
+            500,
+            failure(
+                "KERNEL_DISPATCH",
+                "Sketch solve dispatch returned the wrong response.",
+            ),
+        ),
+        Err(error) => (
+            200,
+            json!({
+                "schema": SKETCH_SOLVE_SCHEMA,
+                "status": "failed",
+                "succeeded": false,
+                "reason": "invalid-domain",
+                "iterations": 0,
+                "initialResidualNorm": 0.0,
+                "finalResidualNorm": 0.0,
+                "initialScaledResidualNorm": 0.0,
+                "finalScaledResidualNorm": 0.0,
+                "finalStepNorm": 0.0,
+                "variableCount": 0,
+                "equationCount": 0,
+                "rank": 0,
+                "degreesOfFreedom": 0,
+                "conditionEstimate": 0.0,
+                "geometry": [],
+                "diagnostics": [error.to_string()]
+            }),
+        ),
+    }
+}
+
+fn finite_json_number(value: Option<&Value>) -> Result<f64, &'static str> {
+    let number = value
+        .and_then(Value::as_f64)
+        .ok_or("Sketch numeric property is missing or invalid.")?;
+    if !number.is_finite() {
+        return Err("Sketch numeric property must be finite.");
+    }
+    Ok(number)
+}
 
 fn box_solid(body: &[u8]) -> (u16, Value) {
     let root: Value = match serde_json::from_slice(body) {

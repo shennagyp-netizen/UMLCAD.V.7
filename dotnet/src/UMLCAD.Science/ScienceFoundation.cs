@@ -1,12 +1,12 @@
 namespace UMLCAD.Science;
 
 public readonly record struct QuantityDimension(
-    string LengthPower,
-    string MassPower,
-    string TimePower,
-    string TemperaturePower)
+    int LengthPower,
+    int MassPower,
+    int TimePower,
+    int TemperaturePower)
 {
-    public static QuantityDimension Dimensionless => new("0", "0", "0", "0");
+    public static QuantityDimension Dimensionless => new(0, 0, 0, 0);
 }
 
 public readonly record struct Quantity(

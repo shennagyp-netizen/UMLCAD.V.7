@@ -621,7 +621,7 @@ def raw_redteam_checks(runner: Runner) -> bool:
             b"KERNEL_SKETCH_SOLVE_SCHEMA",
         ),
         (
-            "sketch non-finite radius",
+            "sketch invalid radius value",
             json.dumps({
                 "schema": "uml-cad-sketch-solve/1.0.0",
                 "operationIdentity": "attack",
@@ -632,7 +632,7 @@ def raw_redteam_checks(runner: Runner) -> bool:
             }).encode(),
             None,
             422,
-            b"KERNEL_SKETCH_SOLVE_INPUT",
+            b"KERNEL_SKETCH_SOLVE_JSON",
         ),
         (
             "unknown endpoint",

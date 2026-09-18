@@ -21,7 +21,7 @@ A reference contains:
 
 Resolution is explicit: Resolved, Missing, Ambiguous, Indeterminate, or Unsupported. The engine fails closed whenever a required reference is not uniquely resolved.
 
-The vertical slice uses a planar-face selector defined by normal and point evidence. The production box adapter now supplies that evidence from the certified box topology contract, so resolution does not depend on face-array order.
+The vertical slice uses a planar-face selector defined by normal and point evidence. The production box adapter now supplies that evidence from the certified box topology contract, so resolution does not depend on face-array order. CAD frames are immutable oriented coordinate systems; their basis participates in validation and evaluation identity.
 
 ## Vertical slice
 

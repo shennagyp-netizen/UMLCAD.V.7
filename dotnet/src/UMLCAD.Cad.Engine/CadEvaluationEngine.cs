@@ -294,6 +294,15 @@ public static class EvaluationIdentity
         Append(builder, "frame.x", frame.OriginX);
         Append(builder, "frame.y", frame.OriginY);
         Append(builder, "frame.z", frame.OriginZ);
+        Append(builder, "frame.xAxis.x", frame.XAxis.X);
+        Append(builder, "frame.xAxis.y", frame.XAxis.Y);
+        Append(builder, "frame.xAxis.z", frame.XAxis.Z);
+        Append(builder, "frame.yAxis.x", frame.YAxis.X);
+        Append(builder, "frame.yAxis.y", frame.YAxis.Y);
+        Append(builder, "frame.yAxis.z", frame.YAxis.Z);
+        Append(builder, "frame.zAxis.x", frame.ZAxis.X);
+        Append(builder, "frame.zAxis.y", frame.ZAxis.Y);
+        Append(builder, "frame.zAxis.z", frame.ZAxis.Z);
     }
 
     private static void Append(StringBuilder builder, string key, string value) =>

@@ -32,11 +32,51 @@ public enum CadEvaluationStatus { Succeeded, InvalidSpecification, MissingRefere
 
 public sealed record CadFrame(CadId Id, CadFrameKind Kind, double OriginX, double OriginY, double OriginZ)
 {
+    public CadVector3 XAxis { get; init; } = new(1d, 0d, 0d);
+    public CadVector3 YAxis { get; init; } = new(0d, 1d, 0d);
+    public CadVector3 ZAxis { get; init; } = new(0d, 0d, 1d);
+
     public void Validate()
     {
         Require(Id.IsValid, "Frame ID is required.");
         Require(double.IsFinite(OriginX) && double.IsFinite(OriginY) && double.IsFinite(OriginZ), "Frame origin must be finite.");
+        ValidateBasis(XAxis, YAxis, ZAxis);
     }
+
+    private static void ValidateBasis(
+        CadVector3 xAxis,
+        CadVector3 yAxis,
+        CadVector3 zAxis)
+    {
+        Require(xAxis.IsFinite && yAxis.IsFinite && zAxis.IsFinite, "Frame basis must be finite.");
+
+        const double tolerance = 1e-12;
+        Require(Math.Abs(Dot(xAxis, xAxis) - 1d) <= tolerance, "Frame X axis must be unit length.");
+        Require(Math.Abs(Dot(yAxis, yAxis) - 1d) <= tolerance, "Frame Y axis must be unit length.");
+        Require(Math.Abs(Dot(zAxis, zAxis) - 1d) <= tolerance, "Frame Z axis must be unit length.");
+        Require(Math.Abs(Dot(xAxis, yAxis)) <= tolerance, "Frame X/Y axes must be orthogonal.");
+        Require(Math.Abs(Dot(xAxis, zAxis)) <= tolerance, "Frame X/Z axes must be orthogonal.");
+        Require(Math.Abs(Dot(yAxis, zAxis)) <= tolerance, "Frame Y/Z axes must be orthogonal.");
+
+        var cross = Cross(xAxis, yAxis);
+        Require(
+            NearlyEqual(cross.X, zAxis.X, tolerance) &&
+            NearlyEqual(cross.Y, zAxis.Y, tolerance) &&
+            NearlyEqual(cross.Z, zAxis.Z, tolerance),
+            "Frame basis must be right-handed.");
+    }
+
+    private static double Dot(CadVector3 left, CadVector3 right) =>
+        (left.X * right.X) + (left.Y * right.Y) + (left.Z * right.Z);
+
+    private static CadVector3 Cross(CadVector3 left, CadVector3 right) =>
+        new(
+            (left.Y * right.Z) - (left.Z * right.Y),
+            (left.Z * right.X) - (left.X * right.Z),
+            (left.X * right.Y) - (left.Y * right.X));
+
+    private static bool NearlyEqual(double left, double right, double tolerance) =>
+        Math.Abs(left - right) <= tolerance;
 
     internal static void Require(bool condition, string message)
     {

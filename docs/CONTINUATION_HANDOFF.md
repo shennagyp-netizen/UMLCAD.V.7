@@ -390,3 +390,10 @@ Next .NET implementation boundary:
 2. establish a certified profile/result contract that can feed the existing convex-planar-extrusion authority without geometric approximation;
 3. replace the remaining S1 contract-test kernel only when the corresponding production contracts exist;
 4. then connect result provenance and downstream Sheet Metal/CAM/Drawing/BOM consumers to the real authoritative CAD-result graph.
+
+
+## System-CAD coordinate-frame hardening
+
+Commit `75dc2ea...` separated semantic reference resolution from kernel execution. The follow-on frame-hardening work adds explicit immutable right-handed `XAxis/YAxis/ZAxis` basis vectors to `CadFrame`, validates orthonormality/handedness, and includes the complete basis in deterministic evaluation identity.
+
+This remains a .NET semantic contract change only. The existing Rust mathematical authority is unchanged.

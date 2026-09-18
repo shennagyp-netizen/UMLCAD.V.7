@@ -968,7 +968,7 @@ pub fn build_axis_aligned_box_solid(
             region: PlanarRegion3 {
                 origin: Vec3::new(min.x, min.y, min.z),
                 u_dir: Vec3::new(1.0, 0.0, 0.0),
-                v_dir: Vec3::new(0.0, -1.0, 0.0),
+                v_dir: Vec3::new(0.0, 1.0, 0.0),
                 outer: vec![
                     zero,
                     Vec2::new(dx, 0.0),
@@ -977,7 +977,7 @@ pub fn build_axis_aligned_box_solid(
                 ],
                 holes: Vec::new(),
             },
-            orientation: true,
+            orientation: false,
         },
         BRepFace {
             id: "f_top".into(),

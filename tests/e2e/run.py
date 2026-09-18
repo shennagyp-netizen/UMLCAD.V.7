@@ -347,6 +347,11 @@ def main() -> int:
     try:
         runner.validate_paths()
         passed &= runner.run(
+            "system-architecture-contract",
+            ["python3", str(ROOT / "tests/e2e/architecture_contract.py"), "--check"],
+            120,
+        )
+        passed &= runner.run(
             "rust-regression-debug",
             ["cargo", "test", "--manifest-path", str(RUST_MANIFEST)],
             900,

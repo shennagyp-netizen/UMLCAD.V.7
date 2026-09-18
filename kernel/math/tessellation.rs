@@ -948,12 +948,28 @@ fn classify_trim_centroid(
     v: f64,
     tolerance: f64,
 ) -> Result<(), TessellationError> {
-    let class = trim
-        .classify_point(super::geometry::Point { x: u, y: v }, tolerance)
-        .map_err(|_| TessellationError::EvaluationFailed)?;
+    let class = match trim.classify_point(
+        super::geometry::Point { x: u, y: v },
+        tolerance,
+    ) {
+        Ok(class) => class,
+        Err(error) => {
+            #[cfg(test)]
+            eprintln!(
+                "trim centroid classification error at ({:.17e}, {:.17e}), tolerance {:.17e}: {:?}",
+                u, v, tolerance, error
+            );
+            return Err(TessellationError::EvaluationFailed);
+        }
+    };
     if class == RegionClass::Inside {
         Ok(())
     } else {
+        #[cfg(test)]
+        eprintln!(
+            "trim centroid rejected at ({:.17e}, {:.17e}), tolerance {:.17e}: {:?}",
+            u, v, tolerance, class
+        );
         Err(TessellationError::EvaluationFailed)
     }
 }

@@ -710,7 +710,6 @@ def main() -> int:
             ["python3", str(ROOT / "tests/e2e/architecture_contract.py"), "--check"],
             120,
         )
-        passed &= sketch_solve_geometry_checks(runner)
         passed &= runner.run(
             "rust-regression-debug",
             ["cargo", "test", "--manifest-path", str(RUST_MANIFEST)],
@@ -742,6 +741,7 @@ def main() -> int:
         passed &= runner.discover_framework_tests()
         runner.start_kernel()
         os.environ["UMLCAD_KERNEL_URL"] = DEFAULT_URL + "/"
+        passed &= sketch_solve_geometry_checks(runner)
         passed &= runner.run(
             "dotnet-framework-full-suite",
             ["dotnet", "test", str(FRAMEWORK_TEST_PROJECT)],

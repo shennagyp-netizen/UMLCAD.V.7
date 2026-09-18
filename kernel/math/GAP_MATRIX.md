@@ -37,6 +37,7 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | GPU abstraction | `gpu.rs` backend-neutral capability/selection, batch memory, dispatch, executor, and f64 conformance contracts | Focused capability/selection, precision, determinism, overflow, dispatch, fallback, and conformance regressions | No hardware backend is implemented in M12; measured crossover thresholds remain future work; selection uses explicit documented policy inputs | CPU math stable | High | P0 | Implemented / Tested (no hardware backend) |
 | Metal | `kernel/native/src/gpu/metal.rs` real `objc2-metal` compute backend for conservative AABB candidate generation | Metal hardware test; exact CPU f64 overlap subset verification; repeated-run determinism; extreme-coordinate regression | Apple Metal lacks hardware f64, so authoritative f64 geometry/evaluation remains CPU; only explicitly conservative f32 broad-phase acceleration is certified in M13 | GPU abstraction | High | P0 | Implemented / Tested / Hardware-validated (conservative broad phase only) |
 | CUDA | `kernel/native/src/gpu/cuda.rs` real CUDA compute backend for batched AABB candidate generation using device-native f64 | CPU f64 overlap oracle; repeated-run determinism; extreme-coordinate fixture; fail-closed false-negative check; no-driver capability behavior | CUDA hardware execution is not available in the current standard CI fleet; hardware status remains explicitly unvalidated until an NVIDIA runner executes the feature-gated tests | GPU abstraction | High | P0 | Implemented / Tested / Not yet hardware-validated (declared AABB domain) |
+| Cross-backend conformance | `CandidatePairConformanceReport` plus shared CPU/accelerator fixture for conservative AABB candidate generation | False-negative/false-positive classification; deterministic repeat comparison; identical fixture on CPU/Metal/CUDA paths | Current hardware evidence validates CPU/Metal; CUDA path is implemented and testable but lacks a confirmed NVIDIA hardware run | Metal + CUDA backends | High | P0 | Implemented / Tested / Hardware-validated (CPU/Metal; CUDA not yet hardware-validated; declared AABB domain) |
 | Cross-backend conformance | None authoritative yet | None | CPU/Metal/CUDA comparison harness | All GPU backends | High | P0 | Missing |
 | Final scale/red-team matrix | Existing scattered tests | Good but incomplete | Standardized 1e-12 … 1e12 and pathological fixture families across all P0 operations | All P0 math | Medium | P0 | Partial |
 
@@ -155,3 +156,12 @@ M13 is closed for the declared Apple Silicon Metal acceleration domain. The real
 - hardware validation executed successfully on the `macos-14` Apple Silicon CI runner.
 
 The M13 certified domain does not include f64 vector/matrix/transform/NURBS geometry execution on Metal. Those operations remain CPU-authoritative until a backend can satisfy the same mathematical precision contract. Cross-backend CPU/Metal/CUDA comparison remains M15 work.
+
+## M15 closure record
+
+M15 is closed for the declared common AABB candidate-generation workload.
+- Backend-neutral candidate conformance distinguishes false negatives from permitted broad-phase false positives.
+- Repeat execution is required to be exactly deterministic.
+- The same adversarial fixture is shared by CPU, Metal, and CUDA test paths.
+- Metal hardware validation passes against the CPU f64 reference.
+- CUDA integration is ready behind `cuda-hardware`, but hardware execution remains unvalidated.

@@ -119,3 +119,25 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
             Lines: lines);
     }
 }
+
+
+public sealed class CamPhenomenaAdvisor
+{
+    private readonly UMLCAD.Science.IPhenomenaSimulationService _simulation;
+
+    public CamPhenomenaAdvisor(UMLCAD.Science.IPhenomenaSimulationService simulation)
+    {
+        _simulation = simulation ?? throw new ArgumentNullException(nameof(simulation));
+    }
+
+    public UMLCAD.Science.PhenomenaSimulationResult SimulateCuttingProcess(
+        string requestId,
+        IReadOnlyDictionary<string, double> inputs)
+    {
+        return _simulation.Simulate(
+            new UMLCAD.Science.PhenomenaSimulationRequest(
+                requestId,
+                UMLCAD.Science.PhenomenonKind.CuttingProcessResponse,
+                inputs));
+    }
+}

@@ -9,11 +9,11 @@ namespace UMLCAD.Kernel.Client;
 public sealed class RustExtrusionGeometryService : IExtrusionGeometryService
 {
     private const string Endpoint = "v1/geometry/extrude-convex-planar-profile";
-    private const string Schema = "uml-cad-extrude-convex-planar-profile/1.0.0";
+    private const string Schema = ExtrusionRequest.ContractSchema;
 
     private static ExtrusionKernelResult Failed(string diagnostic) =>
         new(
-            AxisAlignedBoxSolidKernelStatus.Failed,
+            GeometryKernelStatus.Failed,
             null,
             null,
             Array.Empty<ExtrusionTopology>(),
@@ -97,15 +97,15 @@ public sealed class RustExtrusionGeometryService : IExtrusionGeometryService
 
             var status = dto.Status switch
             {
-                "succeeded" => AxisAlignedBoxSolidKernelStatus.Succeeded,
-                "failed" => AxisAlignedBoxSolidKernelStatus.Failed,
-                "unsupported" => AxisAlignedBoxSolidKernelStatus.Unsupported,
-                "ambiguous" => AxisAlignedBoxSolidKernelStatus.Ambiguous,
-                "indeterminate" => AxisAlignedBoxSolidKernelStatus.Indeterminate,
-                _ => AxisAlignedBoxSolidKernelStatus.Failed,
+                "succeeded" => GeometryKernelStatus.Succeeded,
+                "failed" => GeometryKernelStatus.Failed,
+                "unsupported" => GeometryKernelStatus.Unsupported,
+                "ambiguous" => GeometryKernelStatus.Ambiguous,
+                "indeterminate" => GeometryKernelStatus.Indeterminate,
+                _ => GeometryKernelStatus.Failed,
             };
 
-            if (dto.Succeeded != (status == AxisAlignedBoxSolidKernelStatus.Succeeded))
+            if (dto.Succeeded != (status == GeometryKernelStatus.Succeeded))
                 return Failed("Kernel extrusion status is inconsistent with succeeded.");
 
             return new ExtrusionKernelResult(

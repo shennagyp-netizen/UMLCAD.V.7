@@ -62,9 +62,14 @@ fn signed_area2(loop_points: &[Vec2]) -> f64 {
     if loop_points.is_empty() {
         return 0.0;
     }
+    // Translate the local calculation to the first vertex to avoid
+    // catastrophic cancellation for large absolute UV coordinates.
+    let reference = loop_points[0];
     0.5 * loop_points.iter().enumerate().map(|(i, p)| {
         let q = loop_points[(i + 1) % loop_points.len()];
-        p.x * q.y - p.y * q.x
+        let a = p.sub(reference);
+        let b = q.sub(reference);
+        a.cross(b)
     }).sum::<f64>()
 }
 
@@ -72,16 +77,18 @@ fn polygon_centroid2(loop_points: &[Vec2], area: f64) -> Result<Vec2, BRepError>
     if area == 0.0 {
         return Err(BRepError::Degenerate);
     }
+    let reference = loop_points[0];
     let mut x = 0.0;
     let mut y = 0.0;
     for i in 0..loop_points.len() {
-        let a = loop_points[i];
-        let b = loop_points[(i + 1) % loop_points.len()];
-        let c = a.x * b.y - b.x * a.y;
+        let a = loop_points[i].sub(reference);
+        let b = loop_points[(i + 1) % loop_points.len()].sub(reference);
+        let c = a.cross(b);
         x += (a.x + b.x) * c;
         y += (a.y + b.y) * c;
     }
-    let result = Vec2::new(x / (6.0 * area), y / (6.0 * area));
+    let local = Vec2::new(x / (6.0 * area), y / (6.0 * area));
+    let result = reference.add(local);
     if result.is_finite() { Ok(result) } else { Err(BRepError::Overflow) }
 }
 
@@ -1275,6 +1282,34 @@ mod tests {
         assert!((c.x-12.0).abs()<=1.0e-12 && (c.y-21.5).abs()<=1.0e-12 && (c.z-30.0).abs()<=1.0e-12);
         assert_eq!(region.classify_point(Vec3::new(12.0,21.0,30.0),tol()).unwrap(),RegionClass::Inside);
         assert_eq!(region.classify_point(Vec3::new(12.0,25.0,30.0),tol()).unwrap(),RegionClass::Outside);
+    }
+
+    #[test]
+    fn planar_region_area_and_centroid_are_translation_invariant() {
+        let local = PlanarRegion3 {
+            origin: Vec3::new(0.0,0.0,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(0.0,0.0), Vec2::new(10.0,0.0),
+                Vec2::new(10.0,20.0), Vec2::new(0.0,20.0),
+            ],
+            holes: vec![],
+        };
+        let shifted = PlanarRegion3 {
+            origin: Vec3::new(1.0e12,1.0e12,0.0),
+            u_dir: Vec3::new(1.0,0.0,0.0),
+            v_dir: Vec3::new(0.0,1.0,0.0),
+            outer: vec![
+                Vec2::new(1.0e12,1.0e12), Vec2::new(1.0e12 + 10.0,1.0e12),
+                Vec2::new(1.0e12 + 10.0,1.0e12 + 20.0), Vec2::new(1.0e12,1.0e12 + 20.0),
+            ],
+            holes: vec![],
+        };
+        assert!((local.area(tol()).unwrap() - shifted.area(tol()).unwrap()).abs() <= 1.0e-8);
+        assert!((local.centroid(tol()).unwrap().x - 5.0).abs() <= 1.0e-9);
+        assert!((shifted.centroid(tol()).unwrap().x - (1.0e12 + 5.0)).abs() <= 1.0e-3);
+        assert!((shifted.centroid(tol()).unwrap().y - (1.0e12 + 10.0)).abs() <= 1.0e-3);
     }
 
     #[test]

@@ -74,6 +74,13 @@ public sealed record ProductDefinition(
 
         Occurrences = Occurrences?.ToArray() ??
             throw new ArgumentNullException(nameof(Occurrences));
+
+        if (Components.GroupBy(x => x.ComponentId).Any(g => g.Count() != 1))
+            throw new ArgumentException("Product component identifiers must be unique.", nameof(Components));
+
+        var componentIds = Components.Select(x => x.ComponentId).ToHashSet();
+        if (Occurrences.Any(x => !componentIds.Contains(x.ComponentId)))
+            throw new ArgumentException("Every occurrence must reference an existing component.", nameof(Occurrences));
     }
 }
 
@@ -96,6 +103,8 @@ public static class BomService
         var groups = product.Occurrences
             .GroupBy(x => x.ComponentId)
             .OrderBy(x => componentsById[x.Key].PartNumber, StringComparer.Ordinal)
+            .ThenBy(x => componentsById[x.Key].Revision, StringComparer.Ordinal)
+            .ThenBy(x => x.Key.Value)
             .ToArray();
 
         var lines = new List<BomLine>(groups.Length);

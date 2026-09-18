@@ -57,3 +57,8 @@ Drawing, CAM, Sheet Metal, BOM, and other engineering domains consume Authoritat
 
 S1 now carries an explicit document-level `KernelTolerance` policy. The policy participates in feature/document evaluation identity and is copied into every `KernelEvaluationRequest`. The production Rust adapter consumes the request policy rather than maintaining a hidden geometry tolerance.
 
+
+
+## Oriented-frame transformation
+
+`CadFrame` now provides deterministic local/world point and vector transformations using its immutable validated right-handed basis. These transformations are semantic coordinate operations in the .NET CAD contract; they do not move geometry mathematics into the application layer.

@@ -117,3 +117,30 @@ public sealed class CoordinateFrameContractTests
         Assert.NotEqual(firstIdentity, secondIdentity);
     }
 }
+
+
+[Fact]
+public void RotatedFrameTransformsPointsAndVectorsDeterministically()
+{
+    var frame = new CadFrame(
+        new CadId("rotated"),
+        CadFrameKind.Sketch,
+        10d,
+        20d,
+        30d)
+    {
+        XAxis = new CadVector3(0d, 1d, 0d),
+        YAxis = new CadVector3(-1d, 0d, 0d),
+        ZAxis = new CadVector3(0d, 0d, 1d),
+    };
+
+    frame.Validate();
+
+    var worldPoint = frame.ToWorldPoint(new CadVector3(2d, 3d, 4d));
+    var worldVector = frame.ToWorldVector(new CadVector3(2d, 3d, 4d));
+
+    Assert.Equal(new CadVector3(7d, 22d, 34d), worldPoint);
+    Assert.Equal(new CadVector3(-3d, 2d, 4d), worldVector);
+    Assert.Equal(new CadVector3(2d, 3d, 4d), frame.ToLocalPoint(worldPoint));
+    Assert.Equal(new CadVector3(2d, 3d, 4d), frame.ToLocalVector(worldVector));
+}

@@ -402,3 +402,8 @@ This remains a .NET semantic contract change only. The existing Rust mathematica
 ## System-CAD tolerance authority
 
 The .NET S1 evaluation path now carries document-level tolerance semantics end-to-end. `CadDocumentSpecification.EvaluationTolerance` participates in deterministic document/feature identity, and `KernelEvaluationRequest.Tolerance` is consumed by the production box adapter. The kernel remains unchanged.
+
+
+## System-CAD frame transformation progress
+
+The oriented `CadFrame` contract now provides deterministic local/world point and vector transforms. This makes frame orientation operational for future sketch planes, occurrence transforms, drawing views, and semantic reference context rather than storing orientation as passive metadata.

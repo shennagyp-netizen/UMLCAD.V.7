@@ -66,6 +66,51 @@ public sealed record CadFrame(CadId Id, CadFrameKind Kind, double OriginX, doubl
             "Frame basis must be right-handed.");
     }
 
+    public CadVector3 ToWorldPoint(CadVector3 localPoint)
+    {
+        if (!localPoint.IsFinite)
+            throw new ArgumentException("Local point must be finite.", nameof(localPoint));
+
+        var vector = ToWorldVector(localPoint);
+        return new CadVector3(
+            OriginX + vector.X,
+            OriginY + vector.Y,
+            OriginZ + vector.Z);
+    }
+
+    public CadVector3 ToWorldVector(CadVector3 localVector)
+    {
+        if (!localVector.IsFinite)
+            throw new ArgumentException("Local vector must be finite.", nameof(localVector));
+
+        return new CadVector3(
+            (XAxis.X * localVector.X) + (YAxis.X * localVector.Y) + (ZAxis.X * localVector.Z),
+            (XAxis.Y * localVector.X) + (YAxis.Y * localVector.Y) + (ZAxis.Y * localVector.Z),
+            (XAxis.Z * localVector.X) + (YAxis.Z * localVector.Y) + (ZAxis.Z * localVector.Z));
+    }
+
+    public CadVector3 ToLocalVector(CadVector3 worldVector)
+    {
+        if (!worldVector.IsFinite)
+            throw new ArgumentException("World vector must be finite.", nameof(worldVector));
+
+        return new CadVector3(
+            Dot(worldVector, XAxis),
+            Dot(worldVector, YAxis),
+            Dot(worldVector, ZAxis));
+    }
+
+    public CadVector3 ToLocalPoint(CadVector3 worldPoint)
+    {
+        if (!worldPoint.IsFinite)
+            throw new ArgumentException("World point must be finite.", nameof(worldPoint));
+
+        return ToLocalVector(new CadVector3(
+            worldPoint.X - OriginX,
+            worldPoint.Y - OriginY,
+            worldPoint.Z - OriginZ));
+    }
+
     private static double Dot(CadVector3 left, CadVector3 right) =>
         (left.X * right.X) + (left.Y * right.Y) + (left.Z * right.Z);
 

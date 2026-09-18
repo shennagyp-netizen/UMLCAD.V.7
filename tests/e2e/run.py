@@ -491,8 +491,149 @@ def convex_extrusion_geometry_checks(runner: Runner) -> bool:
 
     return passed
 
+def sketch_solve_geometry_checks(runner: Runner) -> bool:
+    valid_a = {
+        "schema": "uml-cad-sketch-solve/1.0.0",
+        "operationIdentity": "python-sketch-solve-001",
+        "circles": [
+            {"id": "circle-a", "x": 20.0, "y": 20.0, "radius": 5.0},
+            {"id": "circle-b", "x": 70.0, "y": 30.0, "radius": 4.0},
+        ],
+        "fixedConstraints": [
+            {"id": "fixed-a", "geometryId": "circle-a"},
+            {"id": "fixed-b", "geometryId": "circle-b"},
+        ],
+        "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+        "options": {
+            "maxIterations": 100,
+            "residualTolerance": 1.0e-8,
+            "stepTolerance": 1.0e-10,
+            "initialDamping": 1.0e-3,
+        },
+    }
+
+    reordered = dict(valid_a)
+    reordered["circles"] = list(reversed(valid_a["circles"]))
+    reordered["fixedConstraints"] = list(reversed(valid_a["fixedConstraints"]))
+
+    generated = []
+    for index in range(12):
+        generated.append(
+            {
+                "schema": "uml-cad-sketch-solve/1.0.0",
+                "operationIdentity": f"python-sketch-property-{index:03d}",
+                "circles": [
+                    {
+                        "id": f"circle-{index}",
+                        "x": float(index * 17 - 40),
+                        "y": float(index * 11 + 3),
+                        "radius": float(index + 1) * 0.5 + 0.25,
+                    }
+                ],
+                "fixedConstraints": [
+                    {
+                        "id": f"fixed-{index}",
+                        "geometryId": f"circle-{index}",
+                    }
+                ],
+                "tolerance": {"absolute": 1.0e-9, "relative": 1.0e-9},
+            }
+        )
+
+    cases = [
+        ("valid sketch solve", valid_a, True),
+        ("reordered semantic collections", reordered, True),
+        *[(f"generated property {index}", payload, True)
+          for index, payload in enumerate(generated)],
+    ]
+
+    passed = True
+    baseline_body = None
+    for name, payload, expected_success in cases:
+        body = json.dumps(payload).encode()
+        request = (
+            "POST /v1/geometry/solve-sketch HTTP/1.1\r\n"
+            "Host: localhost\r\n"
+            "Content-Type: application/json\r\n"
+            f"Content-Length: {len(body)}\r\n"
+            "Connection: close\r\n\r\n"
+        )
+        try:
+            status, response_body = status_and_body(http_request(body, request))
+            value = json.loads(response_body.decode("utf-8"))
+            actual_success = value.get("succeeded") is True
+            geometry = value.get("geometry", [])
+            ok = (
+                status == 200
+                and actual_success == expected_success
+                and actual_success
+                and value.get("reason") == "converged"
+                and value.get("finalResidualNorm") == 0.0
+                and len(geometry) == len(payload["circles"])
+                and all(
+                    item.get("kind") == "circle"
+                    and item.get("radius", 0) > 0
+                    for item in geometry
+                )
+            )
+            if name == "valid sketch solve":
+                baseline_body = value
+            elif name == "reordered semantic collections" and baseline_body is not None:
+                ok = ok and value == baseline_body
+        except Exception as exc:
+            ok = False
+            response_body = str(exc).encode()
+
+        runner.results.append(
+            Result(
+                f"python-sketch-solve/{name}",
+                ["raw-socket-http-probe", name],
+                0 if ok else 1,
+                0.0,
+                response_body.decode("utf-8", errors="replace")[-2000:],
+            )
+        )
+        runner.log(("PASS" if ok else "FAIL") + f" python-sketch-solve/{name}")
+        passed &= ok
+
+    return passed
+
+
 def raw_redteam_checks(runner: Runner) -> bool:
     checks = [
+        (
+            "sketch invalid JSON",
+            b"{not-json",
+            "POST /v1/geometry/solve-sketch HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\nContent-Length: 9\r\nConnection: close\r\n\r\n",
+            422,
+            b"KERNEL_SKETCH_SOLVE_JSON",
+        ),
+        (
+            "sketch wrong schema",
+            json.dumps({
+                "schema": "attack/0",
+                "operationIdentity": "attack",
+                "circles": [],
+                "fixedConstraints": [],
+            }).encode(),
+            None,
+            422,
+            b"KERNEL_SKETCH_SOLVE_SCHEMA",
+        ),
+        (
+            "sketch non-finite radius",
+            json.dumps({
+                "schema": "uml-cad-sketch-solve/1.0.0",
+                "operationIdentity": "attack",
+                "circles": [
+                    {"id": "circle", "x": 0.0, "y": 0.0, "radius": float("nan")}
+                ],
+                "fixedConstraints": [],
+            }).encode(),
+            None,
+            422,
+            b"KERNEL_SKETCH_SOLVE_INPUT",
+        ),
         (
             "unknown endpoint",
             b"",
@@ -655,6 +796,7 @@ def main() -> int:
         runner.start_kernel()
         passed &= box_solid_geometry_checks(runner)
         passed &= convex_extrusion_geometry_checks(runner)
+        passed &= sketch_solve_geometry_checks(runner)
         passed &= raw_redteam_checks(runner)
     except Exception as exc:
         runner.log(f"HARNESS ERROR: {exc}")

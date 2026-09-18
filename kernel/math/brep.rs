@@ -897,7 +897,9 @@ fn validate_face_region_edge_correspondence(
         let coedges = wire.coedges.iter()
             .map(|id| solid.coedges.iter().find(|c| c.id == *id).ok_or(BRepError::MissingReference))
             .collect::<Result<Vec<_>, _>>()?;
-        let _ = coedges;
+        if coedges.iter().any(|coedge| coedge.face != face.id) {
+            return Err(BRepError::InconsistentOrientation);
+        }
         // The topological loop is authoritative; the planar region supplies
         // the corresponding surface mathematics. Explicit correspondence is
         // required at construction time through matching endpoint positions.
@@ -1432,6 +1434,16 @@ mod tests {
             region.classify_point(Vec3::new(12.0,5.0,0.0),tol()).unwrap(),
             RegionClass::Outside
         );
+    }
+
+    #[test]
+    fn solid_rejects_wire_coedge_attached_to_different_face() {
+        let mut solid = tetra_brep();
+        solid.coedges.iter_mut()
+            .find(|c| c.id == "c0_0")
+            .expect("tetrahedron test coedge exists")
+            .face = "f1".into();
+        assert_eq!(solid.validate(tol()), Err(BRepError::InconsistentOrientation));
     }
 
     #[test]

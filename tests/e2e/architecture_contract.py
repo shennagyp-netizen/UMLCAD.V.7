@@ -29,6 +29,7 @@ PROJECTS = {
     "UMLCAD.Engineering.SheetMetal": SRC / "UMLCAD.Engineering.SheetMetal" / "UMLCAD.Engineering.SheetMetal.csproj",
     "UMLCAD.Engineering.Cam": SRC / "UMLCAD.Engineering.Cam" / "UMLCAD.Engineering.Cam.csproj",
     "UMLCAD.Engineering.Drawing": SRC / "UMLCAD.Engineering.Drawing" / "UMLCAD.Engineering.Drawing.csproj",
+    "UMLCAD.Integration.Simulation": SRC / "UMLCAD.Integration.Simulation" / "UMLCAD.Integration.Simulation.csproj",
     "UMLCAD.Framework": SRC / "UMLCAD.Framework" / "UMLCAD.Framework.csproj",
     "UMLCAD.Kernel.Client": SRC / "UMLCAD.Kernel.Client" / "UMLCAD.Kernel.Client.csproj",
 }
@@ -69,6 +70,9 @@ EXPECTED_REFERENCES = {
     "UMLCAD.Engineering.Drawing": {
         "UMLCAD.Cad.Expressions",
         "UMLCAD.Cad.Semantics",
+        "UMLCAD.Science",
+    },
+    "UMLCAD.Integration.Simulation": {
         "UMLCAD.Science",
     },
     "UMLCAD.Kernel.Client": {"UMLCAD.Cad.Contracts"},
@@ -133,6 +137,15 @@ FORBIDDEN_TARGETS = {
         "UMLCAD.Kernel.Client",
         "UMLCAD.Engineering.SheetMetal",
         "UMLCAD.Engineering.Cam",
+    },
+    "UMLCAD.Integration.Simulation": {
+        "UMLCAD.Framework",
+        "UMLCAD.Kernel.Client",
+        "UMLCAD.Cad.Semantics",
+        "UMLCAD.Cad.Engine",
+        "UMLCAD.Engineering.SheetMetal",
+        "UMLCAD.Engineering.Cam",
+        "UMLCAD.Engineering.Drawing",
     },
 }
 
@@ -365,6 +378,7 @@ def validate_repository_projection(manifest: dict[str, Any]) -> list[str]:
         "UMLCAD.Engineering.SheetMetal",
         "UMLCAD.Engineering.Cam",
         "UMLCAD.Engineering.Drawing",
+        "UMLCAD.Integration.Simulation",
     )
     for name in new_layers:
         for source in source_files(PROJECTS[name]):

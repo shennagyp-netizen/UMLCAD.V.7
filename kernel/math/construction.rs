@@ -1100,4 +1100,141 @@ mod tests {
             Err(ConstructionError::InvalidDimensions)
         );
     }
+    #[test]
+    fn extrusion_volume_is_exact() {
+        let x = LinearExtrusion { profile: rect(20.0, 10.0), height: 30.0 };
+        assert!((x.volume(tol()).unwrap() - 6000.0).abs() <= 1.0e-9);
+    }
+
+    #[test]
+    fn revolution_matches_pappus_and_rejects_axis_contact() {
+        let x = RevolvedPolygon {
+            profile: PlanarPolygon::new(vec![
+                Vec2::new(5.0, 0.0), Vec2::new(10.0, 0.0),
+                Vec2::new(10.0, 20.0), Vec2::new(5.0, 20.0),
+            ]),
+            angle: 2.0 * PI,
+        };
+        let expected = PI * (100.0 - 25.0) * 20.0;
+        assert!((x.volume(tol()).unwrap() - expected).abs() <= 1.0e-9);
+        let mut axis = x.clone();
+        axis.profile.vertices[0].x = 0.0;
+        assert_eq!(axis.validate(tol()), Err(ConstructionError::Unsupported));
+    }
+
+    #[test]
+    fn loft_volume_uses_exact_quadratic_area_integration() {
+        let x = PolygonLoft {
+            lower: rect(20.0, 10.0),
+            lower_z: 0.0,
+            upper: PlanarPolygon::new(vec![
+                Vec2::new(2.0, 1.0), Vec2::new(18.0, 1.0),
+                Vec2::new(18.0, 9.0), Vec2::new(2.0, 9.0),
+            ]),
+            upper_z: 30.0,
+        };
+        let expected = 30.0 * (200.0 + 4.0 * 162.0 + 128.0) / 6.0;
+        assert!((x.volume(tol()).unwrap() - expected).abs() <= 1.0e-9);
+    }
+
+    #[test]
+    fn loft_rejects_mismatched_nonconvex_and_reversed_sections() {
+        let lower = rect(10.0, 10.0);
+        let mut x = PolygonLoft {
+            lower: lower.clone(),
+            lower_z: 0.0,
+            upper: PlanarPolygon::new(vec![
+                Vec2::new(0.0, 0.0), Vec2::new(10.0, 0.0), Vec2::new(0.0, 10.0),
+            ]),
+            upper_z: 10.0,
+        };
+        assert_eq!(x.validate(tol()), Err(ConstructionError::Unsupported));
+        x.upper = PlanarPolygon::new(vec![
+            Vec2::new(0.0, 10.0), Vec2::new(10.0, 10.0),
+            Vec2::new(10.0, 0.0), Vec2::new(0.0, 0.0),
+        ]);
+        assert_eq!(x.validate(tol()), Err(ConstructionError::InvalidDimensions));
+    }
+
+    #[test]
+    fn polygon_self_intersection_is_fail_closed() {
+        let bow = PlanarPolygon::new(vec![
+            Vec2::new(0.0, 0.0), Vec2::new(2.0, 2.0),
+            Vec2::new(0.0, 2.0), Vec2::new(2.0, 0.0),
+        ]);
+        assert_eq!(bow.validate(tol()), Err(ConstructionError::SelfIntersection));
+    }
+
+    #[test]
+    fn hermite_blend_and_geometric_continuity_are_analytic() {
+        let a = CubicHermite3 {
+            p0: Vec3::new(0.0, 0.0, 0.0), p1: Vec3::new(1.0, 0.0, 0.0),
+            t0: Vec3::new(1.0, 0.0, 0.0), t1: Vec3::new(1.0, 0.0, 0.0),
+        };
+        let b = CubicHermite3 {
+            p0: Vec3::new(1.0, 0.0, 0.0), p1: Vec3::new(2.0, 0.0, 0.0),
+            t0: Vec3::new(1.0, 0.0, 0.0), t1: Vec3::new(1.0, 0.0, 0.0),
+        };
+        assert_eq!(verify_continuity(&a, &b, tol()).unwrap(), ContinuityGrade::G2);
+        let mut c = b;
+        c.p0 = Vec3::new(1.0, 1.0, 0.0);
+        assert_eq!(verify_continuity(&a, &c, tol()).unwrap(), ContinuityGrade::Discontinuous);
+    }
+
+    #[test]
+    fn frame_reference_fallback_and_twist_are_deterministic() {
+        let f = Frame3::from_tangent(
+            Vec3::new(1.0, 2.0, 3.0),
+            Vec3::new(0.0, 0.0, 1.0),
+        ).unwrap();
+        assert!((f.tangent.length() - 1.0).abs() <= 1.0e-12);
+        assert!((f.normal.length() - 1.0).abs() <= 1.0e-12);
+        assert!((f.binormal.length() - 1.0).abs() <= 1.0e-12);
+        assert!(f.tangent.dot(f.normal).abs() <= 1.0e-12);
+        let t = f.twisted(0.7).unwrap();
+        assert!((t.normal.dot(t.binormal)).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn fillet_chamfer_shell_match_analytic_contracts() {
+        let fillet = BoxFillet { width: 20.0, depth: 30.0, height: 40.0, radius: 2.0 };
+        let expected_fillet = 24000.0
+            - 2.0 * 2.0 * (600.0 + 800.0 + 1200.0)
+            + PI * 4.0 * (20.0 + 30.0 + 40.0)
+            + (4.0 * PI / 3.0 - 8.0) * 8.0;
+        assert!((fillet.volume(tol()).unwrap() - expected_fillet).abs() <= 1.0e-9);
+
+        let chamfer = BoxChamfer { width: 20.0, depth: 30.0, height: 40.0, distance: 2.0 };
+        assert_eq!(chamfer.volume(tol()).unwrap(), 23328.0);
+
+        let shell = ClosedBoxShell { width: 20.0, depth: 30.0, height: 40.0, thickness: 2.0 };
+        assert_eq!(shell.inner_dimensions(tol()).unwrap(), (16.0, 26.0, 36.0));
+        assert!((shell.material_volume(tol()).unwrap() - 9024.0).abs() <= 1.0e-9);
+    }
+
+    #[test]
+    fn construction_rejects_singular_and_nonfinite_inputs() {
+        assert_eq!(
+            Frame3::from_tangent(Vec3::new(0.0, 0.0, 0.0), Vec3::new(1.0, 0.0, 0.0)),
+            Err(ConstructionError::SingularFrame)
+        );
+        let mut x = LinearExtrusion { profile: rect(10.0, 10.0), height: 1.0 };
+        x.height = f64::NAN;
+        assert_eq!(x.validate(tol()), Err(ConstructionError::NonFinite));
+    }
+
+    #[test]
+    fn construction_stays_finite_at_large_scale() {
+        let s = 1.0e9;
+        let x = LinearExtrusion { profile: rect(20.0 * s, 10.0 * s), height: 30.0 * s };
+        assert!(x.volume(tol()).unwrap().is_finite());
+        let q = RevolvedPolygon {
+            profile: PlanarPolygon::new(vec![
+                Vec2::new(5.0 * s, 0.0), Vec2::new(10.0 * s, 0.0),
+                Vec2::new(10.0 * s, 20.0 * s), Vec2::new(5.0 * s, 20.0 * s),
+            ]),
+            angle: 2.0 * PI,
+        };
+        assert!(q.volume(tol()).unwrap().is_finite());
+    }
 }

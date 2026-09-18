@@ -1404,6 +1404,7 @@ mod tests {
             Vec2::new(0.2,0.1), Vec2::new(0.3,0.1), Vec2::new(0.3,0.2), Vec2::new(0.2,0.2),
         ]);
         assert_eq!(solid.validate(tol()), Err(BRepError::UnsupportedBoolean));
+        assert_eq!(solid.moments(tol()), Err(BRepError::UnsupportedBoolean));
     }
 
     #[test]

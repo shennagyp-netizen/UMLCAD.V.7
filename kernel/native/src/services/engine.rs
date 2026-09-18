@@ -112,4 +112,3 @@ fn build_axis_aligned_box_solid_report(
         solid,
     })
 }
-}

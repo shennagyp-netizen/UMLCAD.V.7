@@ -905,6 +905,20 @@ mod tests {
     }
 
     #[test]
+    fn geometric_scale_is_translation_invariant_for_construction_tolerance() {
+        let local = rect(20.0, 10.0);
+        let shifted = PlanarPolygon::new(vec![
+            Vec2::new(1.0e12, 1.0e12),
+            Vec2::new(1.0e12 + 20.0, 1.0e12),
+            Vec2::new(1.0e12 + 20.0, 1.0e12 + 10.0),
+            Vec2::new(1.0e12, 1.0e12 + 10.0),
+        ]);
+        let local_offset = offset_convex_polygon(&local, 2.0, tol()).unwrap();
+        let shifted_offset = offset_convex_polygon(&shifted, 2.0, tol()).unwrap();
+        assert!((local_offset.area(tol()).unwrap() - shifted_offset.area(tol()).unwrap()).abs() <= 1.0e-8);
+    }
+
+    #[test]
     fn convex_polygon_offset_preserves_winding_and_has_expected_rectangle_bounds() {
         let p = rect(20.0, 10.0);
         let outward = offset_convex_polygon(&p, 2.0, tol()).unwrap();

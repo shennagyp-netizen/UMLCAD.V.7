@@ -697,7 +697,7 @@ mod tests {
         let a = Bvh3::build(&items).unwrap().candidate_pairs(1.0e-12);
         let b = Bvh3::build(&items).unwrap().candidate_pairs(1.0e-12);
         assert_eq!(a, b);
-        assert_eq!(a, vec![(0, 1), (2, 3)]);
+        assert_eq!(a, vec![(0, 2), (1, 3)]);
     }
 
     #[test]

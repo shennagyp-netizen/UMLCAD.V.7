@@ -948,28 +948,12 @@ fn classify_trim_centroid(
     v: f64,
     tolerance: f64,
 ) -> Result<(), TessellationError> {
-    let class = match trim.classify_point(
-        super::geometry::Point { x: u, y: v },
-        tolerance,
-    ) {
-        Ok(class) => class,
-        Err(error) => {
-            #[cfg(test)]
-            eprintln!(
-                "trim centroid classification error at ({:.17e}, {:.17e}), tolerance {:.17e}: {:?}",
-                u, v, tolerance, error
-            );
-            return Err(TessellationError::EvaluationFailed);
-        }
-    };
+    let class = trim
+        .classify_point(super::geometry::Point { x: u, y: v }, tolerance)
+        .map_err(|_| TessellationError::EvaluationFailed)?;
     if class == RegionClass::Inside {
         Ok(())
     } else {
-        #[cfg(test)]
-        eprintln!(
-            "trim centroid rejected at ({:.17e}, {:.17e}), tolerance {:.17e}: {:?}",
-            u, v, tolerance, class
-        );
         Err(TessellationError::EvaluationFailed)
     }
 }
@@ -1081,11 +1065,51 @@ where
     let mut surface_triangles = Vec::new();
     let mut max_chord_error = boundary.max_chord_error;
     let mut max_angular_error = boundary.max_angular_error;
-    for i in 1..boundary_samples.len() - 1 {
+
+    // A fan from a boundary vertex is invalid when adaptive tessellation
+    // preserves multiple collinear samples on a straight trim edge: those
+    // samples form zero-area fan triangles whose centroids lie OnBoundary.
+    // Use the deterministic arithmetic mean of all boundary parameters as a
+    // certified interior seed instead. For a nondegenerate convex polygon the
+    // equal-weight mean lies in its interior; classify it explicitly before
+    // using it as a triangle fan center.
+    let count = boundary_samples.len() as f64;
+    if !count.is_finite() || count <= 0.0 {
+        return Err(TessellationError::Degenerate);
+    }
+    let mut center_u = 0.0;
+    let mut center_v = 0.0;
+    for sample in &boundary_samples {
+        center_u += sample.parameter.0 / count;
+        center_v += sample.parameter.1 / count;
+    }
+    if !center_u.is_finite() || !center_v.is_finite() {
+        return Err(TessellationError::NonFinite);
+    }
+    classify_trim_centroid(trim, center_u, center_v, trim_tolerance)?;
+
+    let center_point = eval(center_u, center_v)?;
+    let center_normal = normal(center_u, center_v)?;
+    if !center_point.is_finite() || !center_normal.is_finite() {
+        return Err(TessellationError::NonFinite);
+    }
+    let center_sample = SurfaceSample3 {
+        parameter: (center_u, center_v),
+        point: center_point,
+        normal: center_normal
+            .normalized()
+            .map_err(|_| TessellationError::Degenerate)?,
+    };
+
+    for i in 0..boundary_samples.len() {
+        let next = (i + 1) % boundary_samples.len();
+        if boundary_samples[i].parameter == boundary_samples[next].parameter {
+            return Err(TessellationError::Degenerate);
+        }
         let (chord, angular) = refine_trim_triangle(
-            boundary_samples[0],
+            center_sample,
             boundary_samples[i],
-            boundary_samples[i + 1],
+            boundary_samples[next],
             0,
             &policy,
             &eval,

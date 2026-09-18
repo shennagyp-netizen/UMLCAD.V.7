@@ -27,8 +27,9 @@ public sealed class CadEvaluationVerticalSliceTests
         Assert.True(extrusionA.Succeeded);
         Assert.True(extrusionB.Succeeded);
 
-        var authoritative = Assert.NotNull(result.FinalAuthoritativeResult);
-        Assert.Equal(CadContractVersions.KernelEvaluation, authoritative.KernelContractVersion);
+        var authoritative = result.FinalAuthoritativeResult;
+        Assert.NotNull(authoritative);
+        Assert.Equal(CadContractVersions.KernelEvaluation, authoritative!.KernelContractVersion);
         Assert.Equal(6, authoritative.Topology.Faces.Count);
         Assert.NotNull(result.Representation);
         Assert.Equal(authoritative.ResultId, result.Representation!.SourceResultId);

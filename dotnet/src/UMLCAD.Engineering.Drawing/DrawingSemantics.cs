@@ -152,3 +152,68 @@ public sealed record DrawingCapabilityMatrix(
     IReadOnlySet<DimensionKind> DimensionKinds,
     IReadOnlySet<AnnotationKind> AnnotationKinds,
     IReadOnlySet<DressUpKind> DressUpKinds);
+
+
+public static class CatiaDraftingCapabilityProfile
+{
+    public static DrawingCapabilityMatrix Baseline(DrawingStandard standard)
+    {
+        return new DrawingCapabilityMatrix(
+            standard,
+            new HashSet<DrawingViewKind>
+            {
+                DrawingViewKind.Front,
+                DrawingViewKind.Rear,
+                DrawingViewKind.Top,
+                DrawingViewKind.Bottom,
+                DrawingViewKind.Left,
+                DrawingViewKind.Right,
+                DrawingViewKind.Isometric,
+                DrawingViewKind.Auxiliary,
+                DrawingViewKind.Section,
+                DrawingViewKind.AlignedSection,
+                DrawingViewKind.OffsetSection,
+                DrawingViewKind.Detail,
+                DrawingViewKind.CircularDetail,
+                DrawingViewKind.ProfiledDetail,
+                DrawingViewKind.Clipping,
+                DrawingViewKind.Broken,
+                DrawingViewKind.Unfolded,
+            },
+            new HashSet<DimensionKind>
+            {
+                DimensionKind.Linear,
+                DimensionKind.Angular,
+                DimensionKind.Radius,
+                DimensionKind.Diameter,
+                DimensionKind.Coordinate,
+                DimensionKind.Baseline,
+                DimensionKind.Chain,
+            },
+            new HashSet<AnnotationKind>
+            {
+                AnnotationKind.Text,
+                AnnotationKind.Note,
+                AnnotationKind.Leader,
+                AnnotationKind.Balloon,
+                AnnotationKind.Datum,
+                AnnotationKind.DatumTarget,
+                AnnotationKind.GeometricTolerance,
+                AnnotationKind.SurfaceRoughness,
+                AnnotationKind.WeldingSymbol,
+                AnnotationKind.FlagNote,
+            },
+            new HashSet<DressUpKind>
+            {
+                DressUpKind.Centerline,
+                DressUpKind.Axis,
+                DressUpKind.SymmetryLine,
+                DressUpKind.ThreadLine,
+                DressUpKind.AreaFill,
+                DressUpKind.Hatch,
+                DressUpKind.BreakLine,
+                DressUpKind.ConstructionGeometry,
+                DressUpKind.MarkupArrow,
+            });
+    }
+}

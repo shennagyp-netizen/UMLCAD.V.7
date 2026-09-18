@@ -31,6 +31,13 @@ public sealed class SimulationApplicationProvider : IPhenomenaSimulationProvider
         ArgumentNullException.ThrowIfNull(request);
         var result = _adapter.Simulate(request);
 
+        if (!string.Equals(result.RequestId, request.RequestId, StringComparison.Ordinal) ||
+            result.Phenomenon != request.Phenomenon)
+        {
+            throw new InvalidOperationException(
+                $"Simulation application adapter '{ProviderId}' returned a result for the wrong request.");
+        }
+
         if (!string.Equals(result.ProviderId, ProviderId, StringComparison.Ordinal))
             throw new InvalidOperationException(
                 $"Simulation application adapter '{ProviderId}' returned a mismatched ProviderId.");

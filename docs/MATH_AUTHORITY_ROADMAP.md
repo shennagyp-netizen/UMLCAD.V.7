@@ -248,3 +248,11 @@ M14 is implemented and repository-tested for the declared NVIDIA CUDA accelerati
 - CUDA hardware validation remains **Not yet hardware-validated** because no NVIDIA runner has executed the feature-gated hardware suite.
 
 The M14 certified domain does not include CUDA execution of the full f64 vector/matrix/transform/NURBS solver stack. Those remain CPU-authoritative pending additional contracts and M15 cross-backend conformance.
+
+## M15 closure record
+
+M15 is closed for the declared common GPU workload supported by both accelerator implementations: conservative AABB candidate generation.
+
+The conformance layer is backend-neutral and keeps CPU f64 exact overlap classification authoritative. Accelerator candidate sets must contain every reference overlap; false positives are measured separately because broad-phase conservatism is permitted. Repeat candidate execution must be deterministic. The identical adversarial fixture is executed by CPU reference and Metal hardware; the CUDA path is wired to the same suite but remains hardware-unvalidated because no NVIDIA runner execution record is available.
+
+M15 does not promote Metal or CUDA to authority for the broader f64 vector/matrix/transform/NURBS solver stack. Those capabilities remain CPU-authoritative pending a common hardware contract.

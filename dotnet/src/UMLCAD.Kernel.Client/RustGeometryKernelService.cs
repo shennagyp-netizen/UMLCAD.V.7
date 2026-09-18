@@ -10,6 +10,17 @@ public sealed class RustGeometryKernelService : IAuthoritativeGeometryService
 {
     private const string Endpoint = "v1/geometry/box-solid";
 
+    private static AxisAlignedBoxSolidKernelResult Failed(string diagnostic) =>
+        new(
+            AxisAlignedBoxSolidKernelStatus.Failed,
+            null,
+            null,
+            Array.Empty<AxisAlignedBoxSolidKernelTopology>(),
+            null,
+            null,
+            null,
+            [diagnostic]);
+
     private readonly HttpClient _httpClient;
     private readonly IOptions<RustKernelOptions> _options;
 
@@ -62,13 +73,45 @@ public sealed class RustGeometryKernelService : IAuthoritativeGeometryService
                     [$"Kernel returned HTTP {(int)response.StatusCode}."]);
 
             await using var stream = await response.Content.ReadAsStreamAsync(linkedCts.Token);
-            var result = await JsonSerializer.DeserializeAsync<AxisAlignedBoxSolidKernelResult>(
+            var dto = await JsonSerializer.DeserializeAsync<AxisAlignedBoxSolidResponseDto>(
                 stream,
                 new JsonSerializerOptions(JsonSerializerDefaults.Web),
                 linkedCts.Token);
 
-            return result ??
+            if (dto is null)
                 throw new InvalidOperationException("Kernel returned an empty box-solid result.");
+
+            if (!string.Equals(dto.Schema, "uml-cad-axis-aligned-box-solid/1.0.0", StringComparison.Ordinal))
+                return Failed("Kernel returned an unexpected box-solid schema.");
+
+            var status = dto.Status switch
+            {
+                "succeeded" => AxisAlignedBoxSolidKernelStatus.Succeeded,
+                "failed" => AxisAlignedBoxSolidKernelStatus.Failed,
+                "unsupported" => AxisAlignedBoxSolidKernelStatus.Unsupported,
+                "ambiguous" => AxisAlignedBoxSolidKernelStatus.Ambiguous,
+                "indeterminate" => AxisAlignedBoxSolidKernelStatus.Indeterminate,
+                _ => AxisAlignedBoxSolidKernelStatus.Failed,
+            };
+
+            var result = new AxisAlignedBoxSolidKernelResult(
+                status,
+                dto.ResultId is null ? null : new ContractResultId(dto.ResultId),
+                dto.EvidenceHash,
+                dto.Topology?
+                    .Select(x => new AxisAlignedBoxSolidKernelTopology(x.Kind, x.Key))
+                    .ToArray() ?? Array.Empty<AxisAlignedBoxSolidKernelTopology>(),
+                dto.Volume,
+                dto.SurfaceArea,
+                dto.Centroid is null
+                    ? null
+                    : new KernelVector3(dto.Centroid.X, dto.Centroid.Y, dto.Centroid.Z),
+                dto.Diagnostics ?? Array.Empty<string>());
+
+            if (dto.Succeeded != (status == AxisAlignedBoxSolidKernelStatus.Succeeded))
+                return Failed("Kernel box-solid status is inconsistent with succeeded.");
+
+            return result;
         }
         catch (JsonException)
         {
@@ -112,3 +155,25 @@ public sealed class RustGeometryKernelService : IAuthoritativeGeometryService
         }
     }
 }
+
+
+internal sealed record AxisAlignedBoxSolidResponseDto(
+    string Schema,
+    string Status,
+    bool Succeeded,
+    string? ResultId,
+    string? EvidenceHash,
+    IReadOnlyList<AxisAlignedBoxSolidResponseTopologyDto>? Topology,
+    double? Volume,
+    double? SurfaceArea,
+    AxisAlignedBoxSolidResponseVectorDto? Centroid,
+    IReadOnlyList<string>? Diagnostics);
+
+internal sealed record AxisAlignedBoxSolidResponseTopologyDto(
+    string Kind,
+    string Key);
+
+internal sealed record AxisAlignedBoxSolidResponseVectorDto(
+    double X,
+    double Y,
+    double Z);

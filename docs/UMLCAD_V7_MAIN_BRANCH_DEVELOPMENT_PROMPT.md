@@ -4,7 +4,14 @@ Continue `UMLCAD.V.7` development from the **exact current `main` branch state**
 
 This document is the **global development law** for system-CAD work. It defines architecture, authority, correctness, testing, determinism, failure semantics, and engineering discipline.
 
-It does **not** define a fixed feature sequence or a comprehensive implementation roadmap. The repository's current milestone, gap, handoff, architecture, and capability documents are authoritative for **what should be implemented next**. An agent must inspect those documents at the current `main` head and select work from the repository's declared state rather than relying on a historical sequence embedded in this prompt.
+It does **not** define a fixed feature sequence or a comprehensive implementation roadmap. The repository's active documents have distinct authority:
+
+- `docs/SYSTEM_CAD_ARCHITECTURE.md` defines the System-CAD ownership model, C4 structure, canonical evaluation architecture, domain boundaries, and architectural gaps.
+- `docs/MATH_AUTHORITY_ROADMAP.md` defines the mathematical authority and certified mathematical domains.
+- `docs/CONTINUATION_HANDOFF.md` defines the current implementation/evidence state and immediate declared gap.
+- `docs/doc.tex` is the published architecture handbook and must remain consistent with the active architecture document.
+
+These documents are authoritative for **what the system means and what is currently implemented**. This prompt defines **how changes are developed and validated**. No agent should infer architecture from an old milestone sequence in this prompt.
 
 ---
 
@@ -206,6 +213,8 @@ Application / Workflow / Presentation
 ```
 
 This is a **logical architecture**, not a requirement that every layer be a separate project.
+
+The normative System-CAD structure, C4 Level 1–4 decomposition, canonical evaluation path, domain dependency rules, template/component/sheet model, simulation-adapter boundary, and mandatory early vertical slice are defined in `docs/SYSTEM_CAD_ARCHITECTURE.md`. This section establishes the governing principle; it does not replace that document.
 
 The key responsibility boundary is:
 
@@ -936,7 +945,7 @@ At the beginning of every new development iteration:
 ```text
 Exact main HEAD
     ↓
-Current repository documents
+Active System-CAD architecture
     ↓
 Current implementation
     ↓
@@ -951,13 +960,16 @@ Implementation
 Validation
 ```
 
-The **current repository milestone/gap documents choose the next implementation target**.
+Use the documents according to their authority:
 
-This prompt deliberately does not embed a fixed comprehensive roadmap.
+- `SYSTEM_CAD_ARCHITECTURE.md` determines the intended architecture and permitted dependency direction.
+- `MATH_AUTHORITY_ROADMAP.md` determines the mathematical authority available to that architecture.
+- `CONTINUATION_HANDOFF.md` and any active gap/capability records determine the current implementation state and next declared work.
+- This prompt determines the development/validation procedure.
 
-When the repository changes its milestone structure, this prompt should remain valid unless an architectural invariant itself changes.
+The prompt deliberately does not embed a fixed feature roadmap.
 
----
+When the repository changes its milestone structure, the prompt should remain valid unless an architectural invariant itself changes.
 
 # 26. FINAL DEVELOPMENT PRINCIPLE
 

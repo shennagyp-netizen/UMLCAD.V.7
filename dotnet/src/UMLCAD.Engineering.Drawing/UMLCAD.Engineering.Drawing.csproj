@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>UMLCAD.Engineering.Drawing</RootNamespace>
+    <AssemblyName>UMLCAD.Engineering.Drawing</AssemblyName>
+    <Description>Associative drafting, views, dimensions, annotations, dress-up, PMI, and drawing structure semantics.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
+    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
+  </ItemGroup>
+</Project>

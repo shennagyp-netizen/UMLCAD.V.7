@@ -16,7 +16,7 @@ public sealed record ProductComponent(
     public ProductComponent
     {
         if (ComponentId.Value == Guid.Empty)
-            throw new ArgumentException("ComponentId is required.", nameof(ComponentComponentId));
+            throw new ArgumentException("ComponentId is required.", nameof(ComponentId));
 
         if (string.IsNullOrWhiteSpace(PartNumber))
             throw new ArgumentException("PartNumber is required.", nameof(PartNumber));

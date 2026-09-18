@@ -17,6 +17,7 @@ from typing import Sequence
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_URL = "http://127.0.0.1:8080"
 FRAMEWORK_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Framework.Tests/UMLCAD.Framework.Tests.csproj"
+ENGINEERING_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Engineering.Tests/UMLCAD.Engineering.Tests.csproj"
 BLACKBOX_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Kernel.Integration.Tests/UMLCAD.Kernel.Integration.Tests.csproj"
 DEMO_PROJECT = ROOT / "projects/demo/Demo.csproj"
 RUST_MANIFEST = ROOT / "kernel/native/Cargo.toml"
@@ -105,6 +106,7 @@ class Runner:
             "repository root": ROOT,
             "Rust manifest": RUST_MANIFEST,
             "Framework test project": FRAMEWORK_TEST_PROJECT,
+            "Engineering test project": ENGINEERING_TEST_PROJECT,
             "black-box test project": BLACKBOX_TEST_PROJECT,
             "demo project": DEMO_PROJECT,
         }
@@ -385,6 +387,11 @@ def main() -> int:
         passed &= runner.run(
             "dotnet-framework-full-suite",
             ["dotnet", "test", str(FRAMEWORK_TEST_PROJECT)],
+            900,
+        )
+        passed &= runner.run(
+            "dotnet-engineering-foundation-suite",
+            ["dotnet", "test", str(ENGINEERING_TEST_PROJECT)],
             900,
         )
         passed &= runner.run(

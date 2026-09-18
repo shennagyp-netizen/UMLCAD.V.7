@@ -35,7 +35,7 @@ This matrix follows the V7 master implementation prompt. `Implemented` means cod
 | Tessellation math | Adaptive 3D curve tessellation, adaptive parametric-surface tessellation, and certified convex line/arc trim-aware outer-loop tessellation with explicit UV/position/normal/error metadata | Curve tests; planar/curved/depth-failure surface tests; trim boundary, convex-fill, concave-rejection, boundary-preservation, and translation/determinism regressions | General concave/holed/freeform trim filling remains outside the certified M11 domain and requires a new mathematical contract; sampled chord/angular metrics are approximation certificates, not exact curvature bounds | Curves / surfaces / trims | High | P1 | Implemented / Tested (certified M11 domain) |
 | Spatial acceleration | AABB, conservative bounding spheres, deterministic 8-way spatial subdivision, BVH query/candidate traversal, and parameter-space bounds | Focused AABB/sphere/parameter/subdivision/BVH determinism, overflow, resident-item, and brute-force-equivalence tests | OBB remains intentionally deferred because no current measured workload justifies another numerical authority; a broader unified bounds interface can be added under a future contract | Bounds / predicates | High | P1 | Implemented / Tested (certified current acceleration domain) |
 | GPU abstraction | `gpu.rs` backend-neutral capability/selection, batch memory, dispatch, executor, and f64 conformance contracts | Focused capability/selection, precision, determinism, overflow, dispatch, fallback, and conformance regressions | No hardware backend is implemented in M12; measured crossover thresholds remain future work; selection uses explicit documented policy inputs | CPU math stable | High | P0 | Implemented / Tested (no hardware backend) |
-| Metal | None authoritative yet | None | Real Metal backend + conformance on Apple Silicon | GPU abstraction | High | P0 | Missing |
+| Metal | `kernel/native/src/gpu/metal.rs` real `objc2-metal` compute backend for conservative AABB candidate generation | Metal hardware test; exact CPU f64 overlap subset verification; repeated-run determinism; extreme-coordinate regression | Apple Metal lacks hardware f64, so authoritative f64 geometry/evaluation remains CPU; only explicitly conservative f32 broad-phase acceleration is certified in M13 | GPU abstraction | High | P0 | Implemented / Tested / Hardware-validated (conservative broad phase only) |
 | CUDA | None authoritative yet | None | Real CUDA backend + conformance on NVIDIA hardware | GPU abstraction | High | P0 | Missing |
 | Cross-backend conformance | None authoritative yet | None | CPU/Metal/CUDA comparison harness | All GPU backends | High | P0 | Missing |
 | Final scale/red-team matrix | Existing scattered tests | Good but incomplete | Standardized 1e-12 … 1e12 and pathological fixture families across all P0 operations | All P0 math | Medium | P0 | Partial |
@@ -142,3 +142,16 @@ M12 is closed for the declared backend-neutral GPU abstraction domain. The CPU m
 - legacy GPU API retained only as a deprecated compatibility wrapper; authority decisions use the diagnostic selection result.
 
 No fake GPU execution, f32 semantic downgrade, fast-math authority, Metal/CUDA device resource, or backend-defined mathematical meaning was introduced. M13 (Metal) and M14 (CUDA) remain responsible for real hardware execution.
+
+## M13 closure record
+
+M13 is closed for the declared Apple Silicon Metal acceleration domain. The real backend is implemented outside `kernel/math` using `objc2-metal`; mathematical semantic types contain no Metal resources.
+- real Metal compute pipeline for batched AABB candidate generation;
+- CPU-generated outward-rounded f32 bounds are used only under an explicit conservative-broad-phase precision contract;
+- the Metal result is required to be a superset of every exact CPU f64 AABB overlap, and the adapter fails closed if a false negative is detected;
+- candidate output is reconstructed in deterministic CPU order and repeated hardware execution is compared for equality;
+- invalid/non-finite/extreme input and batch-size limits are explicit;
+- Metal capability reports `f64 = false`; no authoritative geometry path is downcast to f32;
+- hardware validation executed successfully on the `macos-14` Apple Silicon CI runner.
+
+The M13 certified domain does not include f64 vector/matrix/transform/NURBS geometry execution on Metal. Those operations remain CPU-authoritative until a backend can satisfy the same mathematical precision contract. Cross-backend CPU/Metal/CUDA comparison remains M15 work.

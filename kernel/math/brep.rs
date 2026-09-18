@@ -738,19 +738,39 @@ impl BRepSolid {
         }) {
             return Err(BRepError::UnsupportedBoolean);
         }
+
+        // Translate the integration to a model-local reference point. The
+        // tetrahedral volume and raw moments are translation-sensitive; doing
+        // the polynomial accumulation in world coordinates can lose the
+        // small geometry hidden beneath a very large global translation.
+        let reference = self.vertices.first().ok_or(BRepError::Degenerate)?.point;
+        if !reference.is_finite() {
+            return Err(BRepError::NonFinite);
+        }
+
         let triangles = self.triangles(tolerance)?;
         let mut signed_volume = 0.0;
-        let mut first = Vec3::new(0.0, 0.0, 0.0);
-        let mut second = matrix_zero();
+        let mut first_local = Vec3::new(0.0, 0.0, 0.0);
+        let mut second_local = matrix_zero();
         let mut surface_area = 0.0;
 
         for triangle in triangles {
-            let tetra = triangle.a.dot(triangle.b.cross(triangle.c)) / 6.0;
-            if !tetra.is_finite() { return Err(BRepError::Overflow); }
+            let a = triangle.a.sub(reference);
+            let b = triangle.b.sub(reference);
+            let c = triangle.c.sub(reference);
+            let tetra = a.dot(b.cross(c)) / 6.0;
+            if !tetra.is_finite() {
+                return Err(BRepError::Overflow);
+            }
             signed_volume += tetra;
-            first = first.add(triangle.a.add(triangle.b).add(triangle.c).scale(tetra / 4.0));
-            second = add3(second, tetra_raw_second(triangle.a, triangle.b, triangle.c, tetra));
-            surface_area += 0.5 * triangle.b.sub(triangle.a).cross(triangle.c.sub(triangle.a)).length();
+            first_local = first_local
+                .add(a.add(b).add(c).scale(tetra / 4.0));
+            second_local = add3(second_local, tetra_raw_second(a, b, c, tetra));
+            let area = 0.5 * b.sub(a).cross(c.sub(a)).length();
+            if !area.is_finite() {
+                return Err(BRepError::Overflow);
+            }
+            surface_area += area;
         }
 
         if !signed_volume.is_finite() || signed_volume.abs() <= tolerance
@@ -759,32 +779,62 @@ impl BRepSolid {
         {
             return Err(BRepError::ZeroVolume);
         }
-        let centroid = first.scale(1.0 / signed_volume);
-        let inertia_origin = inertia_from_second(second);
-        let shift = scale3(
-            sub_outer(centroid, centroid),
-            0.0,
-        );
-        let _ = shift;
-        let cc = outer_product(centroid, centroid);
+
+        let centroid_local = first_local.scale(1.0 / signed_volume);
+        let centroid = reference.add(centroid_local);
+        if !centroid.is_finite() {
+            return Err(BRepError::Overflow);
+        }
+
+        let inertia_local_origin = inertia_from_second(second_local);
+        let m = signed_volume;
+        let c = centroid_local;
         let inertia_centroid = [
             [
-                inertia_origin[0][0] - signed_volume * (centroid.y * centroid.y + centroid.z * centroid.z),
-                inertia_origin[0][1] + signed_volume * centroid.x * centroid.y,
-                inertia_origin[0][2] + signed_volume * centroid.x * centroid.z,
+                inertia_local_origin[0][0] - m * (c.y * c.y + c.z * c.z),
+                inertia_local_origin[0][1] + m * c.x * c.y,
+                inertia_local_origin[0][2] + m * c.x * c.z,
             ],
             [
-                inertia_origin[1][0] + signed_volume * centroid.y * centroid.x,
-                inertia_origin[1][1] - signed_volume * (centroid.x * centroid.x + centroid.z * centroid.z),
-                inertia_origin[1][2] + signed_volume * centroid.y * centroid.z,
+                inertia_local_origin[1][0] + m * c.y * c.x,
+                inertia_local_origin[1][1] - m * (c.x * c.x + c.z * c.z),
+                inertia_local_origin[1][2] + m * c.y * c.z,
             ],
             [
-                inertia_origin[2][0] + signed_volume * centroid.z * centroid.x,
-                inertia_origin[2][1] + signed_volume * centroid.z * centroid.y,
-                inertia_origin[2][2] - signed_volume * (centroid.x * centroid.x + centroid.y * centroid.y),
+                inertia_local_origin[2][0] + m * c.z * c.x,
+                inertia_local_origin[2][1] + m * c.z * c.y,
+                inertia_local_origin[2][2] - m * (c.x * c.x + c.y * c.y),
             ],
         ];
-        let _ = cc;
+
+        // Parallel-axis theorem: move the centroidal tensor from the local
+        // reference frame to the requested world-origin frame.
+        inertia_centroid;
+        let inertia_origin = [
+            [
+                inertia_centroid[0][0] + m * (centroid.y * centroid.y + centroid.z * centroid.z),
+                inertia_centroid[0][1] - m * centroid.x * centroid.y,
+                inertia_centroid[0][2] - m * centroid.x * centroid.z,
+            ],
+            [
+                inertia_centroid[1][0] - m * centroid.y * centroid.x,
+                inertia_centroid[1][1] + m * (centroid.x * centroid.x + centroid.z * centroid.z),
+                inertia_centroid[1][2] - m * centroid.y * centroid.z,
+            ],
+            [
+                inertia_centroid[2][0] - m * centroid.z * centroid.x,
+                inertia_centroid[2][1] - m * centroid.z * centroid.y,
+                inertia_centroid[2][2] + m * (centroid.x * centroid.x + centroid.y * centroid.y),
+            ],
+        ];
+
+        if inertia_centroid.iter().flatten().any(|v| !v.is_finite())
+            || inertia_origin.iter().flatten().any(|v| !v.is_finite())
+            || !surface_area.is_finite()
+        {
+            return Err(BRepError::Overflow);
+        }
+
         Ok(SolidMoments {
             signed_volume,
             volume: signed_volume.abs(),
@@ -1432,6 +1482,25 @@ mod tests {
         ]);
         assert_eq!(solid.validate(tol()), Err(BRepError::UnsupportedBoolean));
         assert_eq!(solid.moments(tol()), Err(BRepError::UnsupportedBoolean));
+    }
+
+    #[test]
+    fn translated_tetra_moments_are_stable() {
+        let mut solid = tetra_brep();
+        let shift = Vec3::new(1.0e12, -1.0e12, 5.0e11);
+        for vertex in &mut solid.vertices {
+            vertex.point = vertex.point.add(shift);
+        }
+        for face in &mut solid.faces {
+            face.region.origin = face.region.origin.add(shift);
+        }
+
+        let moments = solid.moments(tol()).unwrap();
+        assert!((moments.volume - 1.0 / 6.0).abs() <= 1.0e-10);
+        assert!((moments.centroid.x - (1.0e12 + 0.25)).abs() <= 1.0e-3);
+        assert!((moments.centroid.y - (-1.0e12 + 0.25)).abs() <= 1.0e-3);
+        assert!((moments.centroid.z - (5.0e11 + 0.25)).abs() <= 1.0e-3);
+        assert!(moments.inertia_centroid.iter().flatten().all(|v| v.is_finite()));
     }
 
     #[test]

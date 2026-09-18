@@ -24,6 +24,10 @@ RUST_MANIFEST = ROOT / "kernel/native/Cargo.toml"
 CARGO_RESULT_RE = re.compile(
     r"test result: (?:ok|FAILED)\.\s+(\d+) passed;\s+(\d+) failed;\s+(\d+) ignored;\s+(\d+) measured;\s+(\d+) filtered out;"
 )
+DOTNET_SUMMARY_RE = re.compile(
+    r"Total tests:\s*(\d+).*?Passed:\s*(\d+).*?Failed:\s*(\d+).*?Skipped:\s*(\d+)",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 @dataclass
@@ -53,6 +57,7 @@ class Runner:
         timeout: int = 600,
         *,
         reject_ignored_rust_tests: bool = False,
+        reject_skipped_dotnet_tests: bool = False,
     ) -> bool:
         started = time.monotonic()
         self.log(f"RUN {name}: {' '.join(command)}")
@@ -94,6 +99,28 @@ class Runner:
                         "authoritative gates require zero ignored tests."
                     )
 
+        if reject_skipped_dotnet_tests:
+            summary = DOTNET_SUMMARY_RE.search(output)
+            if summary is None:
+                returncode = 1
+                output += "\nTEST GATE ERROR: .NET command produced no complete test-result summary."
+            else:
+                total, passed, failed, skipped = map(int, summary.groups())
+                if total == 0:
+                    returncode = 1
+                    output += "\nTEST GATE ERROR: .NET command reported zero executed tests."
+                if failed != 0:
+                    returncode = 1
+                if skipped != 0:
+                    returncode = 1
+                    output += (
+                        f"\nTEST GATE ERROR: .NET command reported {skipped} skipped tests; "
+                        "authoritative gates require zero skipped tests."
+                    )
+                if passed + failed + skipped > total:
+                    returncode = 1
+                    output += "\nTEST GATE ERROR: .NET test-result counters are inconsistent."
+
         duration = time.monotonic() - started
         self.results.append(Result(name, list(command), returncode, duration, output[-8000:]))
         if self.verbose or returncode != 0:
@@ -115,6 +142,61 @@ class Runner:
             raise FileNotFoundError("Required repository paths are missing:\n" + "\n".join(missing))
         self.log(f"repository root: {ROOT}")
         self.log("required repository paths: OK")
+
+    def discover_engineering_tests(self) -> bool:
+        name = "dotnet-engineering-discovery"
+        command = ["dotnet", "test", str(ENGINEERING_TEST_PROJECT), "--list-tests"]
+        started = time.monotonic()
+        self.log(name + ": " + " ".join(command))
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=ROOT,
+                env=os.environ.copy(),
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                timeout=900,
+                check=False,
+            )
+            output = completed.stdout or ""
+            returncode = completed.returncode
+        except subprocess.TimeoutExpired as exc:
+            returncode = 124
+            output = (exc.stdout or "") if isinstance(exc.stdout, str) else ""
+            output += "\nTIMEOUT after 900s"
+        except OSError as exc:
+            returncode = 127
+            output = "PROCESS ERROR: " + str(exc)
+        duration = time.monotonic() - started
+
+        listed_tests = re.findall(
+            r"^\s+UMLCAD\.Engineering\.Tests\.[^\r\n]+$",
+            output,
+            re.MULTILINE,
+        )
+        has_s1 = any(
+            "S1ProductionVerticalSliceTddTests." in test
+            for test in listed_tests
+        )
+        ok = returncode == 0 and len(listed_tests) > 0 and has_s1
+        if not ok and returncode == 0:
+            output += (
+                "\nDISCOVERY ERROR: Engineering test list did not expose the mandatory "
+                "S1ProductionVerticalSliceTddTests suite."
+            )
+        self.results.append(Result(name, command, returncode if ok else 1, duration, output[-8000:]))
+        if self.verbose or not ok:
+            print(output, end="" if output.endswith("\n") else "\n")
+        self.log(
+            ("PASS" if ok else "FAIL")
+            + " "
+            + name
+            + ": discovered "
+            + str(len(listed_tests))
+            + " tests"
+        )
+        return ok
 
     def discover_framework_tests(self) -> bool:
         name = "dotnet-framework-discovery"
@@ -543,22 +625,26 @@ def main() -> int:
                 reject_ignored_rust_tests=True,
             )
         passed &= runner.discover_framework_tests()
+        passed &= runner.discover_engineering_tests()
         runner.start_kernel()
         os.environ["UMLCAD_KERNEL_URL"] = DEFAULT_URL + "/"
         passed &= runner.run(
             "dotnet-framework-full-suite",
             ["dotnet", "test", str(FRAMEWORK_TEST_PROJECT)],
             900,
+            reject_skipped_dotnet_tests=True,
         )
         passed &= runner.run(
             "dotnet-engineering-foundation-suite",
             ["dotnet", "test", str(ENGINEERING_TEST_PROJECT)],
             900,
+            reject_skipped_dotnet_tests=True,
         )
         passed &= runner.run(
             "dotnet-kernel-blackbox-e2e",
             ["dotnet", "test", str(BLACKBOX_TEST_PROJECT)],
             900,
+            reject_skipped_dotnet_tests=True,
         )
         runner.stop_kernel()
         passed &= runner.run(

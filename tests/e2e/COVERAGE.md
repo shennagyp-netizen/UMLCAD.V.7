@@ -8,6 +8,7 @@ The integration gate deliberately has multiple boundaries. No single test substi
 | .NET Framework contract/unit layer | `dotnet/tests/UMLCAD.Framework.Tests` | Complete Framework test project, including semantic builds, compiled models, identity collisions, client behavior, adversarial cases, and real-kernel E2E tests |
 | Production .NET boundary | `dotnet/tests/UMLCAD.Kernel.Integration.Tests/KernelBlackBoxE2ETests.cs` | `RustKernelService` JSON/HTTP transport, compiled-model identity, graph nodes, diagnostics, concurrency, invalid geometry, stale references, malformed schema |
 | Process/wire boundary | `tests/e2e/run.py` | Real `kernel_host` lifecycle, readiness, cleanup, explicit repository-path validation, test discovery, unknown endpoint, malformed JSON, unsupported schema/geometry, aggregate failure reporting |
+| Typed CAD sketch solver boundary | `dotnet/tests/UMLCAD.Engineering.Tests/SketchEvaluationTransportTests.cs` + `tests/e2e/run.py` | Typed circle/constraint request mapping, deterministic result identity/evidence, invalid frame rejection, unsupported constraint rejection, repeated-request determinism |
 | Application path | `projects/demo/Demo.csproj -- --e2e` | Real Bench Vise semantic definition through package creation, Rust evaluation, compiled model validation, nested assembly assertions |
 
 ## Test discovery invariant

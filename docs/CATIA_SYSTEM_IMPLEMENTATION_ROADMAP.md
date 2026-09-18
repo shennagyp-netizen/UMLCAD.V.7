@@ -919,42 +919,7 @@ Product structure is part of the CAD Engineering Core.
 
 Assembly owns product/occurrence semantics:
 
-`
-Product
-SubProduct
-PartOccurrence
-PartDefinition
-OccurrenceTransform
-Configuration
-AssemblyConstraints
-EngineeringConnections
-FunctionalInterfaces
-`
-
-BOM is a CAD product-structure service/view over that authoritative structure.
-
-`
-Product Structure
-      ↓
-   BOM Service
-      ↓
-  ┌───┼───────────┐
-  ↓   ↓           ↓
-Drawing CAM      PLM/ERP
-`
-
-Manufacturing, drawing, PLM/ERP, purchasing, and service views may derive specialized BOM interpretations, but they do not redefine the underlying CAD product structure.
-
-The occurrence and the part definition are different identities. Repeated occurrences may share an evaluated part result while retaining occurrence-specific transform and context.
-
-Assembly-level features are semantic operations over product context, not unexplained shape mutations.
-
-
-Assembly is a semantic graph.
-
-It contains:
-
-```text
+```
 Product
 SubProduct
 PartOccurrence
@@ -965,17 +930,25 @@ AssemblyConstraints
 EngineeringConnections
 FunctionalInterfaces
 ContextualLinks
-BOM semantics
-Flexible behavior
 ```
 
-The occurrence and the part definition are different identities.
+BOM is a CAD product-structure service/view over that authoritative structure.
 
-Repeated occurrences may share one evaluated part result while retaining occurrence-specific transform and context.
+```
+Product Structure
+      ↓
+   BOM Service
+      ↓
+  ┌───┼───────────┐
+  ↓   ↓           ↓
+Drawing CAM      PLM/ERP
+```
 
-Assembly-level features must be modeled as semantic operations over a product context rather than as unexplained shape mutations.
+Manufacturing, drawing, PLM/ERP, purchasing, and service views may derive specialized BOM interpretations, but they do not redefine the underlying CAD product structure.
 
----
+The occurrence and the part definition are different identities. Repeated occurrences may share an evaluated part result while retaining occurrence-specific transform and context.
+
+Assembly-level features are semantic operations over product context, not unexplained shape mutations.
 
 # 14. CAM, Manufacturing, and G-code
 

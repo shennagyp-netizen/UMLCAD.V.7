@@ -85,6 +85,10 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
         ArgumentNullException.ThrowIfNull(machine);
         ArgumentNullException.ThrowIfNull(tool);
 
+        if (operation.Process is not ManufacturingProcessKind.Milling)
+            throw new NotSupportedException(
+                $"The deterministic G-code postprocessor currently supports only Milling; process '{operation.Process}' requires a dedicated postprocessor.");
+
         if (!machine.SupportsProcess(operation.Process, operation.StockThicknessMm))
             throw new InvalidOperationException(
                 $"Machine '{machine.MachineId}' does not support process '{operation.Process}' at stock thickness {operation.StockThicknessMm.ToString(CultureInfo.InvariantCulture)} mm.");
@@ -96,10 +100,6 @@ public sealed class DeterministicGCodePostprocessor : INcPostprocessor
         if (!MachineToolCompatibility.IsCompatible(machine, tool, operation.Process))
             throw new InvalidOperationException(
                 "Machine, tool, and manufacturing process are incompatible.");
-
-        if (operation.Process is not ManufacturingProcessKind.Milling)
-            throw new NotSupportedException(
-                $"The deterministic G-code postprocessor currently supports only Milling; process '{operation.Process}' requires a dedicated postprocessor.");
 
         var lines = new List<string>
         {

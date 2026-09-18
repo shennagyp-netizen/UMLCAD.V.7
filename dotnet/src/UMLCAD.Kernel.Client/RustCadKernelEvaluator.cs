@@ -9,18 +9,13 @@ namespace UMLCAD.Kernel.Client;
 /// </summary>
 public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
 {
-    private const double SelectorAbsoluteTolerance = 1e-9;
-    private const double SelectorRelativeTolerance = 1e-9;
+    private const double GeometryTolerance = 1e-9;
 
     private readonly IAuthoritativeGeometryService _boxGeometry;
-    private readonly IExtrusionGeometryService _extrusionGeometry;
 
-    public RustCadKernelEvaluator(
-        IAuthoritativeGeometryService boxGeometry,
-        IExtrusionGeometryService extrusionGeometry)
+    public RustCadKernelEvaluator(IAuthoritativeGeometryService boxGeometry)
     {
         _boxGeometry = boxGeometry ?? throw new ArgumentNullException(nameof(boxGeometry));
-        _extrusionGeometry = extrusionGeometry ?? throw new ArgumentNullException(nameof(extrusionGeometry));
     }
 
     public async Task<KernelEvaluationResponse> EvaluateAsync(
@@ -62,8 +57,8 @@ public sealed class RustCadKernelEvaluator : ICadKernelEvaluator
                     min,
                     max,
                     new KernelTolerance(
-                        SelectorAbsoluteTolerance,
-                        SelectorRelativeTolerance),
+                        GeometryTolerance,
+                        GeometryTolerance),
                     new ContractVersion("1.0")),
                 cancellationToken);
         }

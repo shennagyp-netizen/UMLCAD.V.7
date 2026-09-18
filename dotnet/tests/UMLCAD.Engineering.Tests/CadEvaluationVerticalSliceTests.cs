@@ -184,41 +184,6 @@ public sealed class CadEvaluationVerticalSliceTests
         public bool DuplicateTopFaces { get; init; }
         public List<string> EvaluatedFeatureIds { get; } = new();
 
-        public Task<ReferenceResolution> ResolveReferenceAsync(
-            CadReference reference,
-            AuthoritativeCadResult result,
-            CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var faces = result.Topology.Faces
-                .Where(face => face.Normal is { } normal &&
-                               Math.Abs(normal.X) < 1e-9 &&
-                               Math.Abs(normal.Y) < 1e-9 &&
-                               normal.Z > 0.999999)
-                .OrderBy(face => face.Id.Value, StringComparer.Ordinal)
-                .ToList();
-
-            if (DuplicateTopFaces)
-                faces.Add(faces.Single() with { Id = new TopologyEntityId("face:duplicate:+Z") });
-            if (ReverseFaceOrder)
-                faces.Reverse();
-
-            if (faces.Count == 0)
-                return Task.FromResult(new ReferenceResolution(
-                    reference, ReferenceResolutionStatus.Missing, Array.Empty<TopologyEntityId>(),
-                    "REFERENCE_MISSING", "No planar +Z face exists."));
-
-            if (faces.Count > 1)
-                return Task.FromResult(new ReferenceResolution(
-                    reference, ReferenceResolutionStatus.Ambiguous, faces.Select(x => x.Id).ToArray(),
-                    "REFERENCE_AMBIGUOUS", "More than one face matches the semantic selector."));
-
-            return Task.FromResult(new ReferenceResolution(
-                reference, ReferenceResolutionStatus.Resolved, new[] { faces[0].Id }, null,
-                "Unique planar +Z face selected by semantic predicate."));
-        }
-
         public Task<KernelEvaluationResponse> EvaluateAsync(
             KernelEvaluationRequest request,
             CancellationToken cancellationToken = default)
@@ -228,7 +193,11 @@ public sealed class CadEvaluationVerticalSliceTests
 
             var result = request.Feature switch
             {
-                BoxFeatureSpecification box => CreateResult(box.Id, 80_000d),
+                BoxFeatureSpecification box => CreateResult(
+                    box.Id,
+                    80_000d,
+                    ReverseFaceOrder,
+                    DuplicateTopFaces),
                 SketchFeatureSpecification => null,
                 ExtrusionFeatureSpecification extrusion => CreateResult(
                     extrusion.Id,
@@ -243,8 +212,13 @@ public sealed class CadEvaluationVerticalSliceTests
                 CadEvaluationStatus.Succeeded, result, Array.Empty<CadDiagnostic>()));
         }
 
-        private static AuthoritativeCadResult CreateResult(CadId featureId, double volume)
+        private static AuthoritativeCadResult CreateResult(
+            CadId featureId,
+            double volume,
+            bool reverseFaceOrder = false,
+            bool duplicateTopFaces = false)
         {
+            var resultId = new CadResultId($"result:{featureId.Value}");
             var faces = new[]
             {
                 Face("face:-X", featureId, resultId, -1, 0, 0, 0, 0, 0),
@@ -255,13 +229,24 @@ public sealed class CadEvaluationVerticalSliceTests
                 Face("face:+Z", featureId, resultId, 0, 0, 1, 50, 40, 10)
             };
 
+            var faceList = faces.ToList();
+            if (duplicateTopFaces)
+                faceList.Add(Face(
+                    "face:duplicate:+Z",
+                    featureId,
+                    resultId,
+                    0, 0, 1,
+                    50, 40, 10));
+            if (reverseFaceOrder)
+                faceList.Reverse();
+
             return new AuthoritativeCadResult(
                 resultId,
                 CadContractVersions.KernelEvaluation,
                 new CadBoundingBox3(0, 0, 0, 100, 80, 10),
                 volume,
                 19_600d,
-                new TopologySnapshot(CadContractVersions.KernelEvaluation, faces));
+                new TopologySnapshot(CadContractVersions.KernelEvaluation, faceList));
         }
 
         private static TopologyEntityResult Face(

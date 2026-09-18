@@ -363,11 +363,6 @@ public sealed record KernelEvaluationResponse(
 
 public interface ICadKernelEvaluator
 {
-    Task<ReferenceResolution> ResolveReferenceAsync(
-        CadReference reference,
-        AuthoritativeCadResult result,
-        CancellationToken cancellationToken = default);
-
     Task<KernelEvaluationResponse> EvaluateAsync(
         KernelEvaluationRequest request,
         CancellationToken cancellationToken = default);

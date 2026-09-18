@@ -36,9 +36,7 @@ public sealed class RustCadKernelEvaluatorTests
                 new KernelVector3(11d, 21.5d, 32d),
                 Array.Empty<string>()));
 
-        var evaluator = new RustCadKernelEvaluator(
-            geometry,
-            new UnusedExtrusionGeometryService());
+        var evaluator = new RustCadKernelEvaluator(geometry);
 
         var response = await evaluator.EvaluateAsync(
             new KernelEvaluationRequest(
@@ -97,7 +95,7 @@ public sealed class RustCadKernelEvaluatorTests
                     52d,
                     new KernelVector3(1d, 1.5d, 2d),
                     Array.Empty<string>())),
-            new UnusedExtrusionGeometryService());
+            );
 
         var evaluation = await evaluator.EvaluateAsync(
             new KernelEvaluationRequest(
@@ -310,14 +308,4 @@ public sealed class RustCadKernelEvaluatorTests
         }
     }
 
-    private sealed class UnusedExtrusionGeometryService : IExtrusionGeometryService
-    {
-        public Task<ExtrusionKernelResult> ExtrudeConvexPlanarProfileAsync(
-            ExtrusionRequest request,
-            CancellationToken cancellationToken = default)
-        {
-            throw new InvalidOperationException(
-                "The first certified adapter subset must not invoke the extrusion service.");
-        }
-    }
 }

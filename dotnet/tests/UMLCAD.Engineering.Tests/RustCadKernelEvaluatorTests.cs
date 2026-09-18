@@ -159,6 +159,91 @@ public sealed class RustCadKernelEvaluatorTests
     }
 
     [Fact]
+    public async Task ProductionAdapterDispatchesSketchToTypedSolver()
+    {
+        var feature = new SketchFeatureSpecification(
+            new CadId("sketch"),
+            new CadReference(
+                new CadId("support"),
+                ReferenceKind.Support,
+                new CadId("box"),
+                TopologySelector.PlanarFaceByNormalAndPoint(
+                    new CadVector3(0d, 0d, 1d),
+                    new CadVector3(1d, 1.5d, 4d)),
+                new ReferenceContext(CadFrameKind.Part, "default")),
+            new CadFrame(new CadId("sketch-frame"), CadFrameKind.Sketch, 0d, 0d, 4d),
+            new[]
+            {
+                new SketchCircle(new CadId("circle-a"), 0d, 0d, 1d)
+            },
+            new[]
+            {
+                new SketchConstraintSpecification(
+                    new CadId("fixed-a"),
+                    SketchConstraintKind.Fixed,
+                    new CadId("circle-a"))
+            });
+
+        var sketchSolver = new RecordingSketchConstraintService(
+            new SketchSolveKernelResult(
+                GeometryKernelStatus.Succeeded,
+                true,
+                "converged",
+                0,
+                0d,
+                0d,
+                0d,
+                0d,
+                0d,
+                3,
+                0,
+                0,
+                3,
+                1d,
+                new[] { new SketchSolvedCircle("circle-a", 0d, 0d, 1d) },
+                Array.Empty<string>()));
+
+        var evaluator = new RustCadKernelEvaluator(
+            new RecordingBoxGeometryService(
+                new AxisAlignedBoxSolidKernelResult(
+                    GeometryKernelStatus.Succeeded,
+                    new ContractResultId("solid:unused"),
+                    "evidence:unused",
+                    new[]
+                    {
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_bottom"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_top"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_back"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_front"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_left"),
+                        new AxisAlignedBoxSolidKernelTopology("Face", "f_right")
+                    },
+                    24d,
+                    52d,
+                    new KernelVector3(1d, 1.5d, 2d),
+                    Array.Empty<string>())),
+            sketchSolver);
+
+        var response = await evaluator.EvaluateAsync(
+            new KernelEvaluationRequest(
+                new CadId("sketch-evaluation-001"),
+                feature,
+                null,
+                Array.Empty<ReferenceResolution>(),
+                Array.Empty<CadFeatureEvaluationResult>())
+            {
+                Tolerance = new KernelTolerance(1e-9, 2e-9)
+            });
+
+        Assert.Equal(CadEvaluationStatus.Succeeded, response.Status);
+        Assert.Null(response.AuthoritativeResult);
+        Assert.NotNull(response.SketchSolve);
+        Assert.Equal("converged", response.SketchSolve!.Reason);
+        Assert.Equal("sketch-evaluation-001", sketchSolver.LastRequest!.OperationIdentity);
+        Assert.Equal(new KernelTolerance(1e-9, 2e-9), sketchSolver.LastRequest.Tolerance);
+    }
+
+    [Fact]
     public void SemanticPlanarFaceReferenceResolvesIndependentOfTopologyArrayOrder()
     {
         var box = new BoxFeatureSpecification(
@@ -388,6 +473,21 @@ public sealed class RustCadKernelEvaluatorTests
             HttpRequestMessage request,
             CancellationToken cancellationToken) =>
             responder(request);
+    }
+
+    private sealed class RecordingSketchConstraintService(
+        SketchSolveKernelResult result) : ISketchConstraintService
+    {
+        public SketchSolveRequest? LastRequest { get; private set; }
+
+        public Task<SketchSolveKernelResult> SolveAsync(
+            SketchSolveRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            LastRequest = request;
+            return Task.FromResult(result);
+        }
     }
 
     private sealed class RecordingBoxGeometryService(

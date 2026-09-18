@@ -79,6 +79,70 @@ public sealed class SketchConstraintAdapterTests
     }
 
     [Fact]
+    public void SketchSolveRequestCanonicalizesNonSemanticCollectionOrder()
+    {
+        var first = new SketchSolveRequest(
+            "same-operation",
+            new[]
+            {
+                new SketchKernelCircle("circle-b", 2d, 3d, 1d),
+                new SketchKernelCircle("circle-a", 1d, 2d, 2d),
+            },
+            new[]
+            {
+                new SketchKernelFixedConstraint("fixed-b", "circle-b"),
+                new SketchKernelFixedConstraint("fixed-a", "circle-a"),
+            },
+            new KernelTolerance(1e-9, 1e-9),
+            KernelSolveOptions.Default);
+
+        var second = new SketchSolveRequest(
+            "same-operation",
+            new[]
+            {
+                new SketchKernelCircle("circle-a", 1d, 2d, 2d),
+                new SketchKernelCircle("circle-b", 2d, 3d, 1d),
+            },
+            new[]
+            {
+                new SketchKernelFixedConstraint("fixed-a", "circle-a"),
+                new SketchKernelFixedConstraint("fixed-b", "circle-b"),
+            },
+            new KernelTolerance(1e-9, 1e-9),
+            KernelSolveOptions.Default);
+
+        Assert.Equal(first.Circles, second.Circles);
+        Assert.Equal(first.FixedConstraints, second.FixedConstraints);
+    }
+
+    [Fact]
+    public void SketchSolveRequestRejectsDuplicateAndStaleConstraintReferences()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new SketchSolveRequest(
+                "duplicate-circle",
+                new[]
+                {
+                    new SketchKernelCircle("circle-a", 0d, 0d, 1d),
+                    new SketchKernelCircle("circle-a", 1d, 0d, 1d),
+                },
+                Array.Empty<SketchKernelFixedConstraint>(),
+                new KernelTolerance(1e-9, 1e-9),
+                KernelSolveOptions.Default));
+
+        Assert.Throws<ArgumentException>(() =>
+            new SketchSolveRequest(
+                "stale-reference",
+                new[] { new SketchKernelCircle("circle-a", 0d, 0d, 1d) },
+                new[]
+                {
+                    new SketchKernelFixedConstraint("fixed-a", "missing-circle")
+                },
+                new KernelTolerance(1e-9, 1e-9),
+                KernelSolveOptions.Default));
+    }
+
+    [Fact]
     public async Task RustSketchConstraintAdapterFailsClosedOnInconsistentStatus()
     {
         const string json = """

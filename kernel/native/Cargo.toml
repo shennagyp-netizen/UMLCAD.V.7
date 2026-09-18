@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 path = "src/lib.rs"
 
+[features]
+default = []
+cuda-hardware = []
+
 [dependencies]
 sha2 = "0.10"
 nalgebra = "0.33"

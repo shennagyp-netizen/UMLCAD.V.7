@@ -337,6 +337,7 @@ kernel void candidate_pairs(
                 )
             };
 
+            let upload_start = Instant::now();
             let min_buffer = buffer_from_bytes(&self.device, mins_bytes)?;
             let max_buffer = buffer_from_bytes(&self.device, maxs_bytes)?;
             let count_bytes = (n as u32).to_ne_bytes();
@@ -347,6 +348,7 @@ kernel void candidate_pairs(
                     .checked_mul(std::mem::size_of::<u32>())
                     .ok_or(MetalError::OutputOverflow)?,
             )?;
+            let buffer_upload_setup = upload_start.elapsed();
 
             let gpu_start = Instant::now();
             let command_buffer = self
@@ -383,7 +385,7 @@ kernel void candidate_pairs(
 
             command_buffer.commit();
             command_buffer.waitUntilCompleted();
-            let gpu_round_trip = gpu_start.elapsed();
+            let device_execution = gpu_start.elapsed();
 
             if command_buffer.status() != objc2_metal::MTLCommandBufferStatus::Completed {
                 let message = command_buffer
@@ -393,6 +395,7 @@ kernel void candidate_pairs(
                 return Err(MetalError::CommandFailed(message));
             }
 
+            let readback_start = Instant::now();
             let mut candidates = Vec::new();
             unsafe {
                 let flags = std::slice::from_raw_parts(
@@ -409,6 +412,7 @@ kernel void candidate_pairs(
                     }
                 }
             }
+            let buffer_readback = readback_start.elapsed();
 
             let postprocess_start = Instant::now();
 
@@ -429,7 +433,9 @@ kernel void candidate_pairs(
 
             Ok((candidates, MetalCandidateTiming {
                 host_prepare,
-                gpu_round_trip,
+                buffer_upload_setup,
+                device_execution,
+                buffer_readback,
                 cpu_postprocess,
             }))
         }

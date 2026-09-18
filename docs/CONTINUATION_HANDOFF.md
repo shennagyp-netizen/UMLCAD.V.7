@@ -115,7 +115,7 @@ The certified scope is adaptive curve/surface tessellation; convex line/arc trim
 
 The closure deliberately excludes general concave/holed/freeform trim filling, exact curvature-bound certification, and OBB as a semantic requirement. OBB is deferred because the current certified acceleration workload has no measured need that justifies another numerical authority.
 
-Before merging, exact-head Rust and comprehensive E2E/red-team validation must pass on `0db7d42694465b9d7146c90b99ba1c62c51fdc11`. The immediately preceding head `f585dddc83471556fc8950e9138cd53f05bb6261` was already green in both authoritative gates.
+Exact-head Rust and comprehensive E2E/red-team validation are green on `c9e542bb99122fa15fb86e8e86049de1b8ee5ca8`. The immediately preceding implementation head `f585dddc83471556fc8950e9138cd53f05bb6261` was also green in both authoritative gates.
 
 ## M9 completion boundary
 

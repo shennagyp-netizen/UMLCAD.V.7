@@ -433,4 +433,54 @@ mod tests {
             Err(MetalError::UnsupportedPlatform)
         );
     }
+
+    #[test]
+    #[cfg(target_os = "macos")]
+    fn metal_candidate_pairs_match_cpu_overlap_subset() {
+        let boxes = vec![
+            Aabb3::new(
+                super::Vec3::new(0.0, 0.0, 0.0),
+                super::Vec3::new(1.0, 1.0, 1.0),
+            )
+            .unwrap(),
+            Aabb3::new(
+                super::Vec3::new(0.5, 0.5, 0.5),
+                super::Vec3::new(2.0, 2.0, 2.0),
+            )
+            .unwrap(),
+            Aabb3::new(
+                super::Vec3::new(3.0, 3.0, 3.0),
+                super::Vec3::new(4.0, 4.0, 4.0),
+            )
+            .unwrap(),
+            Aabb3::new(
+                super::Vec3::new(1.0e12, 1.0e12, 1.0e12),
+                super::Vec3::new(1.0e12 + 1.0e5, 1.0e12 + 1.0e5, 1.0e12 + 1.0e5),
+            )
+            .unwrap(),
+            Aabb3::new(
+                super::Vec3::new(1.0e12 + 5.0e4, 1.0e12 + 5.0e4, 1.0e12 + 5.0e4),
+                super::Vec3::new(1.0e12 + 2.0e5, 1.0e12 + 2.0e5, 1.0e12 + 2.0e5),
+            )
+            .unwrap(),
+        ];
+
+        let backend = MetalBackend::new().expect("Metal device and pipeline");
+        let actual = backend.candidate_pairs(&boxes).expect("Metal candidate pass");
+
+        let actual_set = actual.iter().copied().collect::<std::collections::BTreeSet<_>>();
+        for i in 0..boxes.len() {
+            for j in (i + 1)..boxes.len() {
+                if boxes[i].intersects(boxes[j], 0.0) {
+                    assert!(
+                        actual_set.contains(&(i, j)),
+                        "Metal omitted exact CPU overlap pair ({i}, {j})"
+                    );
+                }
+            }
+        }
+
+        let repeat = backend.candidate_pairs(&boxes).expect("repeat Metal candidate pass");
+        assert_eq!(actual, repeat);
+    }
 }

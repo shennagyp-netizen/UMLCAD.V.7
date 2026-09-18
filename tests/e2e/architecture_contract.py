@@ -24,6 +24,11 @@ PROJECTS = {
     "UMLCAD.Cad.Semantics": SRC / "UMLCAD.Cad.Semantics" / "UMLCAD.Cad.Semantics.csproj",
     "UMLCAD.Cad.Contracts": SRC / "UMLCAD.Cad.Contracts" / "UMLCAD.Cad.Contracts.csproj",
     "UMLCAD.Cad.Engine": SRC / "UMLCAD.Cad.Engine" / "UMLCAD.Cad.Engine.csproj",
+    "UMLCAD.Science": SRC / "UMLCAD.Science" / "UMLCAD.Science.csproj",
+    "UMLCAD.Engineering.Resources": SRC / "UMLCAD.Engineering.Resources" / "UMLCAD.Engineering.Resources.csproj",
+    "UMLCAD.Engineering.SheetMetal": SRC / "UMLCAD.Engineering.SheetMetal" / "UMLCAD.Engineering.SheetMetal.csproj",
+    "UMLCAD.Engineering.Cam": SRC / "UMLCAD.Engineering.Cam" / "UMLCAD.Engineering.Cam.csproj",
+    "UMLCAD.Engineering.Drawing": SRC / "UMLCAD.Engineering.Drawing" / "UMLCAD.Engineering.Drawing.csproj",
     "UMLCAD.Framework": SRC / "UMLCAD.Framework" / "UMLCAD.Framework.csproj",
     "UMLCAD.Kernel.Client": SRC / "UMLCAD.Kernel.Client" / "UMLCAD.Kernel.Client.csproj",
 }
@@ -43,6 +48,28 @@ EXPECTED_REFERENCES = {
         "UMLCAD.Cad.Expressions",
         "UMLCAD.Cad.Semantics",
         "UMLCAD.Cad.Contracts",
+    },
+    "UMLCAD.Science": {"UMLCAD.Cad.Expressions"},
+    "UMLCAD.Engineering.Resources": {
+        "UMLCAD.Cad.Expressions",
+        "UMLCAD.Science",
+    },
+    "UMLCAD.Engineering.SheetMetal": {
+        "UMLCAD.Cad.Expressions",
+        "UMLCAD.Cad.Semantics",
+        "UMLCAD.Science",
+        "UMLCAD.Engineering.Resources",
+    },
+    "UMLCAD.Engineering.Cam": {
+        "UMLCAD.Cad.Expressions",
+        "UMLCAD.Cad.Semantics",
+        "UMLCAD.Science",
+        "UMLCAD.Engineering.Resources",
+    },
+    "UMLCAD.Engineering.Drawing": {
+        "UMLCAD.Cad.Expressions",
+        "UMLCAD.Cad.Semantics",
+        "UMLCAD.Science",
     },
     "UMLCAD.Kernel.Client": {"UMLCAD.Cad.Contracts"},
 }
@@ -70,6 +97,42 @@ FORBIDDEN_TARGETS = {
     "UMLCAD.Cad.Engine": {
         "UMLCAD.Framework",
         "UMLCAD.Kernel.Client",
+    },
+    "UMLCAD.Science": {
+        "UMLCAD.Framework",
+        "UMLCAD.Kernel.Client",
+        "UMLCAD.Cad.Semantics",
+        "UMLCAD.Cad.Contracts",
+        "UMLCAD.Cad.Engine",
+        "UMLCAD.Engineering.Resources",
+        "UMLCAD.Engineering.SheetMetal",
+        "UMLCAD.Engineering.Cam",
+        "UMLCAD.Engineering.Drawing",
+    },
+    "UMLCAD.Engineering.Resources": {
+        "UMLCAD.Framework",
+        "UMLCAD.Kernel.Client",
+        "UMLCAD.Engineering.SheetMetal",
+        "UMLCAD.Engineering.Cam",
+        "UMLCAD.Engineering.Drawing",
+    },
+    "UMLCAD.Engineering.SheetMetal": {
+        "UMLCAD.Framework",
+        "UMLCAD.Kernel.Client",
+        "UMLCAD.Engineering.Cam",
+        "UMLCAD.Engineering.Drawing",
+    },
+    "UMLCAD.Engineering.Cam": {
+        "UMLCAD.Framework",
+        "UMLCAD.Kernel.Client",
+        "UMLCAD.Engineering.SheetMetal",
+        "UMLCAD.Engineering.Drawing",
+    },
+    "UMLCAD.Engineering.Drawing": {
+        "UMLCAD.Framework",
+        "UMLCAD.Kernel.Client",
+        "UMLCAD.Engineering.SheetMetal",
+        "UMLCAD.Engineering.Cam",
     },
 }
 
@@ -297,6 +360,11 @@ def validate_repository_projection(manifest: dict[str, Any]) -> list[str]:
         "UMLCAD.Cad.Semantics",
         "UMLCAD.Cad.Contracts",
         "UMLCAD.Cad.Engine",
+        "UMLCAD.Science",
+        "UMLCAD.Engineering.Resources",
+        "UMLCAD.Engineering.SheetMetal",
+        "UMLCAD.Engineering.Cam",
+        "UMLCAD.Engineering.Drawing",
     )
     for name in new_layers:
         for source in source_files(PROJECTS[name]):

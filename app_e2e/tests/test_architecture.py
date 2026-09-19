@@ -23,9 +23,8 @@ KERNEL_IMPLEMENTATION_MARKERS = (
     "kernel_host",
     "v1/build/evaluate",
     "UMLCAD_KERNEL_URL",
-    "System.Net.Http",
-    "HttpClient",
-    "PostAsJsonAsync",
+    "127.0.0.1:8080",
+    "/v1/build/evaluate",
 )
 
 NATIVE_KERNEL_MARKERS = (

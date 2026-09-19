@@ -129,6 +129,18 @@ public sealed class EngineeringRuleRuntime
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(services);
 
+        if (services.Cad is not ITransactionalCadControlService transaction)
+        {
+            return new EngineeringRuleResult(
+                EngineeringRuleOutcomeKind.Failed,
+                [
+                    new EngineeringDiagnostic(
+                        "ENGINEERING_TRANSACTION_UNAVAILABLE",
+                        "The engineering rule runtime requires a transactional CAD control service.",
+                        [])
+                ]);
+        }
+
         EngineeringRuleResult result;
         try
         {
@@ -136,12 +148,12 @@ public sealed class EngineeringRuleRuntime
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            services.Cad.Rollback();
+            transaction.Rollback();
             throw;
         }
         catch (Exception exception)
         {
-            services.Cad.Rollback();
+            transaction.Rollback();
 
             return new EngineeringRuleResult(
                 EngineeringRuleOutcomeKind.Failed,
@@ -155,15 +167,15 @@ public sealed class EngineeringRuleRuntime
 
         if (result.RequiresRollback)
         {
-            services.Cad.Rollback();
+            transaction.Rollback();
             return result;
         }
 
-        var commit = services.Cad.Commit();
+        var commit = transaction.Commit();
         if (commit.Status is CadCommandStatus.Accepted)
             return result;
 
-        services.Cad.Rollback();
+        transaction.Rollback();
 
         return new EngineeringRuleResult(
             EngineeringRuleOutcomeKind.Failed,
@@ -173,5 +185,6 @@ public sealed class EngineeringRuleRuntime
                     commit.Message ?? "CAD transaction commit failed.",
                     commit.TargetId is CadId target ? [target] : [])
             ]);
+    }
     }
 }

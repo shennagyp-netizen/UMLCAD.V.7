@@ -1,0 +1,21 @@
+name: Application architecture gate
+
+on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+  pull_request:
+
+jobs:
+  application-architecture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Run Application Layer architecture gate
+        run: python3 app_e2e/run.py

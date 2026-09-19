@@ -27,7 +27,7 @@ public sealed class ApplicationCompositionTests
             BaseAddress = new Uri("http://127.0.0.1/")
         };
 
-        var application = new UmlcadApplication(new UmlcadKernel(client));
+        using var application = UmlcadApplication.ForTest(UmlcadKernel.ForTest(new StubHandler(HttpStatusCode.OK, response)));
 
         const string semantic = """{"parts":[]}""";
         var definition = new CadBuildDefinition(

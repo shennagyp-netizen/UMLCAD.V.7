@@ -677,7 +677,7 @@ A drawing contains stable sheets, part references, and settings. Sheets contain 
 
 \chapter{New Application Layer: \texttt{app/}}
 
-The \texttt{app/} tree is the new Application Layer. It is separate from the legacy \texttt{dotnet/} implementation and must not simply reproduce the legacy class model under new namespaces.
+The \texttt{app/} tree is the rebuilt Application Layer. It is separate from the legacy \texttt{dotnet/} implementation and is implemented around typed semantic operation/result composition rather than a traditional CAD Feature Tree.
 
 The purpose of this layer is to provide a programmable System-CAD environment in which typed semantic objects, engineering rules, scientific services and domain operations are composed through deterministic execution pipelines.
 
@@ -690,8 +690,8 @@ Library & Intended responsibility & Current state \\
 \texttt{UMLCAD.Kernel} & Single concrete gateway to the UMLCAD kernel; bounded transport, cancellation and result validation. & Foundation implemented. \\
 \texttt{UMLCAD.Cad.Contracts} & Shared immutable CAD build/package/result contracts. & Foundation implemented. \\
 \texttt{UMLCAD.Cad.Expressions} & Deterministic typed expression values and identities. & Initial implementation. \\
-\texttt{UMLCAD.Cad.Semantics} & Part, Body, Sketch, References/Publications, Parameters/Expressions, Operations, Results and topology provenance. & \textbf{Incomplete}; current feature model is scaffold only. \\
-\texttt{UMLCAD.Cad.Engine} & Functional pipeline evaluation, dependency planning, invalidation, caching and result integration. & Foundation exists; semantic model must be rebuilt around operations/results. \\
+\texttt{UMLCAD.Cad.Semantics} & Part, Body, Sketch, References/Publications, Parameters/Expressions, Operations, Results and topology provenance. & \textbf{First semantic core implemented}; broader operation coverage remains incremental. \\
+\texttt{UMLCAD.Cad.Engine} & Functional operation/result evaluation, dependency planning, invalidation, deterministic identities, incremental reuse and kernel boundary. & \textbf{First vertical engine implemented}. \\
 \texttt{UMLCAD.Science} & Phenomena, simulation requests/results, spatial regions and fields. & Initial contracts implemented. \\
 \texttt{UMLCAD.Engineering.Resources} & Machines, tools, fixtures, processes and capabilities. & Project shell; domain not implemented. \\
 \texttt{UMLCAD.Engineering.SheetMetal} & Sheet-metal operations and manufacturing semantics. & Project shell; domain not implemented. \\
@@ -747,11 +747,22 @@ Operation & Result \\
 
 These are semantic transformations, not prescribed inheritance classes.
 
-\section{Corrective statement about the current scaffold}
+\section{Rebuild status and architectural rule}
 
-The current file \texttt{app/framework/libraries/UMLCAD.Cad.Semantics/CadDocument.cs} still contains \texttt{CadFeatureDefinition}, \texttt{CadFeatureKind}, and the command names \texttt{AddFeature}, \texttt{RemoveFeature}, and \texttt{RenameFeature}. These are transitional scaffolding.
+The previous experimental \texttt{CadDocument}/\texttt{CadFeatureDefinition} implementation has been moved to \texttt{app_old/}. It is not part of the active Application Layer.
 
-The active implementation must continue expanding typed Part/Body/Sketch/Reference/Publication/Parameter/Operation/Result objects and the functional evaluation pipeline defined here. No new traditional Feature hierarchy is permitted.
+The active implementation is based on typed Part/Body/Sketch/Reference/Publication/Parameter/Operation/Result objects. Operations consume earlier operation results and produce the next result. No traditional Feature hierarchy is permitted in active \texttt{app/} code.
+
+The implemented first vertical path is:
+\begin{lstlisting}
+Part
+ -> Sketch
+     -> SketchResult
+ -> Extrusion(SketchResult)
+     -> BodyResult_1
+ -> Hole(BodyResult_1)
+     -> BodyResult_2 = Current Body
+\end{lstlisting}
 
 \section{Application Layer to kernel}
 
@@ -800,7 +811,7 @@ Create Part
  -> assert deterministic new final-body identity
 \end{lstlisting}
 
-Until this path exists as real production code plus tests, the new Application Layer is a foundation/scaffold rather than a complete System-CAD implementation.
+The first semantic vertical path now exists as production Application Layer code plus xUnit tests with an injected kernel boundary. The real operation-level Rust endpoint remains a separate integration increment; the Application Layer does not falsely map the existing legacy build-package endpoint to the new operation contract.
 
 
 \chapter{Compiled Model Contract}

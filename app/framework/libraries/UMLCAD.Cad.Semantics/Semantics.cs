@@ -291,7 +291,7 @@ public abstract record CadOperation(
         foreach (var reference in References.OrderBy(x => x.Id.Value, StringComparer.Ordinal))
             builder.Append("reference=").Append(reference.Id.Value)
                 .Append(':').Append(reference.TargetKind)
-                .Append(':').Append(reference.ResultId?.Value ?? "-")
+                .Append(':').Append(reference.TargetOperationId?.Value ?? "-")
                 .Append(':').Append(reference.TopologyKind ?? "-")
                 .Append(':').Append(reference.TopologyKey ?? "-")
                 .Append(':').Append(reference.PublicationId?.Value ?? "-")
@@ -415,6 +415,33 @@ public sealed record CadPartDefinition(
         var bodyIds = Bodies.Select(x => x.Id).ToHashSet();
         if (Operations.Any(x => !bodyIds.Contains(x.BodyId)))
             throw new ArgumentException("Operation references an undeclared body.");
+        var operationIds = Operations.Select(x => x.Id).ToHashSet();
+        var parameterNames = Parameters.Select(x => x.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var missingParameters = Operations
+            .SelectMany(x => x.ParameterNames)
+            .Distinct(StringComparer.Ordinal)
+            .Where(name => !parameterNames.Contains(name))
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        if (missingParameters.Length > 0)
+            throw new ArgumentException(
+                "Operations reference undeclared parameters: " +
+                string.Join(", ", missingParameters));
+
+        var invalidPublications = Publications
+            .Where(x => !operationIds.Contains(x.SourceOperationId))
+            .Select(x => x.Id.Value)
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToArray();
+
+        if (invalidPublications.Length > 0)
+            throw new ArgumentException(
+                "Publications reference undeclared source operations: " +
+                string.Join(", ", invalidPublications));
+
     }
 
     private static void EnsureUnique<T>(IEnumerable<T> values, string kind)

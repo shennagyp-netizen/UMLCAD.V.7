@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>UMLCAD.Engineering.Resources</RootNamespace>
+    <AssemblyName>UMLCAD.Engineering.Resources</AssemblyName>
+    <Description>Shared engineering resources: machines, tools, fixtures, processes, and capabilities.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" />
+    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
+  </ItemGroup>
+</Project>

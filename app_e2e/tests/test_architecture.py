@@ -8,13 +8,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-DOTNET_ROOT = ROOT / "dotnet"
-SOURCE_ROOT = DOTNET_ROOT / "src"
-TEST_ROOT = DOTNET_ROOT / "tests"
+SOURCE_ROOT = ROOT / "app" / "framework" / "libraries"
+FRAMEWORK_TEST_ROOT = ROOT / "app" / "framework" / "tests"
+APPLICATION_ROOT = ROOT / "app" / "application"
 
-# Transitional implementation name. The architecture contract is "exactly one gateway";
-# migration may rename this project to UMLCAD.Kernel without changing the rule.
-KERNEL_GATEWAY_NAMES = {"UMLCAD.Kernel.Client"}
+# Exactly one production .NET library is the kernel gateway.
+KERNEL_GATEWAY_NAMES = {"UMLCAD.Kernel"}
 
 KERNEL_IMPLEMENTATION_MARKERS = (
     "RustKernelService",
@@ -24,6 +23,9 @@ KERNEL_IMPLEMENTATION_MARKERS = (
     "kernel_host",
     "v1/build/evaluate",
     "UMLCAD_KERNEL_URL",
+    "System.Net.Http",
+    "HttpClient",
+    "PostAsJsonAsync",
 )
 
 NATIVE_KERNEL_MARKERS = (
@@ -34,9 +36,9 @@ NATIVE_KERNEL_MARKERS = (
 )
 
 DIRECT_KERNEL_PROCESS_PATTERNS = (
-    re.compile(r"cargo\\s+(?:run|test).*kernel_host", re.IGNORECASE),
-    re.compile(r"Process\\.Start(?:AsUser|Async)?[^\\n]*kernel_host", re.IGNORECASE),
-    re.compile(r"(?:DllImport|LibraryImport)[^\\n]*(?:kernel|uml?cad)", re.IGNORECASE),
+    re.compile(r"cargo\s+(?:run|test).*kernel_host", re.IGNORECASE),
+    re.compile(r"Process\.Start(?:AsUser|Async)?[^\n]*kernel_host", re.IGNORECASE),
+    re.compile(r"(?:DllImport|LibraryImport)[^\n]*(?:kernel|uml?cad)", re.IGNORECASE),
 )
 
 
@@ -94,13 +96,11 @@ def load_projects() -> dict[Path, Project]:
         )
 
     if not projects:
-        raise AssertionError("No production .NET projects were discovered under dotnet/src.")
+        raise AssertionError(
+            "No production .NET framework libraries were discovered under app/framework/libraries."
+        )
 
     return projects
-
-
-def application_project_set(projects: dict[Path, Project]) -> set[Path]:
-    return set(projects)
 
 
 def cycle_in_graph(projects: dict[Path, Project]) -> list[Path] | None:
@@ -114,6 +114,7 @@ def cycle_in_graph(projects: dict[Path, Project]) -> list[Path] | None:
         for target in projects[node].references:
             if target not in projects:
                 continue
+
             if state[target] == 0:
                 cycle = visit(target)
                 if cycle is not None:
@@ -147,54 +148,111 @@ class ApplicationArchitectureTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.projects = load_projects()
-        cls.application_projects = application_project_set(cls.projects)
 
-    def test_all_production_dotnet_projects_are_application_layer_projects(self) -> None:
-        source_projects = sorted(self.projects)
+    def test_all_production_projects_are_application_framework_libraries(self) -> None:
         unexpected = [
-            project
-            for project in source_projects
+            project for project in self.projects
             if not is_under(project, SOURCE_ROOT.resolve())
         ]
-        self.assertFalse(unexpected, "Production .NET projects escaped dotnet/src: " + ", ".join(map(str, unexpected)))
-
-        stray_projects = [
-            project
-            for project in DOTNET_ROOT.rglob("*.csproj")
-            if not is_under(project.resolve(), SOURCE_ROOT.resolve())
-            and not is_under(project.resolve(), TEST_ROOT.resolve())
-        ]
         self.assertFalse(
-            stray_projects,
-            "A .NET project exists outside the declared Application Layer or test tree: "
-            + ", ".join(map(str, sorted(stray_projects))),
+            unexpected,
+            "Production framework projects escaped app/framework/libraries: "
+            + ", ".join(map(str, unexpected)),
         )
 
-    def test_project_references_never_escape_application_layer(self) -> None:
+    def test_framework_test_tree_exists_and_is_separate(self) -> None:
+        self.assertTrue(
+            FRAMEWORK_TEST_ROOT.is_dir(),
+            f"Framework tests must live under {FRAMEWORK_TEST_ROOT.relative_to(ROOT)}.",
+        )
+
+        framework_tests = list(FRAMEWORK_TEST_ROOT.rglob("*.csproj"))
+        self.assertTrue(
+            framework_tests,
+            "At least one .NET framework test project is required under app/framework/tests.",
+        )
+
+        misplaced = [
+            path for path in framework_tests
+            if is_under(path.resolve(), SOURCE_ROOT.resolve())
+        ]
+        self.assertFalse(
+            misplaced,
+            "Framework tests may not live inside production library directories: "
+            + ", ".join(map(str, misplaced)),
+        )
+
+    def test_application_hosts_exist_outside_framework(self) -> None:
+        application_projects = sorted(APPLICATION_ROOT.rglob("*.csproj"))
+        self.assertTrue(
+            application_projects,
+            "At least one application host is required under app/application.",
+        )
+
+        misplaced = [
+            project for project in application_projects
+            if is_under(project.resolve(), SOURCE_ROOT.resolve())
+            or is_under(project.resolve(), FRAMEWORK_TEST_ROOT.resolve())
+        ]
+        self.assertFalse(
+            misplaced,
+            "Application hosts/demos must remain outside app/framework: "
+            + ", ".join(map(str, misplaced)),
+        )
+
+    def test_new_application_tree_has_no_legacy_dotnet_project_reference(self) -> None:
+        legacy_root = ROOT / "dotnet"
+        violations: list[str] = []
+
+        for project in sorted((ROOT / "app").rglob("*.csproj")):
+            tree = ET.parse(project)
+
+            for element in tree.getroot().iter():
+                if local_name(element.tag) != "ProjectReference":
+                    continue
+
+                include = element.attrib.get("Include", "")
+                target = (project.parent / include).resolve()
+
+                if is_under(target, legacy_root.resolve()):
+                    violations.append(
+                        f"{project.relative_to(ROOT)} -> {target.relative_to(ROOT)}"
+                    )
+
+        self.assertFalse(
+            violations,
+            "The new Application Layer must not reference legacy dotnet projects:\n"
+            + "\n".join(violations),
+        )
+
+    def test_project_references_are_internal_and_acyclic(self) -> None:
         violations: list[str] = []
 
         for project in self.projects.values():
             for target in project.references:
-                if target not in self.application_projects:
+                if target not in self.projects:
                     violations.append(f"{project.name} -> {target}")
 
         self.assertFalse(
             violations,
-            "Production ProjectReference escapes dotnet/src or resolves to an unknown project:\n"
+            "Production framework ProjectReference escapes app/framework/libraries:\n"
             + "\n".join(violations),
         )
 
-    def test_complete_application_project_graph_is_acyclic(self) -> None:
         cycle = cycle_in_graph(self.projects)
         rendered = " -> ".join(self.projects[node].name for node in cycle) if cycle else ""
         self.assertIsNone(
             cycle,
-            "CIRCULAR APPLICATION DEPENDENCY DETECTED"
+            "CIRCULAR APPLICATION FRAMEWORK DEPENDENCY DETECTED"
             + (f": {rendered}" if rendered else ""),
         )
 
-    def test_exactly_one_kernel_access_gateway_exists(self) -> None:
-        gateways = [project for project in self.projects.values() if project.name in KERNEL_GATEWAY_NAMES]
+    def test_exactly_one_kernel_gateway_exists(self) -> None:
+        gateways = [
+            project for project in self.projects.values()
+            if project.name in KERNEL_GATEWAY_NAMES
+        ]
+
         self.assertEqual(
             len(gateways),
             1,
@@ -202,21 +260,26 @@ class ApplicationArchitectureTests(unittest.TestCase):
             f"found {[project.name for project in gateways]}",
         )
 
-        gateway = gateways[0]
-        self.assertTrue(is_under(gateway.path, SOURCE_ROOT.resolve()))
+        self.assertTrue(is_under(gateways[0].path, SOURCE_ROOT.resolve()))
 
     def test_kernel_transport_knowledge_isolated_to_gateway(self) -> None:
-        gateway = next(project for project in self.projects.values() if project.name in KERNEL_GATEWAY_NAMES)
+        gateway = next(
+            project for project in self.projects.values()
+            if project.name in KERNEL_GATEWAY_NAMES
+        )
         violations: list[str] = []
 
         for source_file in sorted(SOURCE_ROOT.rglob("*.cs")):
             if is_under(source_file.resolve(), gateway.path.parent / gateway.path.name):
                 continue
 
-            text = source_file.read_text(encoding="utf-8")
+            source = source_file.read_text(encoding="utf-8")
+
             for marker in KERNEL_IMPLEMENTATION_MARKERS:
-                if marker in text:
-                    violations.append(f"{source_file.relative_to(ROOT)} contains forbidden kernel marker '{marker}'")
+                if marker in source:
+                    violations.append(
+                        f"{source_file.relative_to(ROOT)} contains forbidden kernel marker '{marker}'"
+                    )
 
         self.assertFalse(
             violations,
@@ -224,66 +287,76 @@ class ApplicationArchitectureTests(unittest.TestCase):
             + "\n".join(violations),
         )
 
-    def test_no_direct_native_kernel_path_or_process_access_outside_gateway(self) -> None:
-        gateway = next(project for project in self.projects.values() if project.name in KERNEL_GATEWAY_NAMES)
+    def test_no_direct_native_kernel_access_outside_gateway(self) -> None:
+        gateway = next(
+            project for project in self.projects.values()
+            if project.name in KERNEL_GATEWAY_NAMES
+        )
         violations: list[str] = []
 
         for source_file in sorted(SOURCE_ROOT.rglob("*.cs")):
             if is_under(source_file.resolve(), gateway.path.parent / gateway.path.name):
                 continue
 
-            text = source_file.read_text(encoding="utf-8")
+            source = source_file.read_text(encoding="utf-8")
 
             for marker in NATIVE_KERNEL_MARKERS:
-                if marker in text:
-                    violations.append(f"{source_file.relative_to(ROOT)} contains native kernel path '{marker}'")
+                if marker in source:
+                    violations.append(
+                        f"{source_file.relative_to(ROOT)} contains native kernel path '{marker}'"
+                    )
 
             for pattern in DIRECT_KERNEL_PROCESS_PATTERNS:
-                if pattern.search(text):
-                    violations.append(f"{source_file.relative_to(ROOT)} directly invokes kernel/native transport")
+                if pattern.search(source):
+                    violations.append(
+                        f"{source_file.relative_to(ROOT)} directly invokes kernel/native transport"
+                    )
 
         self.assertFalse(
             violations,
-            "Direct kernel/native access escaped the dedicated gateway:\n" + "\n".join(violations),
+            "Direct kernel/native access escaped the dedicated gateway:\n"
+            + "\n".join(violations),
         )
 
-    def test_gateway_has_no_reverse_dependency_cycle_with_its_consumers(self) -> None:
-        gateway = next(project for project in self.projects.values() if project.name in KERNEL_GATEWAY_NAMES)
-        consumers = {
-            project.path
-            for project in self.projects.values()
+    def test_kernel_gateway_has_no_reverse_dependency(self) -> None:
+        gateway = next(
+            project for project in self.projects.values()
+            if project.name in KERNEL_GATEWAY_NAMES
+        )
+
+        reverse_consumers = {
+            project.path for project in self.projects.values()
             if gateway.path in project.references
         }
 
-        reverse_edges = [
-            f"{project.name} -> {self.projects[target].name}"
-            for project in self.projects.values()
-            if project.path == gateway.path
-            for target in project.references
-            if target in consumers
+        violations = [
+            f"{gateway.name} -> {self.projects[target].name}"
+            for target in gateway.references
+            if target in reverse_consumers
         ]
 
         self.assertFalse(
-            reverse_edges,
-            "The kernel gateway must not depend back on an Application Layer consumer: "
-            + ", ".join(reverse_edges),
+            violations,
+            "Kernel gateway depends back on a consumer:\n" + "\n".join(violations),
         )
 
-    def test_project_names_are_unique(self) -> None:
+    def test_production_assembly_names_are_unique(self) -> None:
         by_name: dict[str, list[Path]] = {}
+
         for project in self.projects.values():
             by_name.setdefault(project.name, []).append(project.path)
 
         duplicates = {
-            name: paths
-            for name, paths in by_name.items()
-            if len(paths) > 1
+            name: paths for name, paths in by_name.items() if len(paths) > 1
         }
 
         self.assertFalse(
             duplicates,
             "Duplicate production assembly names are not permitted: "
-            + "; ".join(f"{name}: {', '.join(map(str, paths))}" for name, paths in duplicates.items()),
+            + "; ".join(
+                f"{name}: {', '.join(map(str, paths))}"
+                for name, paths in duplicates.items()
+            ),
         )
 
 

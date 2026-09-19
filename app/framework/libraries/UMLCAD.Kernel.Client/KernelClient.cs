@@ -106,6 +106,7 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
             if (body is null)
             {
                 return Failure(
+                    request,
                     "KERNEL_RESPONSE_TOO_LARGE",
                     "Kernel response exceeds the configured response limit.");
             }

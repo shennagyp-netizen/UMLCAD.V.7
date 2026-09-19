@@ -13,7 +13,7 @@ FRAMEWORK_TEST_ROOT = ROOT / "app" / "framework" / "tests"
 APPLICATION_ROOT = ROOT / "app" / "application"
 
 # Exactly one production .NET library is the kernel gateway.
-KERNEL_GATEWAY_NAMES = {"UMLCAD.Kernel"}
+KERNEL_GATEWAY_NAMES = {"UMLCAD.Kernel.Client"}
 
 KERNEL_IMPLEMENTATION_MARKERS = (
     "RustKernelService",
@@ -207,7 +207,7 @@ class ApplicationArchitectureTests(unittest.TestCase):
                 continue
 
             source = source_file.read_text(encoding="utf-8", errors="strict")
-            for marker in ("dotnet/", "projects/demo/", "UMLCAD.Kernel.Client"):
+            for marker in ("dotnet/", "projects/demo/"):
                 if marker in source:
                     violations.append(
                         f"{source_file.relative_to(ROOT)} contains legacy marker '{marker}'"

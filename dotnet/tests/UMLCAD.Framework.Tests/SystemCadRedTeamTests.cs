@@ -57,6 +57,151 @@ public sealed class SystemCadRedTeamTests
     }
 
     [Fact]
+    public void Rejected_result_cannot_resolve_a_published_face()
+    {
+        var part = PartWithFacePublication("result-r1");
+        var semantic = new SemanticApplication(
+            "app",
+            "1.0.0",
+            new Dictionary<string, string>(),
+            [part],
+            [],
+            [],
+            "build")
+        {
+            AuthoritativeResults =
+            [
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Rejected)
+            ]
+        };
+
+        using var app = Build(builder => builder.AddPart("anchor", "part"));
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(semantic, new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
+        Assert.Equal("REFERENCE_RESULT_NOT_AUTHORITATIVE", result.DiagnosticCode);
+    }
+
+    [Fact]
+    public void Result_owned_by_another_producer_cannot_back_a_face_publication()
+    {
+        var part = PartWithFacePublication("result-r1");
+        var semantic = new SemanticApplication(
+            "app",
+            "1.0.0",
+            new Dictionary<string, string>(),
+            [part],
+            [],
+            [],
+            "build")
+        {
+            AuthoritativeResults =
+            [
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "other-part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative)
+            ]
+        };
+
+        using var app = Build(builder => builder.AddPart("anchor", "part"));
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(semantic, new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
+        Assert.Equal("REFERENCE_RESULT_OWNER_MISMATCH", result.DiagnosticCode);
+    }
+
+    [Fact]
+    public void Duplicate_result_identity_is_indeterminate_and_never_first_match()
+    {
+        var part = PartWithFacePublication("result-r1");
+        var semantic = new SemanticApplication(
+            "app",
+            "1.0.0",
+            new Dictionary<string, string>(),
+            [part],
+            [],
+            [],
+            "build")
+        {
+            AuthoritativeResults =
+            [
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative),
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "part",
+                    "operation-2",
+                    "contract-v1",
+                    "evidence-2",
+                    AuthoritativeResultStatus.Authoritative)
+            ]
+        };
+
+        using var app = Build(builder => builder.AddPart("anchor", "part"));
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(semantic, new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
+        Assert.Equal("REFERENCE_RESULT_AMBIGUOUS", result.DiagnosticCode);
+    }
+
+    [Fact]
+    [Trait("Gate", "RED")]
+    public void Red_gate_face_reference_in_occurrence_context_must_preserve_occurrence_producer_identity()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "binding");
+        });
+        builder.AddAssembly("assembly", "Assembly", assembly =>
+            assembly.Part("instance", "part"));
+
+        using var app = builder.Build();
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(
+                app.Semantic,
+                new SemanticReference("occurrence:assembly/instance", "front-face", "face", "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
+        Assert.Equal("occurrence:assembly/instance", result.Target!.ProducerId);
+        Assert.Equal("front-face", result.Target.TargetId);
+    }
+
+    private static PartSemantic PartWithFacePublication(string resultId)
+    {
+        return new PartSemantic("part", "solid", [], [], [], [], [])
+        {
+            TopologyBindings =
+            [
+                new TopologyBindingSemantic("binding", "face", "front-face", resultId, "brep-face-6")
+            ],
+            Publications =
+            [
+                new ShapePublicationSemantic("front", "face", "front-face", resultId, "binding")
+            ]
+        };
+    }
+
+    [Fact]
     public void Face_publication_without_matching_binding_is_rejected_at_build()
     {
         var builder = CadApplication.CreateBuilder();

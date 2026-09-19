@@ -57,6 +57,57 @@ public sealed class SystemCadRedTeamTests
     }
 
     [Fact]
+    public void Face_publication_without_matching_binding_is_rejected_at_build()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+            part.Publication("front", "face", "front-face", "result-r1", "missing-binding"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+        Assert.Contains("publication", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Face_publication_with_mismatched_binding_cannot_become_a_valid_snapshot()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding", "face", "other-face", "result-r1", "brep-face-2");
+            part.Publication("front", "face", "front-face", "result-r1", "binding");
+        });
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Fact]
+    public void Duplicate_publication_identity_is_rejected()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding", "face", "front-face", "result-r1", "brep-face-1");
+            part.Publication("front", "face", "front-face", "result-r1", "binding");
+            part.Publication("front", "face", "front-face", "result-r1", "binding");
+        });
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Fact]
+    public void Duplicate_topology_binding_identity_is_rejected()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding", "face", "front-face", "result-r1", "brep-face-1");
+            part.TopologyBinding("binding", "face", "back-face", "result-r1", "brep-face-2");
+        });
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Fact]
     public void Wrong_target_kind_cannot_cross_reinterpretation_boundaries()
     {
         using var app = Build(builder => builder.AddPart("part", "part", part =>

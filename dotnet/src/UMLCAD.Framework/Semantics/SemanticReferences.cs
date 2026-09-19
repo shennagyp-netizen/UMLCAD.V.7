@@ -83,6 +83,59 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                 new[] { "geometry", "constraint", "component" });
         }
 
+        if (TryFindOccurrence(application, reference.ProducerId, out var containingAssembly, out var occurrence))
+        {
+            if (!string.Equals(reference.TargetKind, "face", StringComparison.Ordinal))
+                return Fail(
+                    reference,
+                    SemanticReferenceStatus.Unsupported,
+                    "REFERENCE_UNSUPPORTED_TARGET_KIND",
+                    $"Reference target kind '{reference.TargetKind}' is unsupported for occurrence producer '{reference.ProducerId}'.");
+
+            if (occurrence.DefinitionKind != "part")
+                return Fail(
+                    reference,
+                    SemanticReferenceStatus.Unsupported,
+                    "REFERENCE_UNSUPPORTED_OCCURRENCE_DEFINITION",
+                    $"Occurrence producer '{reference.ProducerId}' does not currently expose a Part face reference.");
+
+            if (occurrence.ConfigurationName is not null)
+                return Fail(
+                    reference,
+                    SemanticReferenceStatus.Indeterminate,
+                    "REFERENCE_CONTEXT_UNSUPPORTED",
+                    $"Occurrence producer '{reference.ProducerId}' has configuration context '{occurrence.ConfigurationName}', but configuration-aware result resolution is not yet implemented.");
+
+            var sourcePart = application.Parts.FirstOrDefault(
+                x => string.Equals(x.Id, occurrence.DefinitionId, StringComparison.Ordinal));
+            if (sourcePart is null)
+                return Fail(
+                    reference,
+                    SemanticReferenceStatus.Missing,
+                    "REFERENCE_PRODUCER_MISSING",
+                    $"Occurrence producer '{reference.ProducerId}' names missing Part definition '{occurrence.DefinitionId}'.");
+
+            var sourceResolution = ResolvePublishedFace(sourcePart, application, reference);
+            if (sourceResolution.Candidates.Count == 0)
+                return new SemanticReferenceResolution(
+                    reference,
+                    sourceResolution.Status,
+                    sourceResolution.Candidates,
+                    sourceResolution.DiagnosticCode,
+                    sourceResolution.Message);
+
+            var reboundCandidates = sourceResolution.Candidates
+                .Select(candidate => candidate with { ProducerId = reference.ProducerId })
+                .ToArray();
+
+            return new SemanticReferenceResolution(
+                reference,
+                sourceResolution.Status,
+                reboundCandidates,
+                sourceResolution.DiagnosticCode,
+                sourceResolution.Message);
+        }
+
         var assembly = application.Assemblies.FirstOrDefault(
             x => string.Equals(x.Id, reference.ProducerId, StringComparison.Ordinal));
         if (assembly is not null)
@@ -104,6 +157,51 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
             SemanticReferenceStatus.Missing,
             "REFERENCE_PRODUCER_MISSING",
             $"Reference producer '{reference.ProducerId}' does not exist.");
+    }
+
+    private static bool TryFindOccurrence(
+        SemanticApplication application,
+        string producerId,
+        out AssemblySemantic containingAssembly,
+        out AssemblyOccurrenceSemantic occurrence)
+    {
+        containingAssembly = null!;
+        occurrence = null!;
+
+        const string prefix = "occurrence:";
+        if (!producerId.StartsWith(prefix, StringComparison.Ordinal))
+            return false;
+
+        var encoded = producerId[prefix.Length..];
+        var separator = encoded.IndexOf('/', StringComparison.Ordinal);
+        if (separator <= 0 || separator == encoded.Length - 1)
+            return false;
+
+        string assemblyId;
+        string occurrenceId;
+        try
+        {
+            assemblyId = Uri.UnescapeDataString(encoded[..separator]);
+            occurrenceId = Uri.UnescapeDataString(encoded[(separator + 1)..]);
+        }
+        catch (UriFormatException)
+        {
+            return false;
+        }
+
+        var assembly = application.Assemblies.FirstOrDefault(
+            x => string.Equals(x.Id, assemblyId, StringComparison.Ordinal));
+        if (assembly is null)
+            return false;
+
+        var match = assembly.Occurrences.FirstOrDefault(
+            x => string.Equals(x.Id, occurrenceId, StringComparison.Ordinal));
+        if (match is null)
+            return false;
+
+        containingAssembly = assembly;
+        occurrence = match;
+        return true;
     }
 
     private static IReadOnlyList<SemanticReferenceCandidate> ResolveApplicationTarget(

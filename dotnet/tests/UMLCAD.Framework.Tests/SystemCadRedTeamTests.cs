@@ -57,6 +57,51 @@ public sealed class SystemCadRedTeamTests
     }
 
     [Fact]
+    public void Unresolved_alternate_publication_prevents_unqualified_face_resolution()
+    {
+        var part = new PartSemantic("part", "solid", [], [], [], [], [])
+        {
+            TopologyBindings =
+            [
+                new TopologyBindingSemantic("binding-valid", "face", "front-face", "result-valid", "brep-face-valid")
+            ],
+            Publications =
+            [
+                new ShapePublicationSemantic("front-valid", "face", "front-face", "result-valid", "binding-valid"),
+                new ShapePublicationSemantic("front-missing", "face", "front-face", "result-missing", "binding-missing")
+            ]
+        };
+
+        var semantic = new SemanticApplication(
+            "app",
+            "1.0.0",
+            new Dictionary<string, string>(),
+            [part],
+            [],
+            [],
+            "build")
+        {
+            AuthoritativeResults =
+            [
+                new AuthoritativeResultSemantic(
+                    "result-valid",
+                    "part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative)
+            ]
+        };
+
+        using var app = Build(builder => builder.AddPart("anchor", "part"));
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(semantic, new SemanticReference("part", "front-face", "face"));
+
+        Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
+        Assert.Equal("REFERENCE_RESULT_MISSING", result.DiagnosticCode);
+    }
+
+    [Fact]
     public void Rejected_result_cannot_resolve_a_published_face()
     {
         var part = PartWithFacePublication("result-r1");

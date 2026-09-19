@@ -4,6 +4,6 @@
     <AssemblyName>UMLCAD.BenchVise</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Application/UMLCAD.Application.csproj" />
+    <ProjectReference Include="../../UMLCAD.Application/UMLCAD.Application.csproj" />
   </ItemGroup>
 </Project>

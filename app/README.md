@@ -1,23 +1,13 @@
 # UMLCAD.V.7 Application Layer
 
-The production Application Layer is a typed semantic execution system.
+Rebuilt around a functional semantic operation/result pipeline.
 
-It does not model CAD as a persistent Feature Tree. User actions become typed semantic operations. Operations consume explicit semantic inputs and previous results and produce new authoritative results.
+    Part
+      -> Sketch -> SketchResult
+      -> Extrusion(SketchResult) -> BodyResult_1
+      -> Hole(BodyResult_1) -> BodyResult_2 = CurrentBody
 
-Canonical composition:
+There is no traditional CAD Feature Tree as semantic authority.
+Earlier results remain immutable lineage for provenance, references, invalidation and recomputation.
 
-Part
- -> Sketch
- -> SketchResult
- -> Extrusion(SketchResult)
- -> BodyResult_1
- -> Hole(BodyResult_1)
- -> BodyResult_2 = Current Body
-
-Previous results are immutable lineage. The newest BodyResult is the current solid state.
-
-The Application Layer owns semantic meaning, functional composition, references/publications, dependency planning, invalidation, evaluation identity, engineering orchestration, and domain contracts.
-
-The UMLCAD kernel is the mathematical authority and realization boundary.
-
-The previous experimental implementation is preserved under app_old/.
+The former implementation is preserved under app_old/.

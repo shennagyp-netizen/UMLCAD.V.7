@@ -1,9 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>UMLCAD.Engineering.Drawing</AssemblyName>
-    <RootNamespace>UMLCAD.Engineering.Drawing</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
-  </ItemGroup>
-</Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>UMLCAD.Engineering.Drawing</AssemblyName></PropertyGroup><ItemGroup><ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" /></ItemGroup></Project>

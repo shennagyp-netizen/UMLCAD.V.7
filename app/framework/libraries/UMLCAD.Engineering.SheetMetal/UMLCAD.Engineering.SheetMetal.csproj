@@ -1,10 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>UMLCAD.Engineering.SheetMetal</AssemblyName>
-    <RootNamespace>UMLCAD.Engineering.SheetMetal</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
-    <ProjectReference Include="../UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj" />
-  </ItemGroup>
-</Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>UMLCAD.Engineering.SheetMetal</AssemblyName></PropertyGroup><ItemGroup><ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" /><ProjectReference Include="../UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj" /></ItemGroup></Project>

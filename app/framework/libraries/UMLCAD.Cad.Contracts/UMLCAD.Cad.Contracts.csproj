@@ -1,6 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>UMLCAD.Cad.Contracts</AssemblyName>
-    <RootNamespace>UMLCAD.Cad.Contracts</RootNamespace>
-  </PropertyGroup>
-</Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>UMLCAD.Cad.Contracts</AssemblyName></PropertyGroup></Project>

@@ -1,125 +1,22 @@
 using System.Net.Http.Json;
-using System.Text.Json;
 using UMLCAD.Cad.Contracts;
-
 namespace UMLCAD.Kernel;
-
-public sealed record UmlcadKernelOptions(
-    Uri BaseAddress,
-    string EvaluationPath = "v2/cad/evaluate",
-    TimeSpan? Timeout = null)
+public sealed record UmlcadKernelOptions(Uri BaseAddress,string EvaluationPath="v2/cad/operation",TimeSpan? Timeout=null){public UmlcadKernelOptions():this(new Uri("http://127.0.0.1:8080/")){}}
+public sealed class UmlcadKernelGateway:IKernelGateway,IDisposable
 {
-    public UmlcadKernelOptions() : this(
-        new Uri("http://localhost:8080/"),
-        "v2/cad/evaluate",
-        TimeSpan.FromMinutes(2))
+    private readonly HttpClient _client;private readonly bool _ownsClient;
+    public UmlcadKernelGateway(UmlcadKernelOptions? options=null,HttpClient? client=null)
     {
+        options??=new();if(!options.BaseAddress.IsAbsoluteUri||options.BaseAddress.Scheme is not("http" or "https"))throw new ArgumentException("Kernel URI must be HTTP(S).");
+        if(string.IsNullOrWhiteSpace(options.EvaluationPath)||Uri.TryCreate(options.EvaluationPath,UriKind.Absolute,out _))throw new ArgumentException("Kernel operation path must be relative.");
+        _client=client??new HttpClient();_ownsClient=client is null;_client.BaseAddress=options.BaseAddress;_client.Timeout=options.Timeout??TimeSpan.FromMinutes(2);EvaluationPath=options.EvaluationPath;
     }
-}
-
-public sealed class UmlcadKernelGateway : IKernelGateway, IDisposable
-{
-    private readonly HttpClient _client;
-    private readonly bool _ownsClient;
-    private readonly UmlcadKernelOptions _options;
-
-    public UmlcadKernelGateway(
-        UmlcadKernelOptions? options = null,
-        HttpClient? client = null)
+    public string EvaluationPath{get;}
+    public async Task<KernelOperationResponse> EvaluateAsync(KernelOperationRequest request,CancellationToken cancellationToken=default)
     {
-        _options = options ?? new UmlcadKernelOptions();
-
-        if (!_options.BaseAddress.IsAbsoluteUri ||
-            _options.BaseAddress.Scheme is not ("http" or "https"))
-            throw new ArgumentException(
-                "Kernel base address must be HTTP(S).",
-                nameof(options));
-
-        if (string.IsNullOrWhiteSpace(_options.EvaluationPath) ||
-            Uri.TryCreate(
-                _options.EvaluationPath,
-                UriKind.Absolute,
-                out _))
-            throw new ArgumentException(
-                "Kernel evaluation path must be relative.",
-                nameof(options));
-
-        _client = client ?? new HttpClient();
-        _ownsClient = client is null;
-        _client.BaseAddress = _options.BaseAddress;
-        _client.Timeout = _options.Timeout ?? TimeSpan.FromMinutes(2);
+        using var response=await _client.PostAsJsonAsync(EvaluationPath,request,cancellationToken);
+        if(!response.IsSuccessStatusCode)return new KernelOperationResponse(CadEvaluationStatus.Failed,null,null,Array.Empty<KernelTopologyBinding>(),new[]{new CadDiagnostic("KERNEL_HTTP",$"Kernel returned HTTP {(int)response.StatusCode}.")});
+        return await response.Content.ReadFromJsonAsync<KernelOperationResponse>(cancellationToken:cancellationToken)??new KernelOperationResponse(CadEvaluationStatus.Failed,null,null,Array.Empty<KernelTopologyBinding>(),new[]{new CadDiagnostic("KERNEL_EMPTY_RESPONSE","Kernel returned no response.")});
     }
-
-    public async Task<KernelOperationResponse> EvaluateAsync(
-        KernelOperationRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-
-        using var response = await _client.PostAsJsonAsync(
-            _options.EvaluationPath,
-            request,
-            new JsonSerializerOptions(JsonSerializerDefaults.Web),
-            cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            return new KernelOperationResponse(
-                CadEvaluationStatus.Failed,
-                null,
-                null,
-                Array.Empty<KernelTopologyBinding>(),
-                new[]
-                {
-                    new CadDiagnostic(
-                        "KERNEL_HTTP",
-                        $"Kernel returned HTTP {(int)response.StatusCode}.")
-                });
-        }
-
-        var value =
-            await response.Content.ReadFromJsonAsync<KernelOperationResponse>(
-                new JsonSerializerOptions(JsonSerializerDefaults.Web),
-                cancellationToken);
-
-        if (value is null)
-        {
-            return new KernelOperationResponse(
-                CadEvaluationStatus.Failed,
-                null,
-                null,
-                Array.Empty<KernelTopologyBinding>(),
-                new[]
-                {
-                    new CadDiagnostic(
-                        "KERNEL_EMPTY_RESPONSE",
-                        "Kernel returned no operation response.")
-                });
-        }
-
-        if (value.Status == CadEvaluationStatus.Succeeded &&
-            (value.AuthoritativeResultId is null ||
-             string.IsNullOrWhiteSpace(value.EvidenceHash)))
-        {
-            return new KernelOperationResponse(
-                CadEvaluationStatus.Failed,
-                null,
-                null,
-                Array.Empty<KernelTopologyBinding>(),
-                new[]
-                {
-                    new CadDiagnostic(
-                        "KERNEL_INVALID_RESULT",
-                        "Successful response lacks result identity or evidence.")
-                });
-        }
-
-        return value;
-    }
-
-    public void Dispose()
-    {
-        if (_ownsClient)
-            _client.Dispose();
-    }
+    public void Dispose(){if(_ownsClient)_client.Dispose();}
 }

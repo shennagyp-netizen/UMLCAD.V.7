@@ -1,13 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>UMLCAD.ApplicationLayer.Tests</AssemblyName>
-    <RootNamespace>UMLCAD.ApplicationLayer.Tests</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="xunit.v3" Version="4.0.1" />
-    <ProjectReference Include="../../libraries/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
-    <ProjectReference Include="../../libraries/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
-    <ProjectReference Include="../../libraries/UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" />
-    <ProjectReference Include="../../libraries/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
-  </ItemGroup>
-</Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>UMLCAD.ApplicationLayer.Tests</AssemblyName></PropertyGroup><ItemGroup><PackageReference Include="xunit.v3" Version="4.0.1" /><ProjectReference Include="../../libraries/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" /><ProjectReference Include="../../libraries/UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" /><ProjectReference Include="../../libraries/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" /><ProjectReference Include="../../libraries/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" /></ItemGroup></Project>

@@ -1,14 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>UMLCAD.Framework</AssemblyName>
-    <RootNamespace>UMLCAD.Framework</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
-    <ProjectReference Include="../UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
-    <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
-    <ProjectReference Include="../UMLCAD.Engineering.Runtime/UMLCAD.Engineering.Runtime.csproj" />
-    <ProjectReference Include="../UMLCAD.Kernel/UMLCAD.Kernel.csproj" />
-    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
-  </ItemGroup>
-</Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>UMLCAD.Framework</AssemblyName></PropertyGroup><ItemGroup><ProjectReference Include="../UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" /><ProjectReference Include="../UMLCAD.Engineering.Runtime/UMLCAD.Engineering.Runtime.csproj" /></ItemGroup></Project>

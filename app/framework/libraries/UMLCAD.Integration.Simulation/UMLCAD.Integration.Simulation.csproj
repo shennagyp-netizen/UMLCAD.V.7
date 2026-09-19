@@ -1,9 +1,1 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <AssemblyName>UMLCAD.Integration.Simulation</AssemblyName>
-    <RootNamespace>UMLCAD.Integration.Simulation</RootNamespace>
-  </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
-  </ItemGroup>
-</Project>
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>UMLCAD.Integration.Simulation</AssemblyName></PropertyGroup><ItemGroup><ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" /></ItemGroup></Project>

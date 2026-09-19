@@ -1,0 +1,15 @@
+# Rebuilt semantic architecture
+
+The old feature-oriented app has been moved to app_old/ and is not part of the new build.
+
+The semantic authority is:
+
+Part -> Operation -> Result -> Operation -> Result
+
+Sketch -> SketchResult
+Extrusion(SketchResult) -> BodyResult_1
+Hole(BodyResult_1) -> BodyResult_2 = CurrentBody
+
+The engine plans the operation DAG, computes invalidation closure, builds deterministic evaluation identities, reuses unchanged results during incremental rebuild, and sends the current operation/result context to the kernel boundary.
+
+No Feature Tree is permitted as semantic authority. Incremental render is a kernel realization optimization, not the semantic model.

@@ -1,0 +1,209 @@
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+using UMLCAD.Cad.Semantics;
+using UMLCAD.Engineering.Resources;
+
+namespace UMLCAD.Engineering.Cam;
+
+public sealed record ToolpathPoint
+{
+    public double X { get; }
+    public double Y { get; }
+    public double Z { get; }
+
+    public ToolpathPoint(double x, double y, double z)
+    {
+        if (!double.IsFinite(x) || !double.IsFinite(y) || !double.IsFinite(z))
+            throw new ArgumentOutOfRangeException(
+                nameof(x),
+                "Toolpath coordinates must be finite.");
+
+        X = x;
+        Y = y;
+        Z = z;
+    }
+}
+
+public sealed record ManufacturingOperation
+{
+    public SemanticId OperationId { get; }
+    public ManufacturingProcessKind Process { get; }
+    public string ToolId { get; }
+    public double StockThicknessMm { get; }
+    public IReadOnlyList<ToolpathPoint> Path { get; }
+
+    public ManufacturingOperation(
+        SemanticId operationId,
+        ManufacturingProcessKind process,
+        string toolId,
+        double stockThicknessMm,
+        IReadOnlyList<ToolpathPoint> path)
+    {
+        if (operationId.Value == Guid.Empty)
+            throw new ArgumentException(
+                "OperationId is required.",
+                nameof(operationId));
+        if (string.IsNullOrWhiteSpace(toolId))
+            throw new ArgumentException(
+                "ToolId is required.",
+                nameof(toolId));
+        if (!double.IsFinite(stockThicknessMm) || stockThicknessMm <= 0d)
+            throw new ArgumentOutOfRangeException(nameof(stockThicknessMm));
+
+        Path = path?.ToArray()
+            ?? throw new ArgumentNullException(nameof(path));
+
+        if (Path.Count == 0)
+            throw new ArgumentException(
+                "A manufacturing operation requires at least one toolpath point.",
+                nameof(path));
+
+        OperationId = operationId;
+        Process = process;
+        ToolId = toolId;
+        StockThicknessMm = stockThicknessMm;
+    }
+}
+
+public sealed record NcProgram
+{
+    public string ProgramId { get; }
+    public string MachineId { get; }
+    public IReadOnlyList<string> Lines { get; }
+
+    public NcProgram(
+        string programId,
+        string machineId,
+        IReadOnlyList<string> lines)
+    {
+        if (string.IsNullOrWhiteSpace(programId))
+            throw new ArgumentException(
+                "ProgramId is required.",
+                nameof(programId));
+        if (string.IsNullOrWhiteSpace(machineId))
+            throw new ArgumentException(
+                "MachineId is required.",
+                nameof(machineId));
+
+        Lines = lines?.ToArray()
+            ?? throw new ArgumentNullException(nameof(lines));
+
+        ProgramId = programId;
+        MachineId = machineId;
+    }
+
+    public string Serialize() => string.Join("\n", Lines);
+
+    public string ContentHash() =>
+        Convert.ToHexString(
+            SHA256.HashData(
+                Encoding.UTF8.GetBytes(Serialize())))
+            .ToLowerInvariant();
+}
+
+public interface INcPostprocessor
+{
+    string Id { get; }
+
+    NcProgram Generate(
+        ManufacturingOperation operation,
+        MachineDefinition machine,
+        ToolDefinition tool);
+}
+
+public sealed class DeterministicGCodePostprocessor : INcPostprocessor
+{
+    public string Id => "UMLCAD.GCODE.BASIC.1";
+
+    public NcProgram Generate(
+        ManufacturingOperation operation,
+        MachineDefinition machine,
+        ToolDefinition tool)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(machine);
+        ArgumentNullException.ThrowIfNull(tool);
+
+        if (operation.Process is not ManufacturingProcessKind.Milling)
+            throw new NotSupportedException(
+                $"The deterministic G-code postprocessor currently supports only Milling; process '{operation.Process}' requires a dedicated postprocessor.");
+
+        if (!machine.SupportsProcess(
+                operation.Process,
+                operation.StockThicknessMm))
+        {
+            throw new InvalidOperationException(
+                $"Machine '{machine.MachineId}' does not support process '{operation.Process}' at stock thickness {operation.StockThicknessMm.ToString(CultureInfo.InvariantCulture)} mm.");
+        }
+
+        if (!string.Equals(
+                operation.ToolId,
+                tool.ToolId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Operation references tool '{operation.ToolId}', but tool definition '{tool.ToolId}' was supplied.");
+        }
+
+        if (!MachineToolCompatibility.IsCompatible(
+                machine,
+                tool,
+                operation.Process))
+        {
+            throw new InvalidOperationException(
+                "Machine, tool, and manufacturing process are incompatible.");
+        }
+
+        var lines = new List<string>
+        {
+            "%",
+            $"(UMLCAD OP {operation.OperationId})",
+            "G21",
+            "G90",
+            $"(TOOL {tool.ToolId} DIA {tool.NominalDiameterMm.ToString("0.##########", CultureInfo.InvariantCulture)})",
+        };
+
+        var first = true;
+        foreach (var point in operation.Path)
+        {
+            var prefix = first ? "G00" : "G01";
+            first = false;
+            lines.Add(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{prefix} X{point.X:0.##########} Y{point.Y:0.##########} Z{point.Z:0.##########}"));
+        }
+
+        lines.Add("M30");
+        lines.Add("%");
+
+        return new NcProgram(
+            ProgramId: $"NC-{operation.OperationId}",
+            MachineId: machine.MachineId,
+            Lines: lines);
+    }
+}
+
+public sealed class CamPhenomenaAdvisor
+{
+    private readonly UMLCAD.Science.IPhenomenaSimulationService _simulation;
+
+    public CamPhenomenaAdvisor(
+        UMLCAD.Science.IPhenomenaSimulationService simulation)
+    {
+        _simulation = simulation
+            ?? throw new ArgumentNullException(nameof(simulation));
+    }
+
+    public UMLCAD.Science.PhenomenaSimulationResult SimulateCuttingProcess(
+        string requestId,
+        IReadOnlyDictionary<string, double> inputs)
+    {
+        return _simulation.Simulate(
+            new UMLCAD.Science.PhenomenaSimulationRequest(
+                requestId,
+                UMLCAD.Science.PhenomenonKind.CuttingProcessResponse,
+                inputs));
+    }
+}

@@ -12,14 +12,17 @@ Establish the exact conceptual boundary before implementation.
 - Rust/HTTP/OCCT/Metal/CUDA names are confined to infrastructure/kernel implementation.
 - Engineering rules are executable services, not a fixed catalog of built-in conditions.
 - Rules can read typed engineering knowledge.
+- Rules can call phenomena simulations.
+- Rules can reuse valid cached simulation results.
 - Rules can invoke controlled CAD semantic operations.
 - Rules can implement their own exception handling and recovery.
+- Build-time mandatory rules can refuse a build with expressive diagnostics.
 - Rule-controlled CAD changes are transactional and provenance-preserving.
+- Engineering Supervision is a distinct programmable layer that can create/revise CAD scenarios and verify system behavior.
 - Simulation produces facts; rules interpret facts; CAD services apply semantic decisions.
-- Spatial regions and fields are first-class engineering knowledge.
 
 ### Acceptance
-Architecture review of dependency direction, API ownership, and at least three nontrivial conceptual scenarios: laser HAZ, milling tool wear, and tolerance-driven design restriction.
+Architecture review of dependency direction, API ownership, build/refusal behavior, simulation-cache semantics, and at least three conceptual scenarios: laser HAZ, milling tool wear, and tolerance-driven design restriction.
 
 ## FW-01 — Kernel-facing .NET boundary cleanup
 
@@ -35,12 +38,12 @@ Refine the current transitional UMLCAD.Kernel.Client design so engineering libra
 - add boundary tests proving implementation replacement does not alter domain contracts.
 
 ### Acceptance
-A test kernel implementation can satisfy the same UMLCAD Kernel API as the real kernel without changes to CAD/CAM/Science rule code.
+A test kernel implementation can satisfy the same UMLCAD Kernel API as the real kernel without changes to CAD/CAM/Science/rule code.
 
 ## FW-02 — Generic Engineering Context
 
 ### Objective
-Create the typed information surface available to engineering rules.
+Create the typed information surface available to engineering rules and supervision programs.
 
 ### Work
 Define query services for:
@@ -58,23 +61,24 @@ spatial regions
 fields
 configuration
 inspection/measurement
+manufacturing history
 ~~~
 
 ### Acceptance
-Rules can retrieve a line/curve/face, its surrounding influence regions, relevant PMI/tolerance information, and associated manufacturing/simulation provenance without stringly typed dictionaries.
+A rule can retrieve a line/curve/face, its surrounding influence regions, relevant PMI/tolerance information, associated manufacturing/simulation provenance, and prior valid simulation results without stringly typed dictionaries.
 
 ## FW-03 — CAD Control API
 
 ### Objective
-Allow engineer-written code to control CAD through semantic operations.
+Allow engineer-written rules and supervision programs to control CAD through semantic operations.
 
 ### Work
-Define command/change services for feature creation, modification, suppression, deletion, parameter changes, constraints, references, and recomputation.
+Define command/change services for feature creation, modification, suppression, deletion, parameter changes, constraints, references, recomputation, and revision/change-set creation.
 
-Rules must never mutate internal semantic collections or raw kernel objects directly.
+Human commands, automation, rules, and supervision should converge on the same semantic command machinery.
 
 ### Acceptance
-A custom rule changes a CAD parameter and creates a design constraint, then the normal evaluation engine recomputes the affected semantic closure and produces the authoritative result.
+A custom rule changes a CAD parameter and creates a design constraint, then the normal evaluation engine recomputes the affected semantic closure and produces the authoritative result. A supervision program can construct the same scenario programmatically.
 
 ## FW-04 — Transactional rule execution and exception semantics
 
@@ -92,7 +96,24 @@ Make custom engineering code safe to execute against semantic CAD state.
 - cancellation and execution budgets.
 
 ### Acceptance
-A rule that mutates three CAD objects and then throws leaves no partial mutation after rollback; a rule that catches its exception may intentionally recover and commit its chosen result.
+A rule that mutates three CAD objects and then throws leaves no partial mutation after rollback. A rule that catches its exception may intentionally recover and commit its chosen result.
+
+## FW-04A — Build-time engineering-rule enforcement
+
+### Objective
+Make mandatory engineering rules part of the normal build contract.
+
+### Work
+- rule applicability and mandatory/optional classification;
+- rule scheduling within the build lifecycle;
+- structured rejection diagnostics;
+- exception-to-diagnostic mapping;
+- deterministic refusal semantics;
+- rule-triggered recomputation;
+- build identity inclusion for authoritative rule decisions.
+
+### Acceptance
+A geometrically valid design is refused because an engineering rule detects an unacceptable condition, and the engineer receives an expressive diagnostic identifying the rule, affected entity/region, evidence, and corrective direction.
 
 ## FW-05 — Rule registration, replacement and precedence
 
@@ -104,6 +125,24 @@ Support default, company, project, part, and process-specific rule registrations
 
 ### Acceptance
 The same rule contract can execute the built-in implementation or a custom implementation without changing callers. Selection is deterministic and provenance records the selected implementation.
+
+## FW-05A — Simulation requests and cache semantics
+
+### Objective
+Allow build-time rules to call phenomena simulations and safely reuse valid results.
+
+### Work
+- typed simulation request contracts;
+- simulation execution identity;
+- cache-key construction from all semantic inputs;
+- validity/provenance checking;
+- stale/incomplete-result rejection;
+- cache invalidation;
+- deterministic cache hit versus fresh execution equivalence;
+- policy for forced refresh.
+
+### Acceptance
+A rule requests a simulation twice with the same semantic inputs and obtains a valid cache hit on the second request. Changing a simulation input forces a new identity and prevents invalid reuse.
 
 ## FW-06 — Spatial regions and engineering fields
 
@@ -129,7 +168,7 @@ mechanical damage
 Do not create a hardcoded class for every future physical effect unless semantics genuinely require one.
 
 ### Acceptance
-A laser simulation result exposes a HAZ region and at least one spatial material-property field; a rule can query whether a candidate feature intersects the region and evaluate a threshold over the field.
+A laser simulation result exposes a HAZ region and at least one spatial material-property field. A rule can query whether a candidate feature intersects the region and evaluate a threshold over the field.
 
 ## FW-07 — Phenomena-simulation foundation
 
@@ -140,7 +179,7 @@ Expand the current generic phenomena service into a serious provider-neutral sim
 Model phenomena, models, solver executions, inputs, assumptions, validity, convergence/evidence, fields, and results. Support thermal, structural, fluid, and coupled/multiphysics concepts without making any one solver application semantic authority.
 
 ### Acceptance
-At least one complete phenomena path returns spatial/physical evidence that is consumable by a manufacturing simulation and an engineering rule. External-solver adapters remain outside the semantic model.
+At least one complete phenomena path returns spatial/physical evidence consumable by a manufacturing simulation, a rule, and a supervision program. External-solver adapters remain outside the semantic model.
 
 ## FW-08 — Manufacturing digital workpiece state
 
@@ -228,33 +267,57 @@ Move CAM from nominal toolpath generation toward simulation-validated manufactur
 ### Acceptance
 A CAM candidate is simulated, evaluated against engineering requirements, compensated or rejected, and only then converted into deterministic NC/G-code.
 
-## FW-14 — Rule/package lifecycle and trust model
+## FW-14 — Engineering Supervision runtime
 
 ### Objective
-Make executable engineering knowledge maintainable in real organizations.
+Provide a programmable engineering-supervision layer capable of constructing sophisticated CAD revisions and testing the integrated behavior of CAD, rules, simulation and manufacturing semantics.
+
+### Work
+- create isolated temporary/revision CAD states;
+- use the same semantic CAD control API as normal engineering code;
+- invoke ordinary rules;
+- invoke simulations and use cached results;
+- inspect physical fields, spatial regions, tolerances and results;
+- express engineering assertions;
+- compare candidate revisions;
+- commit deliberate revisions or discard experiments;
+- preserve supervision provenance and evidence.
+
+The supervision layer should support unit-like, integration-like, system-like, regression-like, and exploratory engineering programs.
+
+### Acceptance
+A supervision program can construct a parametric part with a sketch, rectangle, three circles and three holes; build it; observe a mandatory rule rejection; modify the design; rebuild; run/consume simulation; assert the engineering result; and commit or discard the resulting revision.
+
+## FW-15 — Rule/package lifecycle and trust model
+
+### Objective
+Make executable engineering knowledge and supervision programs maintainable in real organizations.
 
 ### Work
 Define package identity, version compatibility, trusted sources, installation/replacement audit, dependency declarations, reproducible builds, and resource/isolation policy.
 
 ### Acceptance
-A rule package can be replaced without ambiguity, its exact implementation/version is recoverable from provenance, and execution of untrusted code cannot silently bypass semantic authority.
+A rule/supervision package can be replaced without ambiguity, its exact implementation/version is recoverable from provenance, and executable engineering code cannot silently bypass semantic authority.
 
-## FW-15 — Full vertical manufacturing proof
+## FW-16 — Full vertical programmable-manufacturing proof
 
 ### Objective
-Prove the entire architecture through one demanding manufacturing scenario.
+Prove the entire architecture through one demanding scenario.
 
 ### Candidate scenario
 
 ~~~
 Parametric CAD part
-    -> PMI tolerance / functional region
-    -> laser operation
-    -> tool/process/machine definition
-    -> phenomena simulation (thermal + material response)
-    -> HAZ + deviation fields
-    -> custom engineer rule
-    -> design restriction / parameter change
+    -> sketch on specified face
+    -> rectangle + three circles
+    -> three holes
+    -> build
+    -> mandatory engineering rules
+    -> rule requests thermal simulation
+    -> simulation cache hit or execution
+    -> HAZ + material/deviation fields
+    -> rule rejects or creates a design restriction
+    -> engineer/supervision program modifies revision
     -> recompute
     -> CAM re-plan / compensation
     -> final simulation
@@ -263,7 +326,7 @@ Parametric CAD part
 ~~~
 
 ### Acceptance
-The complete path is exercised through real component tests, red-team tests, Python/system E2E, deterministic identity checks, transaction rollback tests, rule replacement tests, and exact evidence.
+The complete path is exercised through real component tests, red-team tests, Python/system E2E, deterministic identity checks, transaction rollback tests, rule replacement tests, simulation-cache tests, supervision revision tests, and exact evidence.
 
 ## Global testing law for FW
 
@@ -279,17 +342,20 @@ Inspect
  -> exact evidence
 ~~~
 
-The new rule engine specifically requires adversarial coverage for:
+The programmable-engineering layer specifically requires adversarial coverage for:
 
 ~~~
 uncaught rule exception
 rule-local recovery
 partial mutation + rollback
+mandatory rule rejection
+diagnostic completeness
 recursive rules
 cyclic rules
 oscillating corrections
 non-deterministic rule input
 stale simulation result
+invalid simulation cache hit
 wrong field frame
 wrong region provenance
 ambiguous spatial query
@@ -300,6 +366,11 @@ rule-version identity collision
 override precedence collision
 provider disagreement
 simulation uncertainty / indeterminate result
+supervision revision isolation
+supervision rollback
+supervision assertion failure
+supervision-induced recompute loop
+revision provenance loss
 ~~~
 
 ## Non-negotiable architectural outcome
@@ -307,27 +378,34 @@ simulation uncertainty / indeterminate result
 At the end of this future-work sequence:
 
 ~~~
-Engineer-written code
+Engineer-written program
        |
        +--> reads engineering knowledge
-       |
+       +--> calls simulations
+       +--> reuses valid cached simulation results
        +--> reasons about geometry + physics + manufacturing
-       |
        +--> invokes CAD semantic functions
-       |
        +--> creates constraints / changes / decisions
-       |
        +--> handles its own exceptions
+       +--> can cause the current build to be rejected
        v
 UMLCAD Engineering Runtime
        |
        +--> transactional semantic control
        +--> deterministic evaluation
        +--> provenance / evidence
+       +--> mandatory engineering-rule enforcement
        +--> authoritative kernel evaluation
        +--> phenomena simulation
+
+Engineering Supervision Program
+       |
+       +--> constructs/revises test scenarios
+       +--> drives normal CAD/rule/simulation services
+       +--> asserts integrated engineering behavior
+       +--> retains or discards revisions
        v
 Validated System-CAD / Manufacturing result
 ~~~
 
-The engineer is not forced to wait for UMLCAD developers to add a bespoke feature for every new engineering idea. The platform provides stable primitives and authority boundaries; engineering code provides the domain logic.
+The engineer is not forced to wait for UMLCAD developers to add a bespoke feature for every new engineering idea. The platform provides stable primitives and authority boundaries; engineering code provides the domain logic; Engineering Supervision provides executable system-level engineering verification and controlled revision.

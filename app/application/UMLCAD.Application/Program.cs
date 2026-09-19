@@ -3,7 +3,6 @@ using UMLCAD.Cad.Engine;
 using UMLCAD.Cad.Expressions;
 using UMLCAD.Cad.Semantics;
 using UMLCAD.Framework;
-using UMLCAD.Kernel;
 
 var part = CadPartProgram.Create(
         "bench-vise",
@@ -40,35 +39,9 @@ var part = CadPartProgram.Create(
             CadExpression.Constant(10),
             CadExpression.Constant(25)));
 
-using var application = new UmlcadApplication(
-    new DemoKernelGateway());
-
+using var application = UmlcadApplication.CreateDeterministicDemo();
 var snapshot = await application.BuildAsync(part.Definition);
 
 Console.WriteLine($"Succeeded: {snapshot.Succeeded}");
 Console.WriteLine($"Pipeline: {string.Join(" -> ", snapshot.Plan.OperationIds)}");
-Console.WriteLine(
-    $"Current Body: {snapshot.CurrentBody(new CadId("body"))}");
-
-sealed class DemoKernelGateway : IKernelGateway
-{
-    public Task<KernelOperationResponse> EvaluateAsync(
-        KernelOperationRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        return Task.FromResult(
-            new KernelOperationResponse(
-                CadEvaluationStatus.Succeeded,
-                new CadResultId("demo:" + request.OperationId.Value),
-                "demo:" + request.EvaluationIdentity.Value,
-                new[]
-                {
-                    new KernelTopologyBinding(
-                        "operation",
-                        request.OperationId.Value)
-                },
-                Array.Empty<CadDiagnostic>()));
-    }
-}
+Console.WriteLine($"Current Body: {snapshot.CurrentBody(new CadId("body"))}");

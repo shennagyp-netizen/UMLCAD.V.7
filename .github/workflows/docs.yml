@@ -7,9 +7,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   latex:
     runs-on: ubuntu-latest
@@ -31,15 +28,3 @@ jobs:
         run: |
           test -s doc.pdf
           pdfinfo doc.pdf | grep '^Pages:'
-
-      - name: Commit generated PDF
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/doc.pdf
-          if git diff --cached --quiet; then
-            echo "Generated PDF is already current."
-          else
-            git commit -m "docs: generate handbook PDF"
-            git push
-          fi

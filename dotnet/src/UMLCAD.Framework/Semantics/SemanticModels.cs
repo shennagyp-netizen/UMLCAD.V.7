@@ -2,6 +2,39 @@ namespace UMLCAD.Framework.Semantics;
 
 public sealed record ParameterSemantic(string Name, string Value, string? Unit = null);
 
+public enum SemanticFrameKind
+{
+    World,
+    Document,
+    Part,
+    Body,
+    Sketch,
+    Face,
+    Occurrence,
+    DrawingView,
+    ManufacturingSetup,
+    Simulation
+}
+
+public sealed record SemanticFrame(
+    string Id,
+    SemanticFrameKind Kind,
+    string? ParentId,
+    TransformSemantic TransformToParent);
+
+public sealed record SemanticFrameResolution(
+    string FrameId,
+    SemanticReferenceStatus Status,
+    IReadOnlyList<SemanticFrame> Candidates,
+    string DiagnosticCode,
+    string Message)
+{
+    public bool IsResolved => Status == SemanticReferenceStatus.Resolved;
+
+    public SemanticFrame? Frame =>
+        IsResolved && Candidates.Count == 1 ? Candidates[0] : null;
+}
+
 public enum AuthoritativeResultStatus
 {
     Authoritative,
@@ -183,6 +216,9 @@ public sealed record SemanticApplication(
     IReadOnlyList<DrawingSemantic> Drawings,
     string BuildIdentity)
 {
+    public IReadOnlyList<SemanticFrame> Frames { get; init; } =
+        Array.Empty<SemanticFrame>();
+
     public IReadOnlyList<AuthoritativeResultSemantic> AuthoritativeResults { get; init; } =
         Array.Empty<AuthoritativeResultSemantic>();
 }

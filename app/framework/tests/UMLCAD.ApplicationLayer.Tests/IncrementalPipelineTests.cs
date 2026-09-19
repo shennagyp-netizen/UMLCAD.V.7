@@ -1,3 +1,4 @@
+using Xunit;
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Engine;
 using UMLCAD.Cad.Expressions;

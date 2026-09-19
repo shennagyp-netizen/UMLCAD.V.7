@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>UMLCAD.Kernel</RootNamespace>
+    <AssemblyName>UMLCAD.Kernel</AssemblyName>
+    <Description>Single concrete Application Layer API for authoritative kernel operations.</Description>
+  </PropertyGroup>
+</Project>

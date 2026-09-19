@@ -31,7 +31,7 @@ public sealed class CadDependencyGraph
         return new CadEvaluationPlan(new ReadOnlyCollection<CadId>(order));
     }
 }
-public sealed record CadEvaluationOptions(string ConfigurationIdentity="default",string TolerancePolicyIdentity="default",string RepresentationPolicyIdentity="default");
+public sealed record CadEvaluationOptions(string ConfigurationIdentity="default",string TolerancePolicyIdentity="default");
 public sealed record CadEvaluationOutcome(CadId OperationId,string OperationKind,CadEvaluationIdentity EvaluationIdentity,CadEvaluationStatus Status,CadResult? Result,IReadOnlyList<CadDiagnostic> Diagnostics);
 public sealed record CadEvaluationSnapshot(CadPart Part,CadEvaluationPlan Plan,KernelEvaluationMode Mode,IReadOnlySet<CadId> InvalidatedOperationIds,IReadOnlyDictionary<CadId,CadEvaluationOutcome> Outcomes,IReadOnlyDictionary<CadId,CadResultId?> CurrentBodyResults)
 {
@@ -49,7 +49,7 @@ public static class CadEvaluationIdentityBuilder
 {
     public static CadEvaluationIdentity Build(string partId,CadOperation op,IReadOnlyList<CadResult> upstream,CadEvaluationOptions options)
     {
-        var b=new StringBuilder(partId).Append('|').Append(op.CanonicalDefinition()).Append("|configuration=").Append(options.ConfigurationIdentity).Append("|tolerance=").Append(options.TolerancePolicyIdentity).Append("|representation=").Append(options.RepresentationPolicyIdentity);
+        var b=new StringBuilder(partId).Append('|').Append(op.CanonicalDefinition()).Append("|configuration=").Append(options.ConfigurationIdentity).Append("|tolerance=").Append(options.TolerancePolicyIdentity);
         foreach(var r in upstream.OrderBy(x=>x.Id.Value,StringComparer.Ordinal))b.Append("|upstream=").Append(r.Id.Value).Append(':').Append(r.EvidenceHash);
         return new CadEvaluationIdentity("sha256:"+Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(b.ToString()))).ToLowerInvariant());
     }

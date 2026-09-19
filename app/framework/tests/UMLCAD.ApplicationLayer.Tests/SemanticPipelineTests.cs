@@ -8,7 +8,7 @@ public sealed class SemanticPipelineTests
 {
  [Fact]public async Task SketchExtrusionHoleProducesCurrentBody()
  {
-   var part=CreatePart();var g=new Gateway();var s=await new CadEvaluationEngine(g).EvaluateAsync(part);
+   var part=CreatePart();var g=new Gateway();var s=await new CadEvaluationEngine(g).EvaluateAsync(part, cancellationToken: TestContext.Current.CancellationToken);
    Assert.True(s.Succeeded);Assert.Equal(new[]{new CadId("sketch"),new CadId("extrude"),new CadId("hole")},s.Plan.OperationIds);Assert.Equal(new CadResultId("r:hole"),s.CurrentBody(new CadId("body")));
  }
  [Fact]public void SketchChangeInvalidatesDownstream(){var graph=new CadDependencyGraph(CreatePart());var a=graph.InvalidationClosure(new[]{new CadId("sketch")});Assert.Equal(new[]{"extrude","hole","sketch"},a.OrderBy(x=>x.Value).Select(x=>x.Value));}

@@ -176,6 +176,37 @@ internal sealed class CompiledModelService : ICompiledModelService
             children.Add(nodeId);
         }
 
+        var topologyBindings = part.TopologyBindings.ToDictionary(x => x.Id, StringComparer.Ordinal);
+        foreach (var publication in part.Publications.OrderBy(x => x.Id, StringComparer.Ordinal))
+        {
+            var binding = topologyBindings[publication.TopologyBindingId];
+            var nodeId = NodeChildId(parentId, "face", publication.Id);
+            var metadata = new SortedDictionary<string, JsonElement>(StringComparer.Ordinal)
+            {
+                ["publicationId"] = JsonSerializer.SerializeToElement(publication.Id),
+                ["targetId"] = JsonSerializer.SerializeToElement(publication.TargetId),
+                ["targetKind"] = JsonSerializer.SerializeToElement(publication.TargetKind),
+                ["resultIdentity"] = JsonSerializer.SerializeToElement(publication.ResultIdentity),
+                ["topologyBindingId"] = JsonSerializer.SerializeToElement(publication.TopologyBindingId),
+                ["authoritativeTopologyId"] = JsonSerializer.SerializeToElement(binding.AuthoritativeTopologyId)
+            };
+
+            AddNode(nodes, new CompiledNode(
+                nodeId,
+                publication.TargetId,
+                "Face",
+                parentId,
+                [],
+                metadata,
+                [],
+                [],
+                new CompiledCapabilities(true, true, true, true),
+                null,
+                new Dictionary<string, string>(StringComparer.Ordinal)));
+
+            children.Add(nodeId);
+        }
+
         foreach (var constraint in part.Constraints.OrderBy(x => x.Id, StringComparer.Ordinal))
         {
             var nodeId = NodeChildId(parentId, "constraint", constraint.Id);

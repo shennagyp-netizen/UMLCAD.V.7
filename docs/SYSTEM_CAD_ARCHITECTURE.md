@@ -12,7 +12,7 @@ It is intentionally separate from `docs/MATH_AUTHORITY_ROADMAP.md`:
 - `docs/doc.tex` is the published engineering handbook and must describe this architecture rather than invent a competing one.
 - `docs/CONTINUATION_HANDOFF.md` records the current implementation/evidence state and points back to this document for architecture.
 
-Repository audit baseline for this revision: `main` at `3943653171af8524e25ed928c19026d595e081ba`.
+Repository audit baseline for this revision: exact `main` at `acb125ca3ad4ca01f5b87033ce63739f6a271163`.
 
 The repository is the source of truth. Chat history is not an architectural source of truth.
 
@@ -22,23 +22,21 @@ The repository is the source of truth. Chat history is not an architectural sour
 
 UMLCAD.V.7 is a **system-CAD architecture**, not a thin geometry application and not a copy of CATIA's internal implementation.
 
-The target system separates:
+The target system is organized into **authority strata**, but those strata are **not a linear runtime dependency chain**. A domain may consume several authoritative producers without inheriting from them.
 
 ```
-Mathematical authority
-        ↓
-Scientific services
-        ↓
-CAD meaning / product semantics
-        ↓
-Engineering resources
-        ↓
-Specialized engineering domains
-        ↓
-Application / workflow / presentation
+Authority strata (conceptual)
+--------------------------------
+Platform Foundation
+Mathematical Authority
+Science / Phenomena Services
+CAD Engineering / Product Semantics
+Engineering Resources
+Specialized Engineering Domains
+Application / Workflow / Presentation
 ```
 
-The key distinction is:
+The actual runtime dependency/consumption graph is defined separately in Section 10. The key distinction is:
 
 ```
 Rust math                     .NET System-CAD
@@ -105,6 +103,8 @@ They are never permitted to define engineering truth.
 
 # 4. C4 Level 1 — System Context
 
+C4 Level 1 describes UMLCAD.V.7 as one software system and shows only people and **external systems** around it. The Rust mathematical kernel is an internal container of UMLCAD.V.7 and therefore belongs in Level 2, not Level 1.
+
 The external system context is:
 
 ```
@@ -116,32 +116,26 @@ The external system context is:
                   |       System-CAD           |
                   +-------------+-------------+
                                 |
-                 +--------------+--------------+
-                 |                             |
-                 v                             v
-       Rust Mathematical Kernel       External / Replaceable
-       contracted math authority       providers and systems
-                                      |
-                        +-------------+-------------+
-                        |                           |
-                 Simulation Providers       PLM / PDM / ERP /
-                 / solver applications       manufacturing systems
-                        |
-                        v
-                 Manufacturing machine
-                 / controller / NC consumer
+             +------------------+-------------------+
+             |                  |                   |
+             v                  v                   v
+   Simulation / Solver     PLM / PDM / ERP     Manufacturing /
+      Providers               Systems          NC Consumer
+             ^                                     
+             |                                     
+        provider contract
 ```
 
 The important system relationships are:
 
 - The engineering user defines and inspects engineering intent through UMLCAD.
-- UMLCAD invokes mathematical authority through explicit contracts.
-- UMLCAD may consume scientific simulation services through a provider-neutral boundary.
-- UMLCAD may exchange lifecycle/product/manufacturing information with external systems through adapters.
-- CAM ultimately emits deterministic machine-ready G-code/NC through a postprocessor boundary.
-- No external provider becomes the semantic owner merely because it performs the computation.
+- The UMLCAD system invokes its internal mathematical authority through an explicit kernel contract.
+- External simulation/solver providers implement provider-neutral phenomena contracts where applicable.
+- PLM/PDM/ERP and other external systems integrate through explicit adapters.
+- CAM ultimately emits deterministic machine-ready G-code/NC for an external NC/machine consumer.
+- An external provider never becomes semantic authority merely because it performs a computation.
 
----
+The Rust mathematical authority, native host, CAD Core, Science, resources, persistence, adapters, workflow, and presentation are **internal UMLCAD containers** and are decomposed in C4 Level 2.---
 
 # 5. C4 Level 2 — Containers
 
@@ -694,27 +688,60 @@ The viewer may not:
 
 # 10. Dependency Rules
 
-The intended dependency direction is:
+Two different diagrams are required and must never be conflated.
+
+### 10.1 Authority strata
+
+The conceptual strata are:
 
 ```
 Platform Foundation
-        ↓
-Mathematics
-        ↓
-Science
-        ↓
-CAD Engineering Core
-        ↓
-Engineering Resource Model
-        ↓
+Mathematical Authority
+Science / Phenomena Services
+CAD Engineering Core / Product Structure
+Engineering Resources
 Specialized Engineering Domains
-        ↓
 Application / Workflow / Presentation
 ```
 
-External providers integrate through contracts/adapters.
+These strata describe **ownership and conceptual placement**, not a requirement that every layer depend on the next layer only.
 
-These arrows express **authority and semantic consumption**, not a requirement that every source file reference every downstream project.
+### 10.2 Actual dependency / consumption graph
+
+For the dependency graph below, A → B means **A consumes an explicit contract/authority supplied by B**.
+
+```
+CAD Engineering Core → Mathematical Contracts
+CAD Engineering Core → Science Contracts (where required)
+CAD Engineering Core → Configuration / Knowledge
+
+Sheet Metal → CAD Core
+Sheet Metal → Science
+Sheet Metal → Engineering Resources
+Sheet Metal → Phenomena Simulation Service (where required)
+
+CAM → CAD Core / Product Structure / BOM
+CAM → Engineering Resources
+CAM → Sheet Metal (where applicable)
+CAM → Science / Material / Process semantics
+CAM → Phenomena Simulation Service (where required)
+
+Drawing/PMI → CAD Core / Product Structure
+Kinematics → Product / Assembly Structure
+Kinematics → Mathematical Contracts
+
+Lifecycle/PLM → CAD / Product / Configuration state
+
+Application/Workflow → CAD Core and domain/application contracts
+Presentation → Derived Result / Representation contracts
+
+Simulation Provider → Phenomena Simulation Service
+Integration Adapter → external provider/system
+```
+
+Platform Foundation is shared infrastructure consumed by the relevant internal components; it is not an upstream business-domain parent.
+
+No specialized domain is required to depend on another domain's private implementation. Cross-domain use occurs through explicit stable contracts.
 
 ### Forbidden dependencies
 
@@ -734,16 +761,16 @@ A domain must not:
 ### Allowed dependency form
 
 ```
-Domain meaning
+Consumer domain
     ↓
-Stable contract
+Stable semantic contract
     ↓
-Provider / evaluator / adapter
+Authoritative producer / provider / evaluator
     ↓
-Implementation
+Concrete implementation
 ```
 
----
+This graph is the architectural dependency rule. It is intentionally different from project-reference topology and from implementation order.---
 
 # 11. Identity, Frames, Provenance and Lifecycle
 

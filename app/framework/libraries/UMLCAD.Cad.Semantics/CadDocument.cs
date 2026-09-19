@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 using UMLCAD.Cad.Contracts;
 
 namespace UMLCAD.Cad.Semantics;
@@ -48,7 +49,7 @@ public sealed record CadFeatureDefinition
         Id = id;
         Kind = kind;
         Name = name;
-        Dependencies = dependencies.ToArray();
+        Dependencies = new ReadOnlyCollection<CadId>(dependencies.ToArray());
     }
 
     public CadId Id { get; }
@@ -60,19 +61,22 @@ public sealed record CadFeatureDefinition
     public IReadOnlyList<CadId> Dependencies { get; }
 }
 
-public sealed record CadDocumentDefinition(
-    CadId Id,
-    string Name,
-    IReadOnlyList<CadFeatureDefinition> Features)
+public sealed record CadDocumentDefinition
 {
-    public CadDocumentDefinition
+    public CadDocumentDefinition(
+        CadId id,
+        string name,
+        IReadOnlyList<CadFeatureDefinition> features)
     {
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Document name cannot be empty.", nameof(Name));
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Document name cannot be empty.", nameof(name));
 
-        ArgumentNullException.ThrowIfNull(Features);
+        ArgumentNullException.ThrowIfNull(features);
 
-        var duplicateIds = Features
+        var copiedFeatures =
+            new ReadOnlyCollection<CadFeatureDefinition>(features.ToArray());
+
+        var duplicateIds = copiedFeatures
             .GroupBy(x => x.Id)
             .Where(group => group.Count() > 1)
             .Select(group => group.Key.Value)
@@ -82,11 +86,11 @@ public sealed record CadDocumentDefinition(
         {
             throw new ArgumentException(
                 $"Duplicate feature IDs: {string.Join(", ", duplicateIds)}",
-                nameof(Features));
+                nameof(features));
         }
 
-        var knownIds = Features.Select(feature => feature.Id).ToImmutableHashSet();
-        var unknownDependencies = Features
+        var knownIds = copiedFeatures.Select(feature => feature.Id).ToImmutableHashSet();
+        var unknownDependencies = copiedFeatures
             .SelectMany(feature => feature.Dependencies
                 .Where(dependency => !knownIds.Contains(dependency))
                 .Select(dependency => $"{feature.Id.Value}->{dependency.Value}"))
@@ -96,22 +100,41 @@ public sealed record CadDocumentDefinition(
         {
             throw new ArgumentException(
                 $"Unknown feature dependencies: {string.Join(", ", unknownDependencies)}",
-                nameof(Features));
+                nameof(features));
         }
+
+        Id = id;
+        Name = name;
+        Features = copiedFeatures;
     }
+
+    public CadId Id { get; }
+
+    public string Name { get; }
+
+    public IReadOnlyList<CadFeatureDefinition> Features { get; }
 }
 
-public sealed record CadDocumentSnapshot(
-    CadId Id,
-    string Name,
-    IReadOnlyList<CadFeatureDefinition> Features)
+public sealed record CadDocumentSnapshot
 {
-    public CadDocumentSnapshot
+    public CadDocumentSnapshot(
+        CadId id,
+        string name,
+        IReadOnlyList<CadFeatureDefinition> features)
     {
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Document name cannot be empty.", nameof(Name));
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Document name cannot be empty.", nameof(name));
 
-        ArgumentNullException.ThrowIfNull(Features);
+        ArgumentNullException.ThrowIfNull(features);
+
+        Id = id;
+        Name = name;
+        Features = new ReadOnlyCollection<CadFeatureDefinition>(features.ToArray());
     }
-}
 
+    public CadId Id { get; }
+
+    public string Name { get; }
+
+    public IReadOnlyList<CadFeatureDefinition> Features { get; }
+}

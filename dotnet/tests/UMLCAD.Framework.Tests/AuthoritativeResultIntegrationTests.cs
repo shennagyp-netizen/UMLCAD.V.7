@@ -25,6 +25,22 @@ public sealed class AuthoritativeResultIntegrationTests
     }
 
     [Fact]
+    public void Derived_authoritative_results_are_not_emitted_as_kernel_semantic_input()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid");
+        using var app = builder.Build();
+
+        var service = app.GetRequiredService<IAuthoritativeResultIntegrationService>();
+        var integrated = service.Integrate(app.Semantic, ValidResult("result-r1", "part"));
+        var package = app.GetRequiredService<IBuildPackageService>().CreatePackage(integrated);
+
+        Assert.Equal(integrated.BuildIdentity, package.BuildIdentity);
+        Assert.Empty(package.Semantic.AuthoritativeResults);
+        Assert.Equal(app.Semantic.BuildIdentity, package.BuildIdentity);
+    }
+
+    [Fact]
     public void Integrating_the_same_result_twice_is_idempotent()
     {
         var builder = CadApplication.CreateBuilder();

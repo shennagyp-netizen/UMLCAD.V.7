@@ -14,7 +14,7 @@ public sealed class RedTeamPipelineTests
         var part = Factory.Create();
         var engine = new CadEvaluationEngine(new MismatchingGateway());
 
-        var snapshot = await engine.EvaluateAsync(part);
+        var snapshot = await engine.EvaluateAsync(part, cancellationToken: TestContext.Current.CancellationToken);
 
         var outcome = snapshot.Outcomes[new CadId("sketch")];
         Assert.False(snapshot.Succeeded);

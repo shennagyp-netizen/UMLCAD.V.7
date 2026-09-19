@@ -117,6 +117,7 @@ public sealed class SystemCadAcceptanceTests
                 new AuthoritativeResultSemantic(
                     "result-r1",
                     "part",
+                    "world",
                     "operation-1",
                     "contract-v1",
                     "evidence-1",

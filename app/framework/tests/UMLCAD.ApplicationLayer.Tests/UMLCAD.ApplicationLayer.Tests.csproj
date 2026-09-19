@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <RootNamespace>UMLCAD.ApplicationLayer.Tests</RootNamespace>
+    <AssemblyName>UMLCAD.ApplicationLayer.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../libraries/UMLCAD.Kernel/UMLCAD.Kernel.csproj" />
+    <ProjectReference Include="../../libraries/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
+    <ProjectReference Include="../../libraries/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
+    <ProjectReference Include="../../libraries/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
+    <ProjectReference Include="../../libraries/UMLCAD.Framework/UMLCAD.Framework.csproj" />
+  </ItemGroup>
+</Project>

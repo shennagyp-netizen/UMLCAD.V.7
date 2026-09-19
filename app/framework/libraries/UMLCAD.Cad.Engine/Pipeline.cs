@@ -121,6 +121,6 @@ public sealed class CadEvaluationEngine
         }
         _previous.Clear();foreach(var x in outcomes)_previous[x.Key]=x.Value;
         _previousKernelHistory=kernelHistory;
-        return new CadEvaluationSnapshot(part,plan,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,kernelHistory,new ReadOnlySetAdapter<CadId>(invalidated),new ReadOnlyDictionary<CadId,CadEvaluationOutcome>(outcomes),new ReadOnlyDictionary<CadId,CadResultId?>(bodies));
+        return new CadEvaluationSnapshot(part,plan,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,kernelHistory,invalidated,new ReadOnlyDictionary<CadId,CadEvaluationOutcome>(outcomes),new ReadOnlyDictionary<CadId,CadResultId?>(bodies));
     }
 }

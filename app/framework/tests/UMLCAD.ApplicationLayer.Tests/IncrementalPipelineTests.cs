@@ -21,6 +21,6 @@ public sealed class IncrementalPipelineTests
  sealed class Gateway:IKernelGateway
  {
   public List<KernelOperationRequest> Requests{get;}=[];
-  public Task<KernelOperationResponse> EvaluateAsync(KernelOperationRequest r,CancellationToken c=default){Requests.Add(r);var id=r.OperationKind switch{"Cad.Sketch"=>"r:sketch","Cad.Extrusion"=>"r:extrude","Cad.Hole"=>"r:hole",_=>"r:unknown"};return Task.FromResult(new KernelOperationResponse(CadEvaluationStatus.Succeeded,new CadResultId(id),"evidence",new[]{new KernelTopologyBinding("operation",r.OperationId.Value)},Array.Empty<CadDiagnostic>()));}
+  public Task<KernelOperationResponse> EvaluateAsync(KernelOperationRequest r,CancellationToken c=default){Requests.Add(r);var id=r.OperationKind switch{"Cad.Sketch"=>"r:sketch","Cad.Extrusion"=>"r:extrude","Cad.Hole"=>"r:hole",_=>"r:unknown"};return Task.FromResult(KernelOperationResponse.Success(r,new CadResultId(id),"evidence",new[]{new KernelTopologyBinding("operation",r.OperationId.Value)}));}
  }
 }

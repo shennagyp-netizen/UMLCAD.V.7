@@ -1,4 +1,5 @@
 using Xunit;
+using Xunit;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -33,7 +34,7 @@ public sealed class KernelClientContractTests
                 1024 * 1024),
             new HttpClient(handler));
 
-        var result = await client.EvaluateAsync(request);
+        var result = await client.EvaluateAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(CadEvaluationStatus.Succeeded, result.Status);
         Assert.Equal(request.EvaluationIdentity, result.EvaluationIdentity);
@@ -145,7 +146,10 @@ public sealed class KernelClientContractTests
             TimeSpan.FromMinutes(1));
 
         using var cancellation = new CancellationTokenSource();
+#pragma warning disable xUnit1051
+        // This deliberately uses a dedicated caller token to verify cancellation propagation.
         var operation = client.EvaluateAsync(request, cancellation.Token);
+#pragma warning restore xUnit1051
         cancellation.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(

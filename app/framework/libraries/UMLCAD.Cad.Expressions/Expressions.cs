@@ -1,33 +1,100 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+
 namespace UMLCAD.Cad.Expressions;
+
 public abstract record CadExpression
 {
-    public abstract double Evaluate(IReadOnlyDictionary<string,double> parameters);
-    public abstract string CanonicalForm{get;}
-    public string Identity=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(CanonicalForm))).ToLowerInvariant();
-    public static CadExpression Constant(double value)=>new ConstantExpression(value);
-    public static CadExpression Parameter(string name)=>new ParameterExpression(name);
-    public static CadExpression Add(params CadExpression[] terms)=>new SumExpression(terms);
+    public abstract double Evaluate(IReadOnlyDictionary<string, double> parameters);
+    public abstract string CanonicalForm { get; }
+
+    public string Identity =>
+        Convert.ToHexString(
+            SHA256.HashData(Encoding.UTF8.GetBytes(CanonicalForm)))
+        .ToLowerInvariant();
+
+    public static CadExpression Constant(double value) =>
+        new ConstantExpression(value);
+
+    public static CadExpression Parameter(string name) =>
+        new ParameterExpression(name);
+
+    public static CadExpression Add(params CadExpression[] terms) =>
+        new SumExpression(terms);
 }
-public sealed record ConstantExpression(double Value):CadExpression
+
+public sealed record ConstantExpression : CadExpression
 {
-    public ConstantExpression{if(!double.IsFinite(Value))throw new ArgumentOutOfRangeException(nameof(Value));}
-    public override double Evaluate(IReadOnlyDictionary<string,double> parameters)=>Value;
-    public override string CanonicalForm=>"const:"+Value.ToString("R",CultureInfo.InvariantCulture);
+    public double Value { get; }
+
+    public ConstantExpression(double value)
+    {
+        if (!double.IsFinite(value))
+            throw new ArgumentOutOfRangeException(nameof(value));
+
+        Value = value;
+    }
+
+    public override double Evaluate(
+        IReadOnlyDictionary<string, double> parameters) => Value;
+
+    public override string CanonicalForm =>
+        "const:" + Value.ToString("R", CultureInfo.InvariantCulture);
 }
-public sealed record ParameterExpression(string Name):CadExpression
+
+public sealed record ParameterExpression : CadExpression
 {
-    public ParameterExpression{if(string.IsNullOrWhiteSpace(Name))throw new ArgumentException("Parameter is required.");}
-    public override double Evaluate(IReadOnlyDictionary<string,double> parameters){if(!parameters.TryGetValue(Name,out var value))throw new KeyNotFoundException(Name);return value;}
-    public override string CanonicalForm=>"param:"+Name;
+    public string Name { get; }
+
+    public ParameterExpression(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Parameter is required.", nameof(name));
+
+        Name = name;
+    }
+
+    public override double Evaluate(
+        IReadOnlyDictionary<string, double> parameters)
+    {
+        if (!parameters.TryGetValue(Name, out var value))
+            throw new KeyNotFoundException(Name);
+
+        return value;
+    }
+
+    public override string CanonicalForm => "param:" + Name;
 }
-public sealed record SumExpression(IReadOnlyList<CadExpression> Terms):CadExpression
+
+public sealed record SumExpression : CadExpression
 {
-    public SumExpression(IEnumerable<CadExpression> terms):this(terms.ToArray()){}
-    public SumExpression{if(Terms.Count==0)throw new ArgumentException("Sum needs terms.");}
-    public override double Evaluate(IReadOnlyDictionary<string,double> parameters)=>Terms.Sum(x=>x.Evaluate(parameters));
-    public override string CanonicalForm=>"sum("+string.Join(",",Terms.Select(x=>x.CanonicalForm))+")";
+    public IReadOnlyList<CadExpression> Terms { get; }
+
+    public SumExpression(IEnumerable<CadExpression> terms)
+    {
+        ArgumentNullException.ThrowIfNull(terms);
+
+        Terms = terms.ToArray();
+
+        if (Terms.Count == 0)
+            throw new ArgumentException("Sum needs terms.", nameof(terms));
+
+        if (Terms.Any(term => term is null))
+            throw new ArgumentException(
+                "Sum terms cannot contain null expressions.",
+                nameof(terms));
+    }
+
+    public override double Evaluate(
+        IReadOnlyDictionary<string, double> parameters) =>
+        Terms.Sum(term => term.Evaluate(parameters));
+
+    public override string CanonicalForm =>
+        "sum(" + string.Join(",", Terms.Select(term => term.CanonicalForm)) + ")";
 }
-public sealed record CadParameterBinding(string Name,CadExpression Expression,string? Unit=null);
+
+public sealed record CadParameterBinding(
+    string Name,
+    CadExpression Expression,
+    string? Unit = null);

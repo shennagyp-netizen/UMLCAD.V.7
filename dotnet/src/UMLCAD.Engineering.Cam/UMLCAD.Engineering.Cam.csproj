@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>UMLCAD.Engineering.Cam</RootNamespace>
+    <AssemblyName>UMLCAD.Engineering.Cam</AssemblyName>
+    <Description>CAM manufacturing operations, toolpaths, postprocessing contracts, and deterministic NC/G-code generation.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
+    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
+    <ProjectReference Include="../UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj" />
+  </ItemGroup>
+</Project>

@@ -43,7 +43,8 @@ public sealed class SemanticReferenceServiceTests
         using var app = builder.Build();
         var service = app.GetRequiredService<ISemanticReferenceService>();
 
-        var result = service.Resolve(app.Semantic,
+        var semantic = WithAuthoritativeResult(app.Semantic, "result-r1", "part");
+        var result = service.Resolve(semantic,
             new SemanticReference("part", "front-face", "face", "stale-build"));
 
         Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
@@ -177,7 +178,8 @@ public sealed class SemanticReferenceServiceTests
         using var app = builder.Build();
         var service = app.GetRequiredService<ISemanticReferenceService>();
 
-        var result = service.Resolve(app.Semantic,
+        var semantic = WithAuthoritativeResult(app.Semantic, "result-r1", "part");
+        var result = service.Resolve(semantic,
             new SemanticReference("part", "front-face", "face", "result-r1"));
 
         Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
@@ -245,12 +247,31 @@ public sealed class SemanticReferenceServiceTests
         });
 
         using var app = builder.Build();
+        var semantic = WithAuthoritativeResult(app.Semantic, "result-r2", "part");
         var result = app.GetRequiredService<ISemanticReferenceService>()
-            .Resolve(app.Semantic, new SemanticReference("part", "front-face", "face", "result-r2"));
+            .Resolve(semantic, new SemanticReference("part", "front-face", "face", "result-r2"));
 
         Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
         Assert.Equal("REFERENCE_PROVENANCE_MISMATCH", result.DiagnosticCode);
     }
+
+    private static SemanticApplication WithAuthoritativeResult(
+        SemanticApplication semantic,
+        string resultId,
+        string producerId) =>
+        semantic with
+        {
+            AuthoritativeResults =
+            [
+                new AuthoritativeResultSemantic(
+                    resultId,
+                    producerId,
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative)
+            ]
+        };
 
     [Fact]
     public void Reports_unsupported_face_reference_without_inventing_topology()

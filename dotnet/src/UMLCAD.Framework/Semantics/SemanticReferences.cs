@@ -172,35 +172,68 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
         if (!producerId.StartsWith(prefix, StringComparison.Ordinal))
             return false;
 
-        var encoded = producerId[prefix.Length..];
-        var separator = encoded.IndexOf('/', StringComparison.Ordinal);
-        if (separator <= 0 || separator == encoded.Length - 1)
+        var encodedSegments = producerId[prefix.Length..]
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        if (encodedSegments.Length < 2)
             return false;
 
-        string assemblyId;
-        string occurrenceId;
-        try
+        string Decode(string value)
         {
-            assemblyId = Uri.UnescapeDataString(encoded[..separator]);
-            occurrenceId = Uri.UnescapeDataString(encoded[(separator + 1)..]);
+            try
+            {
+                return Uri.UnescapeDataString(value);
+            }
+            catch (UriFormatException)
+            {
+                return string.Empty;
+            }
         }
-        catch (UriFormatException)
-        {
+
+        var assemblyId = Decode(encodedSegments[0]);
+        if (string.IsNullOrWhiteSpace(assemblyId))
             return false;
-        }
 
         var assembly = application.Assemblies.FirstOrDefault(
             x => string.Equals(x.Id, assemblyId, StringComparison.Ordinal));
         if (assembly is null)
             return false;
 
-        var match = assembly.Occurrences.FirstOrDefault(
-            x => string.Equals(x.Id, occurrenceId, StringComparison.Ordinal));
-        if (match is null)
-            return false;
+        var currentAssembly = assembly;
+        AssemblyOccurrenceSemantic? currentOccurrence = null;
 
-        containingAssembly = assembly;
-        occurrence = match;
+        for (var index = 1; index < encodedSegments.Length; index++)
+        {
+            var segment = encodedSegments[index];
+            if (index > 1 && !segment.StartsWith("occurrence:", StringComparison.Ordinal))
+                return false;
+
+            var occurrenceId = Decode(
+                index == 1 ? segment : segment["occurrence:".Length..]);
+
+            if (string.IsNullOrWhiteSpace(occurrenceId))
+                return false;
+
+            currentOccurrence = currentAssembly.Occurrences.FirstOrDefault(
+                x => string.Equals(x.Id, occurrenceId, StringComparison.Ordinal));
+
+            if (currentOccurrence is null)
+                return false;
+
+            if (index < encodedSegments.Length - 1)
+            {
+                if (!string.Equals(currentOccurrence.DefinitionKind, "assembly", StringComparison.Ordinal))
+                    return false;
+
+                currentAssembly = application.Assemblies.FirstOrDefault(
+                    x => string.Equals(x.Id, currentOccurrence!.DefinitionId, StringComparison.Ordinal))!;
+                if (currentAssembly is null)
+                    return false;
+            }
+        }
+
+        containingAssembly = currentAssembly;
+        occurrence = currentOccurrence!;
         return true;
     }
 

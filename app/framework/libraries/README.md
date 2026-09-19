@@ -15,6 +15,7 @@ The new Application Layer is intentionally decomposed into focused libraries.
 | UMLCAD.Engineering.Cam | Manufacturing semantics and NC generation |
 | UMLCAD.Engineering.Drawing | Drawing and PMI semantics |
 | UMLCAD.Integration.Simulation | External simulation integration boundary |
+| UMLCAD.Engineering.Runtime | Typed engineering context, rules, and controlled engineering execution |
 | UMLCAD.Framework | Application composition and cross-domain orchestration |
 
 The table describes ownership, not inheritance. Dependencies are explicit and must remain acyclic.

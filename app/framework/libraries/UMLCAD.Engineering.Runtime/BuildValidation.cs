@@ -40,38 +40,46 @@ public sealed class EngineeringBuildValidator
         var initialState = store.Snapshot();
         var results = new List<EngineeringRuleResult>(orderedRules.Length);
 
-        foreach (var rule in orderedRules)
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var currentState = store.Snapshot();
-            var context = new EngineeringContext(
-                currentState,
-                currentState.Features.ToDictionary(feature => feature.Id));
-
-            var control = new InMemoryCadControlService(store);
-            var services = new EngineeringServices(control, simulation);
-            var result = await _ruleRuntime.ExecuteAsync(
-                rule,
-                context,
-                services,
-                cancellationToken);
-
-            results.Add(result);
-
-            if (result.RequiresRollback)
+            foreach (var rule in orderedRules)
             {
-                store.Restore(initialState);
-                return new EngineeringBuildValidationResult(
-                    false,
-                    results,
-                    store.Snapshot());
-            }
-        }
+                cancellationToken.ThrowIfCancellationRequested();
 
-        return new EngineeringBuildValidationResult(
-            true,
-            results,
-            store.Snapshot());
+                var currentState = store.Snapshot();
+                var context = new EngineeringContext(
+                    currentState,
+                    currentState.Features.ToDictionary(feature => feature.Id));
+
+                var control = new InMemoryCadControlService(store);
+                var services = new EngineeringServices(control, simulation);
+                var result = await _ruleRuntime.ExecuteAsync(
+                    rule,
+                    context,
+                    services,
+                    cancellationToken);
+
+                results.Add(result);
+
+                if (result.RequiresRollback)
+                {
+                    store.Restore(initialState);
+                    return new EngineeringBuildValidationResult(
+                        false,
+                        results,
+                        store.Snapshot());
+                }
+            }
+
+            return new EngineeringBuildValidationResult(
+                true,
+                results,
+                store.Snapshot());
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            store.Restore(initialState);
+            throw;
+        }
     }
 }

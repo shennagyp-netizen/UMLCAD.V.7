@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Semantics;
 
@@ -9,11 +10,27 @@ public enum CadEvaluationPlanStatus
     CycleDetected
 }
 
-public sealed record CadEvaluationPlan(
-    CadEvaluationPlanStatus Status,
-    IReadOnlyList<CadId> EvaluationOrder,
-    IReadOnlyList<CadId> CyclePath)
+public sealed record CadEvaluationPlan
 {
+    public CadEvaluationPlan(
+        CadEvaluationPlanStatus status,
+        IReadOnlyList<CadId> evaluationOrder,
+        IReadOnlyList<CadId> cyclePath)
+    {
+        ArgumentNullException.ThrowIfNull(evaluationOrder);
+        ArgumentNullException.ThrowIfNull(cyclePath);
+
+        Status = status;
+        EvaluationOrder = new ReadOnlyCollection<CadId>(evaluationOrder.ToArray());
+        CyclePath = new ReadOnlyCollection<CadId>(cyclePath.ToArray());
+    }
+
+    public CadEvaluationPlanStatus Status { get; }
+
+    public IReadOnlyList<CadId> EvaluationOrder { get; }
+
+    public IReadOnlyList<CadId> CyclePath { get; }
+
     public bool IsValid => Status == CadEvaluationPlanStatus.Ready;
 }
 
@@ -42,6 +59,14 @@ public sealed class CadDependencyGraph
             .ToArray();
 
         var reverse = _dependencies.Keys.ToDictionary(id => id, _ => new List<CadId>());
+        var unknown = changed.Where(id => !reverse.ContainsKey(id)).ToArray();
+        if (unknown.Length > 0)
+        {
+            throw new ArgumentException(
+                "Changed feature IDs are not present in the document: " +
+                string.Join(", ", unknown.Select(id => id.Value)),
+                nameof(changedIds));
+        }
 
         foreach (var (dependent, dependencies) in _dependencies)
         {
@@ -63,9 +88,10 @@ public sealed class CadDependencyGraph
             }
         }
 
-        return affected
-            .OrderBy(id => id.Value, StringComparer.Ordinal)
-            .ToArray();
+        return new ReadOnlyCollection<CadId>(
+            affected
+                .OrderBy(id => id.Value, StringComparer.Ordinal)
+                .ToArray());
     }
 
     public CadEvaluationPlan CreatePlan()
@@ -82,7 +108,7 @@ public sealed class CadDependencyGraph
             var cycle = Visit(node, state, stack, order);
             if (cycle.Count > 0)
             {
-                return new CadEvaluationPlan(
+                    return new CadEvaluationPlan(
                     CadEvaluationPlanStatus.CycleDetected,
                     [],
                     cycle);

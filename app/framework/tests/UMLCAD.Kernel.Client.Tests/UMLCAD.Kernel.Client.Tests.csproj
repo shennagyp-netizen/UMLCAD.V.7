@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>UMLCAD.Kernel.Client.Tests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.1" />
+    <ProjectReference Include="../../libraries/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
+    <ProjectReference Include="../../libraries/UMLCAD.Kernel.Client/UMLCAD.Kernel.Client.csproj" />
+  </ItemGroup>
+</Project>

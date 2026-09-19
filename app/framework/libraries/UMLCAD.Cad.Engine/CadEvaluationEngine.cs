@@ -16,6 +16,16 @@ public sealed class CadEvaluationEngine(UmlcadKernel kernel)
         return new CadDependencyGraph(document).CreatePlan();
     }
 
+    public Task<KernelEvaluationOutcome> EvaluateAsync(
+        CadPartDefinition part,
+        CadBuildIdentity identity,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(part);
+        var definition = new CadKernelBuildPackageFactory().Create(part, identity);
+        return EvaluateAsync(definition, cancellationToken);
+    }
+
     public async Task<KernelEvaluationOutcome> EvaluateAsync(
         CadBuildDefinition definition,
         CancellationToken cancellationToken = default)

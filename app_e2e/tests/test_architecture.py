@@ -316,6 +316,11 @@ class ApplicationArchitectureTests(unittest.TestCase):
 
         self.assertTrue(is_under(gateways[0].path, SOURCE_ROOT.resolve()))
 
+    def _production_app_sources(self):
+        for root in (SOURCE_ROOT, APPLICATION_ROOT):
+            for source_file in sorted(root.rglob("*.cs")):
+                yield source_file
+
     def test_kernel_transport_knowledge_isolated_to_gateway(self) -> None:
         gateway = next(
             project for project in self.projects.values()
@@ -323,7 +328,7 @@ class ApplicationArchitectureTests(unittest.TestCase):
         )
         violations: list[str] = []
 
-        for source_file in sorted(SOURCE_ROOT.rglob("*.cs")):
+        for source_file in self._production_app_sources():
             if is_under(source_file.resolve(), gateway.path.parent / gateway.path.name):
                 continue
 
@@ -348,7 +353,7 @@ class ApplicationArchitectureTests(unittest.TestCase):
         )
         violations: list[str] = []
 
-        for source_file in sorted(SOURCE_ROOT.rglob("*.cs")):
+        for source_file in self._production_app_sources():
             if is_under(source_file.resolve(), gateway.path.parent / gateway.path.name):
                 continue
 

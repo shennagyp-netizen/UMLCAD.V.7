@@ -54,6 +54,7 @@ public sealed record KernelOperationResponse(
         KernelOperationRequest request,
         CadResultId resultId,
         string evidenceHash,
+        KernelHistoryIdentity historyIdentity,
         IReadOnlyList<KernelTopologyBinding>? topology = null,
         IReadOnlyList<CadDiagnostic>? diagnostics = null) =>
         new(
@@ -65,7 +66,7 @@ public sealed record KernelOperationResponse(
             evidenceHash,
             topology ?? Array.Empty<KernelTopologyBinding>(),
             diagnostics ?? Array.Empty<CadDiagnostic>(),
-            new KernelHistoryIdentity("demo:" + request.EvaluationIdentity.Value));
+            historyIdentity);
 
     public static KernelOperationResponse Failure(
         KernelOperationRequest request,

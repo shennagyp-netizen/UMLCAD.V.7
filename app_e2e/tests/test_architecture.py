@@ -396,6 +396,14 @@ class ApplicationArchitectureTests(unittest.TestCase):
             + (f": {rendered}" if rendered else ""),
         )
 
+    def test_no_duplicate_kernel_gateway_project_exists(self) -> None:
+        duplicate = SOURCE_ROOT / "UMLCAD.Kernel"
+
+        self.assertFalse(
+            duplicate.exists(),
+            f"Legacy duplicate kernel gateway must not exist: {duplicate.relative_to(ROOT)}",
+        )
+
     def test_exactly_one_kernel_gateway_exists(self) -> None:
         gateways = [
             project for project in self.projects.values()

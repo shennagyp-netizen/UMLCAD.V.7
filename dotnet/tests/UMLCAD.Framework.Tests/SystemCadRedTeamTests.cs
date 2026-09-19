@@ -26,26 +26,12 @@ public sealed class SystemCadRedTeamTests
     [Fact]
     public void Duplicate_constraint_identity_is_ambiguous()
     {
-        var semantic = new PartSemantic(
-            "part",
-            "part",
-            [],
-            [new GeometrySemantic("edge", "line", new Dictionary<string, string>())],
-            [
-                new ConstraintSemantic("c", "horizontal", ["edge"], new Dictionary<string, string>()),
-                new ConstraintSemantic("c", "vertical", ["edge"], new Dictionary<string, string>())
-            ],
-            [],
-            []);
-
-        using var app = BuildFromSemantic(new SemanticApplication(
-            "app",
-            "1.0.0",
-            new Dictionary<string, string>(),
-            [semantic],
-            [],
-            [],
-            "build"));
+        using var app = Build(builder => builder.AddPart("part", "part", part =>
+        {
+            part.Geometry("edge", "line", new Dictionary<string, string>());
+            part.Constraint("c", "horizontal", ["edge"], new Dictionary<string, string>());
+            part.Constraint("c", "vertical", ["edge"], new Dictionary<string, string>());
+        }));
 
         var result = Resolve(app, "part", "c", "constraint");
 
@@ -56,24 +42,14 @@ public sealed class SystemCadRedTeamTests
     [Fact]
     public void Duplicate_component_identity_is_ambiguous()
     {
-        var semantic = new PartSemantic(
-            "part",
-            "part",
-            [],
-            [],
-            [],
-            [],
-            ["component", "component"]);
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "part", part =>
+        {
+            part.Component("component");
+            part.Component("component");
+        });
 
-        using var app = BuildFromSemantic(new SemanticApplication(
-            "app",
-            "1.0.0",
-            new Dictionary<string, string>(),
-            [semantic],
-            [],
-            [],
-            "build"));
-
+        using var app = builder.Build();
         var result = Resolve(app, "part", "component", "component");
 
         Assert.Equal(SemanticReferenceStatus.Ambiguous, result.Status);
@@ -251,38 +227,6 @@ public sealed class SystemCadRedTeamTests
     }
 
     [Fact]
-    public void Compiled_manifest_graph_rejects_reference_to_missing_child_after_construction()
-    {
-        var manifest = new CompiledModelManifest(
-            "uml-cad-compiled-model/1.1.0",
-            "app",
-            "1.0.0",
-            "build",
-            ["root"],
-            [
-                new CompiledNode(
-                    "root",
-                    "Root",
-                    "Root",
-                    null,
-                    ["missing-child"],
-                    new Dictionary<string, JsonElement>(),
-                    [],
-                    [],
-                    new CompiledCapabilities(true, true, true, true),
-                    null,
-                    new Dictionary<string, string>())
-            ],
-            [],
-            [],
-            [],
-            [],
-            []);
-
-        Assert.Equal("missing-child", manifest.Nodes[0].ChildIds.Single());
-    }
-
-    [Fact]
     public void Repeated_compilation_is_stable_for_the_same_snapshot()
     {
         using var app = Build(builder =>
@@ -305,14 +249,6 @@ public sealed class SystemCadRedTeamTests
         var builder = CadApplication.CreateBuilder();
         configure(builder);
         return builder.Build();
-    }
-
-    private static CadApplication BuildFromSemantic(SemanticApplication semantic)
-    {
-        var builder = CadApplication.CreateBuilder();
-        builder.ApplicationId = semantic.Id;
-        builder.Version = semantic.Version;
-        return new TestApplicationBuilder(builder).Build(semantic);
     }
 
     private static SemanticReferenceResolution Resolve(

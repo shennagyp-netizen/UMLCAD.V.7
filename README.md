@@ -16,37 +16,38 @@ The architecture document defines **how the system is structured**. The handoff/
 
 ## Architectural invariants
 
-```text
-Science
-├── Material / physical properties
-└── Phenomena Simulation Service
-             ↑
-             │ multiple providers
-             │
-Engineering Resources
-├── Machine
-├── Tool
-├── Fixture
-├── Process
-└── Capabilities
-             ↑
-      ┌──────┴──────┐
-      │             │
- Sheet Metal       CAM
-      │             ├── Toolpath
-      │             ├── Postprocessor
-      │             └── deterministic G-code / NC
-      │
-      └── material/machine/process validation
+The architecture distinguishes conceptual authority strata from the actual dependency graph.
 
-CAD Product Structure
-        ↓
-       BOM
-        ↓
-Drawing / CAM / PLM
+```
+Authority strata
+----------------
+Platform Foundation
+Mathematical Authority
+Science / Phenomena Services
+CAD / Product Semantics
+Engineering Resources
+Specialized Engineering Domains
+Application / Workflow / Presentation
 ```
 
-BOM is derived from authoritative product structure. CAM consumes authoritative CAD/product semantics, engineering resources, and applicable scientific/simulation services; CAM ultimately produces deterministic G-code/NC through its postprocessor boundary. Simulation is provider-neutral. The viewer is presentation-only.
+Actual consumption is contract-driven:
+
+```
+CAD Core → Mathematical Contracts
+CAM → CAD / Product Structure / BOM
+CAM → Engineering Resources / Science / Simulation
+Sheet Metal → CAD / Science / Engineering Resources
+Drawing / PMI → CAD / Product Structure
+Kinematics → Product / Assembly / Mathematical Contracts
+Lifecycle / PLM → CAD / Product / Configuration
+```
+
+```
+CAD Product Structure → BOM → Drawing / CAM / PLM
+Simulation Provider → Phenomena Simulation Service
+```
+
+BOM is derived from authoritative Product Structure. CAM consumes authoritative CAD/product semantics, engineering resources, and applicable scientific/simulation services; CAM ultimately produces deterministic G-code/NC through its postprocessor boundary. Simulation is provider-neutral. The viewer is presentation-only.
 
 ## Mathematical authority
 

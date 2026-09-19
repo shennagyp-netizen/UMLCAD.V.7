@@ -266,7 +266,7 @@ The authoritative current body is $B_2$.
 \item side effects are confined to controlled boundaries such as kernel calls, persistence and simulation.
 \end{enumerate}
 
-\section{Body and incremental render semantics}
+\section{Body and kernel-history realization semantics}
 
 A Body is the current solid/result state, not a container holding a traditional feature tree.
 
@@ -283,10 +283,10 @@ The kernel may realize the transition incrementally:
 
 \begin{lstlisting}
 previous authoritative result + semantic delta
-        -> kernel incremental render
+        -> kernel history/state realization
 \end{lstlisting}
 
-Incremental render is a kernel execution/optimization mechanism. It is not the semantic model and must not replace the Application Layer pipeline.
+Kernel history/state realization is an execution mechanism. It is not the semantic model and must not replace the Application Layer pipeline. Rendering is a separate derived-representation operation.
 
 The required equivalence is:
 \[
@@ -392,7 +392,7 @@ Part
   -> Hole
       -> BodyResult_2 = Final/Current Body
   -> topology + provenance
-  -> kernel incremental-render request
+  -> kernel operation request against current kernel history/state
   -> authoritative kernel result
   -> derived representation
 \end{lstlisting}
@@ -785,7 +785,7 @@ UMLCAD.Kernel.Client gateway
 Rust mathematical/native kernel
         |
         v
-incremental render / authoritative realization
+kernel history / authoritative realization
 \end{lstlisting}
 
 The Application Layer owns meaning and composition. The kernel owns mathematical authority and realization. No domain library may introduce a second competing Body/geometry authority.

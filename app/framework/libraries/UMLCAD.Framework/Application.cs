@@ -44,6 +44,16 @@ public sealed class UmlcadApplication : IDisposable
     }
 
     public Task<KernelEvaluationOutcome> BuildAsync(
+        CadPartDefinition part,
+        CadBuildIdentity identity,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(part);
+        return _evaluation.EvaluateAsync(part, identity, cancellationToken);
+    }
+
+    public Task<KernelEvaluationOutcome> BuildAsync(
         CadBuildDefinition definition,
         CancellationToken cancellationToken = default)
     {

@@ -253,14 +253,44 @@ public sealed record CadPartProgram(CadPartDefinition Definition)
             Array.Empty<Publication>(),
             Array.Empty<CadOperation>()));
 
-    public CadPartProgram AddParameter(CadParameter parameter) =>
-        this with
+    public CadPartProgram AddParameter(CadParameter parameter)
+    {
+        ArgumentNullException.ThrowIfNull(parameter);
+
+        if (Definition.Parameters.Any(
+                x => string.Equals(
+                    x.Name,
+                    parameter.Name,
+                    StringComparison.Ordinal)))
+            throw new InvalidOperationException(
+                $"Parameter '{parameter.Name}' already exists.");
+
+        return this with
         {
             Definition = Definition with
             {
                 Parameters = Definition.Parameters.Append(parameter).ToArray()
             }
         };
+    }
+
+    public CadPartProgram AddPublication(Publication publication)
+    {
+        ArgumentNullException.ThrowIfNull(publication);
+
+        if (Definition.Publications.Any(
+                x => x.Id == publication.Id))
+            throw new InvalidOperationException(
+                $"Publication '{publication.Id}' already exists.");
+
+        return this with
+        {
+            Definition = Definition with
+            {
+                Publications = Definition.Publications.Append(publication).ToArray()
+            }
+        };
+    }
 
     public CadPartProgram AddSketch(SketchOperation operation) => AddOperation(operation);
     public CadPartProgram Extrude(ExtrusionOperation operation) => AddOperation(operation);

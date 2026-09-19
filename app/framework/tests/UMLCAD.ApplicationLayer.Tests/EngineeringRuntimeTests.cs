@@ -114,6 +114,60 @@ public sealed class EngineeringRuntimeTests
         Assert.Empty(context.FeatureIndex);
     }
 
+
+    [Fact]
+    public async Task Build_Validation_Is_Atomic_Across_Multiple_Rules()
+    {
+        var store = NewStore();
+        var rules = new IEngineeringRule[]
+        {
+            new ChangeRule(
+                new EngineeringRuleIdentity("rule.first", "1.0.0"),
+                EngineeringRuleOutcomeKind.ApplyChange),
+            new ChangeRule(
+                new EngineeringRuleIdentity("rule.second", "1.0.0"),
+                EngineeringRuleOutcomeKind.Reject)
+        };
+
+        var result = await new EngineeringBuildValidator().ValidateAsync(
+            store,
+            rules,
+            new EmptySimulationService());
+
+        Assert.False(result.Accepted);
+        Assert.Equal(2, result.RuleResults.Count);
+        Assert.Empty(store.Snapshot().Features);
+        Assert.Empty(result.FinalState.Features);
+    }
+
+    [Fact]
+    public async Task Later_Rule_Sees_Previous_Committed_Rule_Changes()
+    {
+        var store = NewStore();
+        var rules = new IEngineeringRule[]
+        {
+            new ChangeRule(
+                new EngineeringRuleIdentity("rule.first", "1.0.0"),
+                EngineeringRuleOutcomeKind.ApplyChange),
+            new DependentChangeRule()
+        };
+
+        var result = await new EngineeringBuildValidator().ValidateAsync(
+            store,
+            rules,
+            new EmptySimulationService());
+
+        Assert.True(result.Accepted);
+        Assert.Equal(2, result.FinalState.Features.Count);
+        Assert.Contains(
+            result.FinalState.Features,
+            feature => feature.Id.Value == "created");
+        Assert.Contains(
+            result.FinalState.Features,
+            feature => feature.Id.Value == "created-after-previous");
+    }
+
+
     private static CadDocumentStore NewStore() =>
         new(
             new CadDocumentDefinition(
@@ -261,6 +315,41 @@ public sealed class EngineeringRuntimeTests
                     request,
                     SimulationResultStatus.Completed,
                     [],
+                    []));
+        }
+    }
+
+
+    private sealed class DependentChangeRule : IEngineeringRule
+    {
+        public EngineeringRuleIdentity Identity { get; } =
+            new("rule.dependent", "1.0.0");
+
+        public ValueTask<EngineeringRuleResult> ExecuteAsync(
+            EngineeringContext context,
+            IEngineeringServices services,
+            CancellationToken cancellationToken = default)
+        {
+            if (!context.TryGetFeature(new CadId("created"), out _))
+            {
+                return ValueTask.FromResult(
+                    new EngineeringRuleResult(
+                        EngineeringRuleOutcomeKind.Reject,
+                        [new EngineeringDiagnostic(
+                            "PREVIOUS_RULE_STATE_MISSING",
+                            "The previous rule change was not visible.",
+                            [])]));
+            }
+
+            services.Cad.AddFeature(
+                new CadFeatureDefinition(
+                    new CadId("created-after-previous"),
+                    CadFeatureKind.Feature,
+                    "Created after previous rule"));
+
+            return ValueTask.FromResult(
+                new EngineeringRuleResult(
+                    EngineeringRuleOutcomeKind.ApplyChange,
                     []));
         }
     }

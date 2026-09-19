@@ -100,7 +100,7 @@ Therefore C# compilation and xUnit execution are not claimed as locally executed
 
 The project graph was statically inspected:
 
-- 16 active .NET projects;
+- 17 active .NET projects (13 production libraries, 2 framework test projects, and 2 application/demo hosts);
 - no project-reference cycle;
 - active `app/` contains no Feature-named implementation file;
 - previous app implementation is preserved under `app_old/`.

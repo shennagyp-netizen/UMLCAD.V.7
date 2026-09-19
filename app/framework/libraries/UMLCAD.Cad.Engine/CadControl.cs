@@ -84,11 +84,13 @@ public sealed class InMemoryCadControlService : ICadControlService, IEngineering
 {
     private readonly CadDocumentStore _store;
     private readonly List<CadCommand> _pending = [];
+    private readonly CadDocumentSnapshot _initialSnapshot;
     private bool _completed;
 
     public InMemoryCadControlService(CadDocumentStore store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _initialSnapshot = _store.Snapshot();
     }
 
     public CadCommandResult AddFeature(CadFeatureDefinition feature)
@@ -149,11 +151,14 @@ public sealed class InMemoryCadControlService : ICadControlService, IEngineering
             var result = _store.Apply(command);
             if (result.Status is not CadCommandStatus.Accepted)
             {
-                Rollback();
+                _store.Restore(_initialSnapshot);
+                _pending.Clear();
+                _completed = true;
                 return result;
             }
         }
 
+        _store.Restore(_initialSnapshot);
         _pending.Clear();
         _completed = true;
         return new(CadCommandStatus.Accepted, null, null, null);

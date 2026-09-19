@@ -10,7 +10,7 @@ public sealed class IncrementalPipelineTests
  {
    var p=Factory.Create();var g=new Gateway();var e=new CadEvaluationEngine(g);await e.EvaluateAsync(p, cancellationToken: TestContext.Current.CancellationToken);g.Requests.Clear();
    var s=await e.RebuildAsync(p,new HashSet<CadId>{new("hole")}, cancellationToken: TestContext.Current.CancellationToken);
-   Assert.True(s.Succeeded);Assert.Equal(KernelEvaluationMode.Incremental,s.Mode);Assert.Equal(new[]{"Cad.Hole"},g.Requests.Select(x=>x.OperationKind));Assert.Null(g.Requests.Single().IncrementalBaseResultId);Assert.Equal(new CadResultId("r:hole"),s.CurrentBody(new CadId("body")));Assert.NotEqual(CadEvaluationHistory.Empty.Identity,s.History.Identity);
+   Assert.True(s.Succeeded);Assert.Equal(KernelEvaluationMode.Incremental,s.Mode);Assert.Equal(new[]{"Cad.Hole"},g.Requests.Select(x=>x.OperationKind));Assert.Equal(new CadResultId("r:hole"),g.Requests.Single().IncrementalBaseResultId);Assert.Equal(new CadResultId("r:hole"),s.CurrentBody(new CadId("body")));Assert.Equal(3,s.History.Entries.Count);
  }
  static class Factory
  {

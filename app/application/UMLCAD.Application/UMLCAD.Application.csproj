@@ -1,1 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><AssemblyName>UMLCAD.Application</AssemblyName></PropertyGroup><ItemGroup><ProjectReference Include="../../framework/libraries/UMLCAD.Framework/UMLCAD.Framework.csproj" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>UMLCAD.Application</AssemblyName>
+    <RootNamespace>UMLCAD.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../framework/libraries/UMLCAD.Framework/UMLCAD.Framework.csproj" />
+  </ItemGroup>
+</Project>

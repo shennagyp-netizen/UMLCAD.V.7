@@ -102,4 +102,79 @@ public sealed class DependencyPlanningTests
         Assert.Single(feature.Dependencies);
         Assert.Equal(new CadId("base"), feature.Dependencies[0]);
     }
+
+    [Fact]
+    public void A_Change_Invalidates_All_Transitive_Dependents_Deterministically()
+    {
+        var document = new CadDocumentDefinition(
+            new CadId("document"),
+            "Closure Test",
+            [
+                new CadFeatureDefinition(
+                    new CadId("a"),
+                    CadFeatureKind.Feature,
+                    "A"),
+                new CadFeatureDefinition(
+                    new CadId("b"),
+                    CadFeatureKind.Feature,
+                    "B",
+                    [new CadId("a")]),
+                new CadFeatureDefinition(
+                    new CadId("c"),
+                    CadFeatureKind.Feature,
+                    "C",
+                    [new CadId("b")]),
+                new CadFeatureDefinition(
+                    new CadId("independent"),
+                    CadFeatureKind.Feature,
+                    "Independent")
+            ]);
+
+        var graph = new CadDependencyGraph(document);
+
+        var affected = graph.GetAffectedByChanges([new CadId("a")]);
+
+        Assert.Equal(
+            ["a", "b", "c"],
+            affected.Select(id => id.Value).ToArray());
+    }
+
+    [Fact]
+    public void Multiple_Changed_Nodes_Produce_One_Deduplicated_Closure()
+    {
+        var document = new CadDocumentDefinition(
+            new CadId("document"),
+            "Multi Closure Test",
+            [
+                new CadFeatureDefinition(
+                    new CadId("a"),
+                    CadFeatureKind.Feature,
+                    "A"),
+                new CadFeatureDefinition(
+                    new CadId("b"),
+                    CadFeatureKind.Feature,
+                    "B",
+                    [new CadId("a")]),
+                new CadFeatureDefinition(
+                    new CadId("c"),
+                    CadFeatureKind.Feature,
+                    "C",
+                    [new CadId("a")]),
+                new CadFeatureDefinition(
+                    new CadId("d"),
+                    CadFeatureKind.Feature,
+                    "D",
+                    [new CadId("b"), new CadId("c")])
+            ]);
+
+        var graph = new CadDependencyGraph(document);
+
+        var affected = graph.GetAffectedByChanges(
+            [new CadId("b"), new CadId("c")]);
+
+        Assert.Equal(
+            ["b", "c", "d"],
+            affected.Select(id => id.Value).ToArray());
+    }
+
 }

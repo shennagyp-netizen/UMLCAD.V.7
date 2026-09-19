@@ -19,6 +19,6 @@ public sealed class SemanticPipelineTests
  sealed class Gateway:IKernelGateway
  {
    public Task<KernelOperationResponse> EvaluateAsync(KernelOperationRequest r,CancellationToken c=default)
-   {var id=r.OperationKind switch{"Cad.Sketch"=>"r:sketch","Cad.Extrusion"=>"r:extrude","Cad.Hole"=>"r:hole",_=>"r:unknown"};return Task.FromResult(KernelOperationResponse.Success(r,new CadResultId(id),"evidence",new[]{new KernelTopologyBinding("operation",r.OperationId.Value)}));}
+   {var id=r.OperationKind switch{"Cad.Sketch"=>"r:sketch","Cad.Extrusion"=>"r:extrude","Cad.Hole"=>"r:hole",_=>"r:unknown"};return Task.FromResult(KernelOperationResponse.Success(r,new CadResultId(id),"evidence",new KernelHistoryIdentity("test-history:"+r.OperationId.Value),new[]{new KernelTopologyBinding("operation",r.OperationId.Value)}));}
  }
 }

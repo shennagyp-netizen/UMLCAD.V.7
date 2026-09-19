@@ -90,6 +90,9 @@ public interface ICompiledModelService
 internal sealed class CompiledModelService : ICompiledModelService
 {
     private const string Schema = "uml-cad-compiled-model/1.1.0";
+    private readonly ISemanticReferenceService _referenceService;
+
+    public CompiledModelService(ISemanticReferenceService referenceService) => _referenceService = referenceService;
 
     public CompiledModelManifest Create(SemanticApplication application)
     {
@@ -101,7 +104,7 @@ internal sealed class CompiledModelService : ICompiledModelService
         foreach (var part in application.Parts.OrderBy(x => x.Id, StringComparer.Ordinal))
         {
             var definitionId = DefinitionId("Part", part.Id);
-            var children = AddPartChildren(part, definitionId, nodes, relationships);
+            var children = AddPartChildren(application, part, definitionId, nodes, relationships);
             AddNode(nodes, new CompiledNode(
                 definitionId,
                 part.Name,
@@ -157,7 +160,8 @@ internal sealed class CompiledModelService : ICompiledModelService
             [], [], [], []);
     }
 
-    private static IReadOnlyList<string> AddPartChildren(
+    private IReadOnlyList<string> AddPartChildren(
+        SemanticApplication application,
         PartSemantic part,
         string parentId,
         IDictionary<string, CompiledNode> nodes,
@@ -180,9 +184,19 @@ internal sealed class CompiledModelService : ICompiledModelService
 
             foreach (var reference in constraint.References.OrderBy(x => x, StringComparer.Ordinal))
             {
-                var targetId = NodeChildId(parentId, "geometry", reference);
+                var semanticReference = new SemanticReference(
+                    part.Id,
+                    reference,
+                    "geometry",
+                    application.BuildIdentity);
+
+                var resolution = _referenceService.Resolve(application, semanticReference);
+                if (!resolution.IsResolved)
+                    throw new InvalidOperationException($"{resolution.DiagnosticCode}: {resolution.Message}");
+
+                var targetId = NodeChildId(parentId, "geometry", resolution.Target!.TargetId);
                 AddRelationship(relationships, new CompiledRelationship(
-                    $"relationship:{nodeId}:references:{EncodeSegment(reference)}", "references", nodeId, [targetId], new Dictionary<string, JsonElement>()));
+                    $"relationship:{nodeId}:references:{EncodeSegment(resolution.Target.TargetId)}", "references", nodeId, [targetId], new Dictionary<string, JsonElement>()));
             }
             children.Add(nodeId);
         }
@@ -220,7 +234,7 @@ internal sealed class CompiledModelService : ICompiledModelService
         else if (occurrence.DefinitionKind == "part")
         {
             var definition = application.Parts.Single(x => x.Id == occurrence.DefinitionId);
-            childIds.AddRange(AddPartChildren(definition, nodeId, nodes, relationships));
+            childIds.AddRange(AddPartChildren(application, definition, nodeId, nodes, relationships));
         }
 
         AddNode(nodes, new CompiledNode(

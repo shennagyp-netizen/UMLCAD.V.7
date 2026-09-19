@@ -75,6 +75,7 @@ public sealed class CadApplicationBuilder
         services.AddSingleton<ICadConfiguration>(_ => new CadConfiguration(_configuration));
         services.AddSingleton<IBuildHistory>(_buildHistory);
         services.AddSingleton<ISemanticApplication>(semanticState);
+        services.AddSingleton<ISemanticReferenceService, SemanticReferenceService>();
         services.AddSingleton<IPartSemanticService, PartSemanticService>();
         services.AddSingleton<IDrawingSemanticService, DrawingSemanticService>();
         services.AddSingleton<ISheetSemanticService, SheetSemanticService>();

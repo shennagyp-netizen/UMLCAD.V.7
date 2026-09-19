@@ -136,9 +136,22 @@ public sealed class CadApplicationBuilder
         foreach (var assembly in _assemblies)
             if (!definitionIds.Add(assembly.Id))
                 throw new InvalidOperationException($"A semantic definition with ID '{assembly.Id}' is already defined.");
+        foreach (var drawing in _drawings)
+            if (!definitionIds.Add(drawing.Id))
+                throw new InvalidOperationException($"A semantic definition with ID '{drawing.Id}' is already defined.");
+
+        if (definitionIds.Contains(ApplicationId))
+            throw new InvalidOperationException($"Application ID '{ApplicationId}' collides with a semantic definition ID.");
 
         var assemblyLookup = _assemblies.ToDictionary(x => x.Id, StringComparer.Ordinal);
         var partLookup = _parts.ToDictionary(x => x.Id, StringComparer.Ordinal);
+
+        foreach (var drawing in _drawings)
+        {
+            foreach (var partReference in drawing.PartReferences)
+                if (!partLookup.ContainsKey(partReference))
+                    throw new InvalidOperationException($"Drawing '{drawing.Id}' references unknown part definition '{partReference}'.");
+        }
 
         foreach (var assembly in _assemblies)
         {

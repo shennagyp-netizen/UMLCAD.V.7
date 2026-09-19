@@ -16,5 +16,6 @@
     <ProjectReference Include="../UMLCAD.Engineering.Cam/UMLCAD.Engineering.Cam.csproj" />
     <ProjectReference Include="../UMLCAD.Engineering.Drawing/UMLCAD.Engineering.Drawing.csproj" />
     <ProjectReference Include="../UMLCAD.Integration.Simulation/UMLCAD.Integration.Simulation.csproj" />
+    <ProjectReference Include="../UMLCAD.Engineering.Runtime/UMLCAD.Engineering.Runtime.csproj" />
   </ItemGroup>
 </Project>

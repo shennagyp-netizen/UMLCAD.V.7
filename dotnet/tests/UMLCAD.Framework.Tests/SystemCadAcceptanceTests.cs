@@ -99,6 +99,82 @@ public sealed class SystemCadAcceptanceTests
     }
 
     [Fact]
+    public void Face_reference_resolves_through_a_top_level_occurrence_context()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "binding");
+        });
+        builder.AddAssembly("assembly", "Assembly", assembly =>
+            assembly.Part("instance", "part"));
+
+        using var app = builder.Build();
+        var integrated = app.GetRequiredService<IAuthoritativeResultIntegrationService>()
+            .Integrate(
+                app.Semantic,
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative));
+
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(
+                integrated,
+                new SemanticReference(
+                    "occurrence:assembly/instance",
+                    "front-face",
+                    "face",
+                    "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
+        Assert.Equal("occurrence:assembly/instance", result.Target!.ProducerId);
+        Assert.Equal("result-r1", result.Target.ResultIdentity);
+    }
+
+    [Fact]
+    public void Configuration_bound_occurrence_face_reference_fails_closed_until_configuration_result_context_exists()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "binding");
+        });
+        builder.AddAssembly("assembly", "Assembly", assembly =>
+            assembly.Part("instance", "part", configure: occurrence =>
+                occurrence.Configuration("Service")));
+
+        using var app = builder.Build();
+        var integrated = app.GetRequiredService<IAuthoritativeResultIntegrationService>()
+            .Integrate(
+                app.Semantic,
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative));
+
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(
+                integrated,
+                new SemanticReference(
+                    "occurrence:assembly/instance",
+                    "front-face",
+                    "face",
+                    "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
+        Assert.Equal("REFERENCE_CONTEXT_UNSUPPORTED", result.DiagnosticCode);
+    }
+
+    [Fact]
     public void Compiled_constraint_reference_and_semantic_reference_resolve_to_the_same_target()
     {
         var builder = CadApplication.CreateBuilder();

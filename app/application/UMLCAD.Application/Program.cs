@@ -16,6 +16,6 @@ sealed class DemoKernel:IKernelGateway
  {
    c.ThrowIfCancellationRequested();
    var id=r.OperationKind switch{"Cad.Sketch"=>"demo:sketch","Cad.Extrusion"=>"demo:body1","Cad.Hole"=>"demo:body2",_=>"demo:unknown"};
-   return Task.FromResult(KernelOperationResponse.Success(r,new CadResultId(id),"demo:"+r.EvaluationIdentity.Value,new[]{new KernelTopologyBinding("operation",r.OperationId.Value)}));
+   return Task.FromResult(KernelOperationResponse.Success(r,new CadResultId(id),"demo:"+r.EvaluationIdentity.Value,new KernelHistoryIdentity("demo-history:"+r.OperationId.Value),new[]{new KernelTopologyBinding("operation",r.OperationId.Value)}));
  }
 }

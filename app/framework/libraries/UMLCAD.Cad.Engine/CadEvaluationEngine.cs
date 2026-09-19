@@ -1,14 +1,22 @@
 using System.Text.Json;
 using UMLCAD.Cad.Contracts;
+using UMLCAD.Cad.Semantics;
 using UMLCAD.Kernel;
 
 namespace UMLCAD.Cad.Engine;
 
 public sealed class CadEvaluationEngine(UmlcadKernel kernel)
 {
-    private readonly UmlcadKernel _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
+    private readonly UmlcadKernel _kernel =
+        kernel ?? throw new ArgumentNullException(nameof(kernel));
 
-    public Task<KernelEvaluationOutcome> EvaluateAsync(
+    public CadEvaluationPlan Plan(CadDocumentDefinition document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        return new CadDependencyGraph(document).CreatePlan();
+    }
+
+    public async Task<KernelEvaluationOutcome> EvaluateAsync(
         CadBuildDefinition definition,
         CancellationToken cancellationToken = default)
     {
@@ -21,6 +29,6 @@ public sealed class CadEvaluationEngine(UmlcadKernel kernel)
             definition.Identity.SemanticIdentity,
             document.RootElement.Clone());
 
-        return _kernel.EvaluateBuildAsync(request, cancellationToken);
+        return await _kernel.EvaluateBuildAsync(request, cancellationToken);
     }
 }

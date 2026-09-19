@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using UMLCAD.Engineering.Runtime;
 using UMLCAD.Science;
 
@@ -29,7 +28,7 @@ public sealed class SimulationCacheTests
     }
 
     [Fact]
-    public async Task Changing_A_Semantic_Input_Changes_Simulation_Identity()
+    public void Changing_A_Semantic_Input_Changes_Simulation_Identity()
     {
         var first = Request("geometry-1");
         var changed = Request("geometry-2");

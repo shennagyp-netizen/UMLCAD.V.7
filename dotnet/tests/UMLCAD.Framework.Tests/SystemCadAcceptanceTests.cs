@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.Json;
 using UMLCAD.Framework;
 using UMLCAD.Framework.Semantics;
 using Xunit;
@@ -149,7 +151,13 @@ public sealed class SystemCadAcceptanceTests
             return app.CreateCompiledModelManifest();
         }
 
-        Assert.Equal(Build(false), Build(true));
+        var first = Build(false);
+        var second = Build(true);
+
+        Assert.Equal(first.BuildIdentity, second.BuildIdentity);
+        Assert.Equal(
+            JsonSerializer.Serialize(first),
+            JsonSerializer.Serialize(second));
     }
 
     [Fact]
@@ -206,6 +214,6 @@ public sealed class SystemCadAcceptanceTests
 
     private static double[] ParsePoint(string value) =>
         value.Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(double.Parse)
+            .Select(value => double.Parse(value, CultureInfo.InvariantCulture))
             .ToArray();
 }

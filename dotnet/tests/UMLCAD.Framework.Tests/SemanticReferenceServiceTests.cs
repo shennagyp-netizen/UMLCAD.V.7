@@ -42,8 +42,7 @@ public sealed class SemanticReferenceServiceTests
 
         using var app = builder.Build();
         var service = app.GetRequiredService<ISemanticReferenceService>();
-
-        var semantic = WithAuthoritativeResult(app.Semantic, "result-r1", "part");
+        var semantic = WithAuthoritativeResult(app, "result-r1", "part");
         var result = service.Resolve(semantic,
             new SemanticReference("part", "front-face", "face", "stale-build"));
 
@@ -96,66 +95,30 @@ public sealed class SemanticReferenceServiceTests
     [Fact]
     public void Published_face_requires_an_authoritative_result_owned_by_the_producer()
     {
-        var part = new PartSemantic(
-            "part",
-            "solid",
-            [],
-            [],
-            [],
-            [],
-            [])
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
         {
-            TopologyBindings =
-            [
-                new TopologyBindingSemantic(
-                    "topology-front",
-                    "face",
-                    "front-face",
-                    "result-r1",
-                    "brep-face-6")
-            ],
-            Publications =
-            [
-                new ShapePublicationSemantic(
-                    "front",
-                    "face",
-                    "front-face",
-                    "result-r1",
-                    "topology-front")
-            ]
-        };
+            part.TopologyBinding("topology-front", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "topology-front");
+        });
 
-        var withoutResult = new SemanticApplication(
-            "app",
-            "1.0.0",
-            new Dictionary<string, string>(),
-            [part],
-            [],
-            [],
-            "semantic-build");
-
-        var anchorBuilder = CadApplication.CreateBuilder();
-        anchorBuilder.AddPart("anchor", "part");
-        using var app = anchorBuilder.Build();
+        using var app = builder.Build();
         var service = app.GetRequiredService<ISemanticReferenceService>();
+        var resultIntegration = app.GetRequiredService<IAuthoritativeResultIntegrationService>();
 
         var missing = service.Resolve(
-            withoutResult,
+            app.Semantic,
             new SemanticReference("part", "front-face", "face", "result-r1"));
 
-        var withResult = withoutResult with
-        {
-            AuthoritativeResults =
-            [
-                new AuthoritativeResultSemantic(
-                    "result-r1",
-                    "part",
-                    "operation-1",
-                    "contract-v1",
-                    "evidence-1",
-                    AuthoritativeResultStatus.Authoritative)
-            ]
-        };
+        var withResult = resultIntegration.Integrate(
+            app.Semantic,
+            new AuthoritativeResultSemantic(
+                "result-r1",
+                "part",
+                "operation-1",
+                "contract-v1",
+                "evidence-1",
+                AuthoritativeResultStatus.Authoritative));
 
         var resolved = service.Resolve(
             withResult,
@@ -180,8 +143,7 @@ public sealed class SemanticReferenceServiceTests
 
         using var app = builder.Build();
         var service = app.GetRequiredService<ISemanticReferenceService>();
-
-        var semantic = WithAuthoritativeResult(app.Semantic, "result-r1", "part");
+        var semantic = WithAuthoritativeResult(app, "result-r1", "part");
         var result = service.Resolve(semantic,
             new SemanticReference("part", "front-face", "face", "result-r1"));
 
@@ -250,7 +212,7 @@ public sealed class SemanticReferenceServiceTests
         });
 
         using var app = builder.Build();
-        var semantic = WithAuthoritativeResult(app.Semantic, "result-r2", "part");
+        var semantic = WithAuthoritativeResult(app, "result-r2", "part");
         var result = app.GetRequiredService<ISemanticReferenceService>()
             .Resolve(semantic, new SemanticReference("part", "front-face", "face", "result-r2"));
 
@@ -259,22 +221,18 @@ public sealed class SemanticReferenceServiceTests
     }
 
     private static SemanticApplication WithAuthoritativeResult(
-        SemanticApplication semantic,
+        CadApplication app,
         string resultId,
         string producerId) =>
-        semantic with
-        {
-            AuthoritativeResults =
-            [
-                new AuthoritativeResultSemantic(
-                    resultId,
-                    producerId,
-                    "operation-1",
-                    "contract-v1",
-                    "evidence-1",
-                    AuthoritativeResultStatus.Authoritative)
-            ]
-        };
+        app.GetRequiredService<IAuthoritativeResultIntegrationService>().Integrate(
+            app.Semantic,
+            new AuthoritativeResultSemantic(
+                resultId,
+                producerId,
+                "operation-1",
+                "contract-v1",
+                "evidence-1",
+                AuthoritativeResultStatus.Authoritative));
 
     [Fact]
     public void Reports_unsupported_face_reference_without_inventing_topology()

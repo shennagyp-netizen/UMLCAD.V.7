@@ -68,6 +68,7 @@ public sealed class AuthoritativeResultIntegrationTests
         var conflict = new AuthoritativeResultSemantic(
             "result-r1",
             "part",
+            "world",
             "operation-2",
             "contract-v2",
             "evidence-2",
@@ -99,11 +100,11 @@ public sealed class AuthoritativeResultIntegrationTests
 
         foreach (var result in new[]
         {
-            new AuthoritativeResultSemantic("", "part", "operation", "contract", "evidence", AuthoritativeResultStatus.Authoritative),
-            new AuthoritativeResultSemantic("result", "", "operation", "contract", "evidence", AuthoritativeResultStatus.Authoritative),
-            new AuthoritativeResultSemantic("result", "part", "", "contract", "evidence", AuthoritativeResultStatus.Authoritative),
-            new AuthoritativeResultSemantic("result", "part", "operation", "", "evidence", AuthoritativeResultStatus.Authoritative),
-            new AuthoritativeResultSemantic("result", "part", "operation", "contract", "", AuthoritativeResultStatus.Authoritative)
+            new AuthoritativeResultSemantic("", "part", "world", "operation", "contract", "evidence", AuthoritativeResultStatus.Authoritative),
+            new AuthoritativeResultSemantic("result", "", "world", "operation", "contract", "evidence", AuthoritativeResultStatus.Authoritative),
+            new AuthoritativeResultSemantic("result", "part", "world", "", "contract", "evidence", AuthoritativeResultStatus.Authoritative),
+            new AuthoritativeResultSemantic("result", "part", "world", "operation", "", "evidence", AuthoritativeResultStatus.Authoritative),
+            new AuthoritativeResultSemantic("result", "part", "world", "operation", "contract", "", AuthoritativeResultStatus.Authoritative)
         })
         {
             Assert.Throws<ArgumentException>(() => service.Integrate(app.Semantic, result));
@@ -121,6 +122,7 @@ public sealed class AuthoritativeResultIntegrationTests
             new AuthoritativeResultSemantic(
                 "result-r1",
                 "part",
+                "world",
                 "operation",
                 "contract",
                 "evidence",

@@ -8,6 +8,7 @@ The files here are planning/target documents. They do not claim that the describ
 
 - ENGINEERING_PROGRAMMABILITY.md — target architecture for programmable engineering knowledge/rules/services, including read access to spatial/physical knowledge and controlled write access to CAD semantics.
 - MILESTONES.md — ordered future-work milestones and acceptance gates.
+- APP_LAYER_DEVELOPMENT_PROMPT.md — mandatory development law for the .NET Application Layer: dependency architecture, single kernel gateway, app_e2e enforcement, TDD, integration, red-team, E2E, determinism, transaction safety, and coding standards.
 
 ## Governing distinction
 

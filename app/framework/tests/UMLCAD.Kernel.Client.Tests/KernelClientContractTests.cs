@@ -93,7 +93,7 @@ public sealed class KernelClientContractTests
         });
 
         using var client = CreateClient(handler);
-        var result = await client.EvaluateAsync(request);
+        var result = await client.EvaluateAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(CadEvaluationStatus.Failed, result.Status);
         Assert.Null(result.AuthoritativeResultId);
@@ -123,7 +123,7 @@ public sealed class KernelClientContractTests
                 256),
             new HttpClient(handler));
 
-        var result = await client.EvaluateAsync(request);
+        var result = await client.EvaluateAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(CadEvaluationStatus.Failed, result.Status);
         Assert.Contains(

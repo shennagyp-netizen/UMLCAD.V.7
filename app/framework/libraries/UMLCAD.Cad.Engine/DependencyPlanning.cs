@@ -32,6 +32,42 @@ public sealed class CadDependencyGraph
                 .ToArray());
     }
 
+    public IReadOnlyList<CadId> GetAffectedByChanges(IEnumerable<CadId> changedIds)
+    {
+        ArgumentNullException.ThrowIfNull(changedIds);
+
+        var changed = changedIds
+            .Distinct()
+            .OrderBy(id => id.Value, StringComparer.Ordinal)
+            .ToArray();
+
+        var reverse = _dependencies.Keys.ToDictionary(id => id, _ => new List<CadId>());
+
+        foreach (var (dependent, dependencies) in _dependencies)
+        {
+            foreach (var dependency in dependencies)
+                reverse[dependency].Add(dependent);
+        }
+
+        var affected = new HashSet<CadId>(changed);
+        var queue = new Queue<CadId>(changed);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+
+            foreach (var dependent in reverse[current].OrderBy(id => id.Value, StringComparer.Ordinal))
+            {
+                if (affected.Add(dependent))
+                    queue.Enqueue(dependent);
+            }
+        }
+
+        return affected
+            .OrderBy(id => id.Value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
     public CadEvaluationPlan CreatePlan()
     {
         var state = _dependencies.Keys.ToDictionary(id => id, _ => VisitState.Unvisited);

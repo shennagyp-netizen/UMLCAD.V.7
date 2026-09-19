@@ -1,12 +1,52 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using UMLCAD.Cad.Contracts;
+using UMLCAD.Cad.Engine;
+using UMLCAD.Cad.Semantics;
 using UMLCAD.Kernel;
 
 namespace UMLCAD.ApplicationLayer.Tests;
 
 public sealed class KernelGatewayIntegrationTests
 {
+    [Fact]
+    public async Task Typed_Cad_Evaluation_Travels_Through_Concrete_Kernel_Gateway()
+    {
+        await using var server = await LoopbackServer.StartAsync();
+
+        using var kernel = UmlcadKernel.Connect(new UmlcadKernelOptions
+        {
+            BaseAddress = server.BaseAddress,
+            BuildEvaluationPath = "v1/build/evaluate",
+            RequestTimeout = TimeSpan.FromSeconds(10),
+            MaximumResponseBytes = 1024 * 1024
+        });
+
+        var engine = new CadEvaluationEngine(kernel);
+        var part = new CadPartDefinition(
+            new CadId("part-integration"),
+            "Integration Part",
+            [
+                new CadCircle(
+                    new CadId("circle-integration"),
+                    new CadPoint2D(2, 3),
+                    1.5)
+            ]);
+
+        var result = await engine.EvaluateAsync(
+            part,
+            new CadBuildIdentity(
+                "integration-test",
+                "1.0.0",
+                "typed-build-001"));
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(result.CompiledModel);
+        Assert.Contains("circle-integration", server.RequestBody!);
+        Assert.Contains(@"""kind"":""circle""", server.RequestBody!);
+    }
+
     [Fact]
     public async Task KernelGateway_Uses_Real_Loopback_Transport_Through_Public_API()
     {

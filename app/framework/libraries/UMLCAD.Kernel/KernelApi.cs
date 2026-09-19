@@ -39,7 +39,7 @@ public sealed record KernelEvaluationOutcome(
     JsonElement? CompiledModel,
     IReadOnlyList<KernelDiagnostic> Diagnostics);
 
-public sealed class UmlcadKernel
+public sealed class UmlcadKernel : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -48,35 +48,47 @@ public sealed class UmlcadKernel
 
     private readonly HttpClient _httpClient;
     private readonly UmlcadKernelOptions _options;
+    private readonly bool _ownsHttpClient;
+    private bool _disposed;
 
-    public UmlcadKernel(HttpClient httpClient, UmlcadKernelOptions? options = null)
+    private UmlcadKernel(HttpClient httpClient, UmlcadKernelOptions options, bool ownsHttpClient)
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-        _options = options ?? new UmlcadKernelOptions();
+        _options = Validate(options);
+        _ownsHttpClient = ownsHttpClient;
+    }
 
-        if (!_options.BaseAddress.IsAbsoluteUri)
-            throw new ArgumentException("Kernel base address must be absolute.", nameof(options));
+    public static UmlcadKernel Connect(UmlcadKernelOptions? options = null)
+    {
+        var validated = Validate(options ?? new UmlcadKernelOptions());
+        var httpClient = new HttpClient
+        {
+            BaseAddress = validated.BaseAddress,
+            Timeout = validated.RequestTimeout
+        };
 
-        if (_options.BaseAddress.Scheme is not ("http" or "https"))
-            throw new ArgumentException("Kernel base address must use HTTP or HTTPS.", nameof(options));
+        return new UmlcadKernel(httpClient, validated, ownsHttpClient: true);
+    }
 
-        if (string.IsNullOrWhiteSpace(_options.BuildEvaluationPath))
-            throw new ArgumentException("Kernel evaluation path cannot be empty.", nameof(options));
+    internal static UmlcadKernel ForTest(HttpMessageHandler handler, UmlcadKernelOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
 
-        if (Uri.TryCreate(_options.BuildEvaluationPath, UriKind.Absolute, out _))
-            throw new ArgumentException("Kernel evaluation path must be relative.", nameof(options));
+        var validated = Validate(options ?? new UmlcadKernelOptions());
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = validated.BaseAddress,
+            Timeout = validated.RequestTimeout
+        };
 
-        if (_options.RequestTimeout <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(options), "Kernel request timeout must be positive.");
-
-        if (_options.MaximumResponseBytes <= 0)
-            throw new ArgumentOutOfRangeException(nameof(options), "Kernel response limit must be positive.");
+        return new UmlcadKernel(httpClient, validated, ownsHttpClient: true);
     }
 
     public async Task<KernelEvaluationOutcome> EvaluateBuildAsync(
         KernelBuildRequest request,
         CancellationToken cancellationToken = default)
     {
+        ThrowIfDisposed();
         ArgumentNullException.ThrowIfNull(request);
 
         var payload = new
@@ -131,7 +143,11 @@ public sealed class UmlcadKernel
 
             var diagnostics = ReadDiagnostics(root);
             if (succeeded && diagnostics.Any(x => x.Severity == KernelDiagnosticSeverity.Error))
-                return Failure("KERNEL_CONTRADICTORY_RESULT", "Kernel reported success while returning an error diagnostic.");
+            {
+                return Failure(
+                    "KERNEL_CONTRADICTORY_RESULT",
+                    "Kernel reported success while returning an error diagnostic.");
+            }
 
             return new KernelEvaluationOutcome(succeeded, compiledModel, diagnostics);
         }
@@ -155,6 +171,16 @@ public sealed class UmlcadKernel
         {
             return Failure("KERNEL_CLIENT", $"Kernel gateway failed: {exception.Message}");
         }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        if (_ownsHttpClient)
+            _httpClient.Dispose();
     }
 
     private async Task<byte[]?> ReadBodyAsync(
@@ -230,4 +256,43 @@ public sealed class UmlcadKernel
 
     private static KernelEvaluationOutcome Failure(string code, string message) =>
         new(false, null, [new KernelDiagnostic(code, KernelDiagnosticSeverity.Error, message)]);
+
+    private static UmlcadKernelOptions Validate(UmlcadKernelOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
+        if (!options.BaseAddress.IsAbsoluteUri ||
+            options.BaseAddress.Scheme is not ("http" or "https"))
+        {
+            throw new ArgumentException(
+                "Kernel base address must be an absolute HTTP(S) URI.",
+                nameof(options));
+        }
+
+        if (string.IsNullOrWhiteSpace(options.BuildEvaluationPath) ||
+            Uri.TryCreate(options.BuildEvaluationPath, UriKind.Absolute, out _))
+        {
+            throw new ArgumentException(
+                "Kernel build evaluation path must be a non-empty relative URI.",
+                nameof(options));
+        }
+
+        if (options.RequestTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "Kernel request timeout must be positive.");
+
+        if (options.MaximumResponseBytes <= 0)
+            throw new ArgumentOutOfRangeException(
+                nameof(options),
+                "Kernel response limit must be positive.");
+
+        return options;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(UmlcadKernel));
+    }
 }

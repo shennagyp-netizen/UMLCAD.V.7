@@ -31,7 +31,9 @@ public sealed class RedTeamPipelineTests
         var part = Factory.CreateWithIndependentSketch();
         var engine = new CadEvaluationEngine(new FailingFirstGateway());
 
-        var snapshot = await engine.EvaluateAsync(part);
+        var snapshot = await engine.EvaluateAsync(
+            part,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.False(snapshot.Succeeded);
         Assert.Equal(CadEvaluationStatus.Failed, snapshot.Outcomes[new CadId("a")].Status);

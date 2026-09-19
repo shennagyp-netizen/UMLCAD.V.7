@@ -92,6 +92,78 @@ public sealed class SemanticReferenceServiceTests
     }
 
     [Fact]
+    public void Published_face_requires_an_authoritative_result_owned_by_the_producer()
+    {
+        var part = new PartSemantic(
+            "part",
+            "solid",
+            [],
+            [],
+            [],
+            [],
+            [])
+        {
+            TopologyBindings =
+            [
+                new TopologyBindingSemantic(
+                    "topology-front",
+                    "face",
+                    "front-face",
+                    "result-r1",
+                    "brep-face-6")
+            ],
+            Publications =
+            [
+                new ShapePublicationSemantic(
+                    "front",
+                    "face",
+                    "front-face",
+                    "result-r1",
+                    "topology-front")
+            ]
+        };
+
+        var withoutResult = new SemanticApplication(
+            "app",
+            "1.0.0",
+            new Dictionary<string, string>(),
+            [part],
+            [],
+            [],
+            "semantic-build");
+
+        using var app = CadApplication.CreateBuilder().AddPart("anchor", "part").Build();
+        var service = app.GetRequiredService<ISemanticReferenceService>();
+
+        var missing = service.Resolve(
+            withoutResult,
+            new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        var withResult = withoutResult with
+        {
+            AuthoritativeResults =
+            [
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative)
+            ]
+        };
+
+        var resolved = service.Resolve(
+            withResult,
+            new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Indeterminate, missing.Status);
+        Assert.Equal("REFERENCE_RESULT_MISSING", missing.DiagnosticCode);
+        Assert.Equal(SemanticReferenceStatus.Resolved, resolved.Status);
+        Assert.Equal("result-r1", resolved.Target!.ResultIdentity);
+    }
+
+    [Fact]
     public void Resolves_published_face_only_when_publication_and_topology_provenance_match()
     {
         var builder = CadApplication.CreateBuilder();

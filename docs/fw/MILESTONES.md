@@ -67,6 +67,31 @@ manufacturing history
 ### Acceptance
 A rule can retrieve a line/curve/face, its surrounding influence regions, relevant PMI/tolerance information, associated manufacturing/simulation provenance, and prior valid simulation results without stringly typed dictionaries.
 
+## FW-03A — Explicit programmatic CAD pathway
+
+### Objective
+Make the rule/supervision-to-CAD path a first-class architectural contract rather than an implied use of internal services.
+
+### Work
+Define and test the complete sequence:
+
+~~~text
+engineering program
+ -> knowledge query
+ -> semantic CAD command
+ -> transaction/change set
+ -> dependency closure
+ -> recompute
+ -> UMLCAD Kernel API
+ -> authoritative result
+ -> updated engineering context
+~~~
+
+The same semantic command path must be usable by normal user actions, automation, engineering rules, and Engineering Supervision.
+
+### Acceptance
+A supervision program can create and modify CAD entirely through the public semantic command pathway, while direct access to private semantic collections or kernel implementation objects is impossible from the engineering-programming surface.
+
 ## FW-03 — CAD Control API
 
 ### Objective

@@ -52,7 +52,8 @@ public sealed class KernelClientContractTests
             var response = KernelOperationResponse.Success(
                     request,
                     new CadResultId("result:1"),
-                    "evidence:1")
+                    "evidence:1",
+                    new KernelHistoryIdentity("history:mismatch"))
                 with
                 {
                     OperationId = new CadId("other-operation")

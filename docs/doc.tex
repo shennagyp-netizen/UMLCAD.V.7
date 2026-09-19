@@ -1385,22 +1385,28 @@ Never substitute a percentage for a gate.
 \end{enumerate}
 
 
-\chapter{.NET Kernel Library Reference}
+\chapter{.NET Library Reference}\n\nThe current production .NET layer consists of twelve libraries under \texttt{dotnet/src}. The detailed current library/class reference is \pathref{docs/DOTNET_KERNEL_LIBRARY_REFERENCE.tex}. This chapter records the architectural segmentation in the main handbook.
 
-The current production .NET kernel consists of exactly two libraries. The detailed class-by-class companion is \pathref{docs/DOTNET_KERNEL_LIBRARY_REFERENCE.md}. This chapter records the architectural segmentation in the main handbook.
+\\section{Library map}
 
-\section{Library map}
-
-\begin{tabularx}{\textwidth}{@{}p{0.28\textwidth}p{0.25\textwidth}X@{}}
-\toprule
-Library & Source project & Architectural responsibility \\
-\midrule
-UMLCAD.Framework & \pathref{dotnet/src/UMLCAD.Framework/UMLCAD.Framework.csproj} & Application authoring, semantic state, deterministic identity, semantic lookup, build history, package generation, and compiled graph generation. \\
-UMLCAD.Kernel.Client & \pathref{dotnet/src/UMLCAD.Kernel.Client/UMLCAD.Kernel.Client.csproj} & HTTP/process boundary to Rust, timeout/cancellation, response-size defense, stable diagnostics, DI registration, and compiled-result integrity validation. \\
-\bottomrule
-\end{tabularx}
-
-\section{UMLCAD.Framework class segmentation}
+\\begin{tabularx}{\\textwidth}{@{}p{0.25\\textwidth}p{0.64\\textwidth}@{}}
+\\toprule
+Library & Architectural responsibility \\\\
+\\midrule
+UMLCAD.Framework & Application composition, authoring, semantic state, build identity/history, build package, compiled semantic graph. \\\\
+UMLCAD.Kernel.Client & Existing transport boundary to the Rust mathematical authority. \\\\
+UMLCAD.Cad.Contracts & Versioned CAD, geometry, solver, kernel and representation contracts. \\\\
+UMLCAD.Cad.Expressions & Pure arithmetic expressions and deterministic expression identities. \\\\
+UMLCAD.Cad.Semantics & Feature semantics, references, authoritative results, product structure and BOM. \\\\
+UMLCAD.Cad.Engine & Evaluation graph, planning, invalidation, caching, reference resolution and result integration. \\\\
+UMLCAD.Science & Quantities, dimensions, materials and phenomena-simulation contracts. \\\\
+UMLCAD.Engineering.Resources & Machines, tools, processes, capabilities and compatibility. \\\\
+UMLCAD.Engineering.SheetMetal & Sheet-metal semantics, bend expressions and manufacturing validation. \\\\
+UMLCAD.Engineering.Cam & CAM operations, toolpaths, postprocessing and deterministic NC/G-code. \\\\
+UMLCAD.Engineering.Drawing & Drawing semantics, views, dimensions, annotations, dress-up, PMI, BOM presentation and associativity. \\\\
+UMLCAD.Integration.Simulation & External simulation-application adapter boundary. \\\\
+\\bottomrule
+\\end{tabularx}\n\n\section{UMLCAD.Framework class segmentation}
 
 \begin{longtable}{@{}p{0.28\textwidth}p{0.18\textwidth}p{0.45\textwidth}@{}}
 \toprule

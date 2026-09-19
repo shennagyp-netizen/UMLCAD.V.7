@@ -220,6 +220,24 @@ class ApplicationArchitectureTests(unittest.TestCase):
             + "\n".join(violations),
         )
 
+    def test_application_hosts_do_not_access_kernel_gateway_directly(self) -> None:
+        violations: list[str] = []
+
+        for source_file in sorted(APPLICATION_ROOT.rglob("*.cs")):
+            source = source_file.read_text(encoding="utf-8", errors="strict")
+
+            for marker in ("UMLCAD.Kernel", "UmlcadKernel", "KernelBuildRequest"):
+                if marker in source:
+                    violations.append(
+                        f"{source_file.relative_to(ROOT)} contains direct kernel gateway access '{marker}'"
+                    )
+
+        self.assertFalse(
+            violations,
+            "Application hosts/demos must not access the kernel gateway directly:\n"
+            + "\n".join(violations),
+        )
+
     def test_application_hosts_use_framework_as_their_framework_boundary(self) -> None:
         violations: list[str] = []
 

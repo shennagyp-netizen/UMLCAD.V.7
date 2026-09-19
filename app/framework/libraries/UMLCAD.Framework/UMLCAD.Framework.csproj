@@ -1,1 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>UMLCAD.Framework</AssemblyName></PropertyGroup><ItemGroup><ProjectReference Include="../UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" /><ProjectReference Include="../UMLCAD.Engineering.Runtime/UMLCAD.Engineering.Runtime.csproj" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>UMLCAD.Framework</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
+    <ProjectReference Include="../UMLCAD.Engineering.Runtime/UMLCAD.Engineering.Runtime.csproj" />
+    <ProjectReference Include="../UMLCAD.Kernel.Client/UMLCAD.Kernel.Client.csproj" />
+  </ItemGroup>
+</Project>

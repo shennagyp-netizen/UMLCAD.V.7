@@ -93,6 +93,7 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
                 contentLength > _maxResponseBytes)
             {
                 return Failure(
+                    request,
                     "KERNEL_RESPONSE_TOO_LARGE",
                     "Kernel response exceeds the configured response limit.");
             }
@@ -116,6 +117,7 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
                     : $" Body: {Encoding.UTF8.GetString(body)}";
 
                 return Failure(
+                    request,
                     "KERNEL_HTTP",
                     $"Kernel returned HTTP {(int)response.StatusCode} ({response.ReasonPhrase}).{detail}");
             }
@@ -123,6 +125,7 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
             if (body.Length == 0)
             {
                 return Failure(
+                    request,
                     "KERNEL_EMPTY_RESPONSE",
                     "Kernel returned an empty response.");
             }
@@ -134,6 +137,7 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
             if (result is null)
             {
                 return Failure(
+                    request,
                     "KERNEL_INVALID_RESPONSE",
                     "Kernel returned no usable operation response.");
             }
@@ -145,6 +149,7 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
             catch (InvalidOperationException exception)
             {
                 return Failure(
+                    request,
                     "KERNEL_INVALID_RESULT",
                     exception.Message);
             }
@@ -154,6 +159,7 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
         catch (HttpRequestException)
         {
             return Failure(
+                request,
                 "KERNEL_TRANSPORT",
                 "Kernel transport failed or the kernel could not be reached.");
         }
@@ -164,18 +170,21 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
             return Failure(
+                request,
                 "KERNEL_TIMEOUT",
                 "Kernel operation exceeded the configured timeout.");
         }
         catch (JsonException)
         {
             return Failure(
+                request,
                 "KERNEL_INVALID_JSON",
                 "Kernel returned invalid JSON.");
         }
         catch (Exception)
         {
             return Failure(
+                request,
                 "KERNEL_CLIENT",
                 "Kernel client failed while processing the operation.");
         }
@@ -251,20 +260,10 @@ public sealed class UmlcadKernelClient : IKernelGateway, IDisposable
     }
 
     private static KernelOperationResponse Failure(
+        KernelOperationRequest request,
         string code,
         string message) =>
-        new(
-            CadEvaluationStatus.Failed,
-            null,
-            null,
-            Array.Empty<KernelTopologyBinding>(),
-            new[]
-            {
-                new CadDiagnostic(
-                    code,
-                    message,
-                    CadEvaluationStatus.Failed)
-            });
+        KernelOperationResponse.Failure(request, code, message);
 }
 
 internal static class KernelOperationResponseValidator
@@ -273,6 +272,27 @@ internal static class KernelOperationResponseValidator
         KernelOperationRequest request,
         KernelOperationResponse response)
     {
+        if (!string.Equals(
+                response.ContractVersion,
+                request.ContractVersion,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Kernel response contract version does not match the request.");
+        }
+
+        if (response.EvaluationIdentity != request.EvaluationIdentity)
+        {
+            throw new InvalidOperationException(
+                "Kernel response evaluation identity does not match the request.");
+        }
+
+        if (response.OperationId != request.OperationId)
+        {
+            throw new InvalidOperationException(
+                "Kernel response operation identity does not match the request.");
+        }
+
         if (response.Status == CadEvaluationStatus.Succeeded)
         {
             if (response.AuthoritativeResultId is null)
@@ -307,7 +327,5 @@ internal static class KernelOperationResponseValidator
                     "Kernel topology bindings must contain non-empty kind and key.");
             }
         }
-
-        _ = request;
     }
 }

@@ -7,24 +7,21 @@ namespace UMLCAD.ApplicationLayer.Tests;
 public sealed class KernelGatewayTests
 {
     [Fact]
-    public void KernelApi_Is_Concrete_And_Sealed()
+    public void KernelApi_Is_Concrete_And_Has_No_Public_Transport_Constructor()
     {
-        Assert.True(typeof(UmlcadKernel).IsSealed);
-        Assert.False(typeof(UmlcadKernel).IsAbstract);
-        Assert.Null(typeof(UmlcadKernel).Assembly.GetType("UMLCAD.Kernel.IRustKernelService"));
+        var type = typeof(UmlcadKernel);
+
+        Assert.True(type.IsSealed);
+        Assert.False(type.IsAbstract);
+        Assert.Empty(type.GetConstructors());
+        Assert.Null(type.Assembly.GetType("UMLCAD.Kernel.IRustKernelService"));
     }
 
     [Fact]
     public async Task KernelGateway_Returns_Explicit_Failure_For_Invalid_Response()
     {
-        using var httpClient = new HttpClient(new StubHandler(
-            HttpStatusCode.OK,
-            "{ invalid"))
-        {
-            BaseAddress = new Uri("http://127.0.0.1/")
-        };
-
-        var kernel = new UmlcadKernel(httpClient);
+        using var kernel = UmlcadKernel.ForTest(
+            new StubHandler(HttpStatusCode.OK, "{ invalid"));
 
         using var semantic = System.Text.Json.JsonDocument.Parse("{\"parts\":[]}");
         var request = new KernelBuildRequest("test-app", "1.0.0", "identity-1", semantic.RootElement.Clone());
@@ -52,12 +49,9 @@ public sealed class KernelGatewayTests
         }
         """;
 
-        using var httpClient = new HttpClient(new StubHandler(HttpStatusCode.OK, response))
-        {
-            BaseAddress = new Uri("http://127.0.0.1/")
-        };
+        using var kernel = UmlcadKernel.ForTest(
+            new StubHandler(HttpStatusCode.OK, response));
 
-        var kernel = new UmlcadKernel(httpClient);
         using var semantic = System.Text.Json.JsonDocument.Parse("{\"parts\":[]}");
 
         var result = await kernel.EvaluateBuildAsync(
@@ -67,6 +61,34 @@ public sealed class KernelGatewayTests
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal("KERNEL_BUILD_SCHEMA", diagnostic.Code);
         Assert.Equal(KernelDiagnosticSeverity.Error, diagnostic.Severity);
+    }
+
+    [Fact]
+    public async Task KernelGateway_Fails_Closed_On_Contradictory_Success()
+    {
+        const string response = """
+        {
+          "succeeded": true,
+          "compiledModel": null,
+          "diagnostics": [
+            {
+              "code": "KERNEL_WARNING_AS_ERROR",
+              "severity": "error",
+              "message": "Contradictory result fixture."
+            }
+          ]
+        }
+        """;
+
+        using var kernel = UmlcadKernel.ForTest(
+            new StubHandler(HttpStatusCode.OK, response));
+
+        using var semantic = System.Text.Json.JsonDocument.Parse("{\"parts\":[]}");
+        var result = await kernel.EvaluateBuildAsync(
+            new KernelBuildRequest("test-app", "1.0.0", "identity-1", semantic.RootElement.Clone()));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("KERNEL_CONTRADICTORY_RESULT", Assert.Single(result.Diagnostics).Code);
     }
 
     private sealed class StubHandler(HttpStatusCode statusCode, string body) : HttpMessageHandler

@@ -246,3 +246,29 @@ The final M16 red-team matrix covers:
 M16 CUDA status remains **hardware-unverified** because no NVIDIA runner was available for execution. No claim of CUDA hardware performance or CUDA hardware conformance is made.
 
 M0-M16 is now closed as a roadmap of certified mathematical capabilities, not as a claim that every conceivable CAD operation is complete. Future changes to the mathematical authority layer require new explicit capability contracts and fresh gates.
+
+## System-CAD test expansion — PR #41 branch
+
+The current branch extends the .NET System-CAD validation matrix without claiming completion of the mandatory vertical slice.
+
+Added test suites:
+
+- `dotnet/tests/UMLCAD.Framework.Tests/SemanticReferenceIntegrationTests.cs`: 18 test methods covering application, part, assembly and drawing scopes, missing/unsupported/ambiguous states, identity validation, result identity, null handling and repeat determinism.
+- `dotnet/tests/UMLCAD.Framework.Tests/SystemCadAcceptanceTests.cs`: 9 acceptance scenarios covering the currently implemented semantic path, occurrence context, deterministic compiled projections and fail-closed definition/reference validation.
+- `dotnet/tests/UMLCAD.Framework.Tests/SystemCadRedTeamTests.cs`: 16 adversarial scenarios covering ambiguity, cross-scope attacks, identity mutation, Unicode identity, stale results, unsupported targets, malformed input, forged metadata, identity collision, structural delimiter injection, snapshot isolation and deterministic recompilation.
+- `dotnet/tests/UMLCAD.Framework.Tests/SystemCadVerticalSliceGateTests.cs`: 4 vertical-slice checks. Three are explicit RED gates for the currently absent face semantics, authoritative topology/representation result, and sketch/feature semantic path; one passing control proves the foundation currently stops at the unsupported face boundary.
+- `tests/e2e/run.py`: framework test discovery now requires all System-CAD suites above, so new suites cannot silently disappear from the comprehensive gate.
+- `docs/SYSTEM_CAD_TEST_MATRIX.md`: authoritative test inventory and explicit distinction between implemented current coverage and future architectural gates.
+
+Additional fail-closed builder validation now rejects:
+
+- application IDs that collide with semantic definition IDs;
+- dangling drawing-to-part references.
+
+Current branch HEAD: `7ac6cc082f2a7ea2930a3777389feef54a72334d`.
+
+Validation status for this branch:
+- Local .NET execution: not available because the environment does not contain the .NET SDK.
+- GitHub Actions: runs were queued on the latest head; repository workflow logs are currently unavailable through the connected API (job-log endpoint returns BlobNotFound).
+- The three vertical-slice RED gates are intentionally expected to fail until the corresponding architecture is implemented. They are not represented as green completion evidence.
+

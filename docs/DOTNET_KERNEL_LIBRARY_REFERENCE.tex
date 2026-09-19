@@ -4,6 +4,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{newtxtext,newtxmath}
 \usepackage{microtype}
+\usepackage{xurl}
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{array}
@@ -53,7 +54,7 @@
 \renewcommand{\headrulewidth}{0.35pt}
 \renewcommand{\footrulewidth}{0pt}
 
-\newcommand{\code}[1]{\texttt{\footnotesize #1}}
+\newcommand{\code}[1]{\nolinkurl{#1}}
 \newcommand{\filepath}[1]{\path{#1}}
 
 \newtcolorbox{infobox}{

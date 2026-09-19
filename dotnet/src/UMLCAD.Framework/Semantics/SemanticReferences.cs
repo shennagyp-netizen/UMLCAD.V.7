@@ -18,7 +18,9 @@ public sealed record SemanticReference(
 public sealed record SemanticReferenceCandidate(
     string ProducerId,
     string TargetId,
-    string TargetKind);
+    string TargetKind,
+    string? ResultIdentity = null,
+    string? ProvenanceId = null);
 
 public sealed record SemanticReferenceResolution(
     SemanticReference Reference,
@@ -62,16 +64,6 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                 "Reference producer, target, target kind, and any supplied result identity must be non-empty.");
         }
 
-        if (reference.ExpectedResultIdentity is not null &&
-            !string.Equals(reference.ExpectedResultIdentity, application.BuildIdentity, StringComparison.Ordinal))
-        {
-            return Fail(
-                reference,
-                SemanticReferenceStatus.Indeterminate,
-                "REFERENCE_STALE_RESULT",
-                $"Reference expected result identity '{reference.ExpectedResultIdentity}' but current semantic result identity is '{application.BuildIdentity}'.");
-        }
-
         if (string.Equals(reference.ProducerId, application.Id, StringComparison.Ordinal))
             return Classify(
                 reference,
@@ -81,10 +73,15 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
         var part = application.Parts.FirstOrDefault(
             x => string.Equals(x.Id, reference.ProducerId, StringComparison.Ordinal));
         if (part is not null)
+        {
+            if (string.Equals(reference.TargetKind, "face", StringComparison.Ordinal))
+                return ResolvePublishedFace(part, reference);
+
             return Classify(
                 reference,
                 ResolvePartTarget(part, reference),
                 new[] { "geometry", "constraint", "component" });
+        }
 
         var assembly = application.Assemblies.FirstOrDefault(
             x => string.Equals(x.Id, reference.ProducerId, StringComparison.Ordinal));
@@ -128,6 +125,78 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                 .ToArray(),
             _ => Array.Empty<SemanticReferenceCandidate>()
         };
+
+    private static SemanticReferenceResolution ResolvePublishedFace(
+        PartSemantic part,
+        SemanticReference reference)
+    {
+        var publications = part.Publications
+            .Where(x =>
+                string.Equals(x.TargetKind, "face", StringComparison.Ordinal) &&
+                string.Equals(x.TargetId, reference.TargetId, StringComparison.Ordinal))
+            .OrderBy(x => x.Id, StringComparer.Ordinal)
+            .ToArray();
+
+        if (publications.Length == 0)
+            return Fail(
+                reference,
+                SemanticReferenceStatus.Indeterminate,
+                "REFERENCE_PUBLICATION_MISSING",
+                $"No face publication for target '{reference.TargetId}' exists under producer '{reference.ProducerId}'.");
+
+        var candidates = new List<SemanticReferenceCandidate>();
+        var provenanceMissing = false;
+        var provenanceMismatch = false;
+
+        foreach (var publication in publications)
+        {
+            var binding = part.TopologyBindings.FirstOrDefault(
+                x => string.Equals(x.Id, publication.TopologyBindingId, StringComparison.Ordinal));
+
+            if (binding is null)
+            {
+                provenanceMissing = true;
+                continue;
+            }
+
+            var valid =
+                string.Equals(binding.TopologyKind, publication.TargetKind, StringComparison.Ordinal) &&
+                string.Equals(binding.SemanticTargetId, publication.TargetId, StringComparison.Ordinal) &&
+                string.Equals(binding.ResultIdentity, publication.ResultIdentity, StringComparison.Ordinal);
+
+            if (!valid)
+            {
+                provenanceMismatch = true;
+                continue;
+            }
+
+            candidates.Add(new SemanticReferenceCandidate(
+                part.Id,
+                publication.TargetId,
+                publication.TargetKind,
+                publication.ResultIdentity,
+                publication.TopologyBindingId));
+        }
+
+        if (candidates.Count == 0)
+        {
+            var code = provenanceMissing
+                ? "REFERENCE_PROVENANCE_MISSING"
+                : provenanceMismatch
+                    ? "REFERENCE_PROVENANCE_MISMATCH"
+                    : "REFERENCE_PUBLICATION_MISSING";
+            return Fail(
+                reference,
+                SemanticReferenceStatus.Indeterminate,
+                code,
+                $"Face publication '{reference.TargetId}' has no matching authoritative topology provenance.");
+        }
+
+        return Classify(
+            reference,
+            candidates,
+            new[] { "face" });
+    }
 
     private static IReadOnlyList<SemanticReferenceCandidate> ResolvePartTarget(
         PartSemantic part,
@@ -180,6 +249,38 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
         IReadOnlyList<SemanticReferenceCandidate> candidates,
         IReadOnlyList<string> supportedKinds)
     {
+        if (candidates.Count == 0)
+        {
+            if (!supportedKinds.Contains(reference.TargetKind, StringComparer.Ordinal))
+                return Fail(
+                    reference,
+                    SemanticReferenceStatus.Unsupported,
+                    "REFERENCE_UNSUPPORTED_TARGET_KIND",
+                    $"Reference target kind '{reference.TargetKind}' is unsupported for producer '{reference.ProducerId}'.");
+
+            return Fail(
+                reference,
+                SemanticReferenceStatus.Missing,
+                "REFERENCE_TARGET_MISSING",
+                $"Reference target '{reference.TargetId}' of kind '{reference.TargetKind}' does not exist under producer '{reference.ProducerId}'.");
+        }
+
+        if (reference.ExpectedResultIdentity is not null)
+        {
+            var matching = candidates
+                .Where(x => string.Equals(x.ResultIdentity, reference.ExpectedResultIdentity, StringComparison.Ordinal))
+                .ToArray();
+
+            if (matching.Length == 0)
+                return Fail(
+                    reference,
+                    SemanticReferenceStatus.Indeterminate,
+                    "REFERENCE_STALE_RESULT",
+                    $"Reference expected result identity '{reference.ExpectedResultIdentity}', but no resolved candidate is backed by that result identity.");
+
+            candidates = matching;
+        }
+
         if (candidates.Count == 1)
             return new(
                 reference,
@@ -196,8 +297,7 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                 "REFERENCE_AMBIGUOUS",
                 $"Reference target '{reference.TargetId}' is ambiguous within producer '{reference.ProducerId}'.");
 
-        if (!supportedKinds.Contains(reference.TargetKind, StringComparer.Ordinal))
-            return Fail(
+        return Fail(
                 reference,
                 SemanticReferenceStatus.Unsupported,
                 "REFERENCE_UNSUPPORTED_TARGET_KIND",

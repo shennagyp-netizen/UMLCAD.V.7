@@ -200,6 +200,61 @@ class ApplicationArchitectureTests(unittest.TestCase):
             + ", ".join(map(str, misplaced)),
         )
 
+    def test_new_application_tree_has_no_legacy_names_or_paths(self) -> None:
+        violations: list[str] = []
+
+        for source_file in sorted((ROOT / "app").rglob("*")):
+            if not source_file.is_file() or source_file.suffix not in {".cs", ".csproj", ".props", ".targets"}:
+                continue
+
+            source = source_file.read_text(encoding="utf-8", errors="strict")
+            for marker in ("dotnet/", "projects/demo/", "UMLCAD.Kernel.Client"):
+                if marker in source:
+                    violations.append(
+                        f"{source_file.relative_to(ROOT)} contains legacy marker '{marker}'"
+                    )
+
+        self.assertFalse(
+            violations,
+            "The new app tree must not reintroduce legacy .NET/application paths or names:\n"
+            + "\n".join(violations),
+        )
+
+    def test_application_hosts_use_framework_as_their_framework_boundary(self) -> None:
+        violations: list[str] = []
+
+        for project in sorted(APPLICATION_ROOT.rglob("*.csproj")):
+            tree = ET.parse(project)
+            references: list[Path] = []
+
+            for element in tree.getroot().iter():
+                if local_name(element.tag) != "ProjectReference":
+                    continue
+
+                include = element.attrib.get("Include", "")
+                references.append((project.parent / include).resolve())
+
+            relative = project.relative_to(APPLICATION_ROOT)
+            if project.name == "UMLCAD.Application.csproj":
+                allowed_names = {"UMLCAD.Framework.csproj"}
+            else:
+                allowed_names = {"UMLCAD.Application.csproj"}
+
+            actual_names = {target.name for target in references}
+            unexpected = actual_names - allowed_names
+
+            if unexpected:
+                violations.append(
+                    f"{project.relative_to(ROOT)} references {sorted(unexpected)}; "
+                    f"allowed: {sorted(allowed_names)}"
+                )
+
+        self.assertFalse(
+            violations,
+            "Application hosts/demos must use the declared application boundary:\n"
+            + "\n".join(violations),
+        )
+
     def test_new_application_tree_has_no_legacy_dotnet_project_reference(self) -> None:
         legacy_root = ROOT / "dotnet"
         violations: list[str] = []

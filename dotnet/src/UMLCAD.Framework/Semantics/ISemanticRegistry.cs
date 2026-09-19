@@ -5,6 +5,7 @@ public interface ISemanticRegistry
     void RegisterPart(PartSemantic part);
     void RegisterAssembly(AssemblySemantic assembly);
     void RegisterDrawing(DrawingSemantic drawing);
+    void RegisterFrame(SemanticFrame frame);
 
     SemanticApplication Snapshot(
         string applicationId,
@@ -18,12 +19,15 @@ internal sealed class SemanticRegistry : ISemanticRegistry
     private readonly Dictionary<string, PartSemantic> _parts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, AssemblySemantic> _assemblies = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DrawingSemantic> _drawings = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, SemanticFrame> _frames = new(StringComparer.Ordinal);
 
     public void RegisterPart(PartSemantic part) => AddUnique(_parts, part.Id, part);
 
     public void RegisterAssembly(AssemblySemantic assembly) => AddUnique(_assemblies, assembly.Id, assembly);
 
     public void RegisterDrawing(DrawingSemantic drawing) => AddUnique(_drawings, drawing.Id, drawing);
+
+    public void RegisterFrame(SemanticFrame frame) => AddUnique(_frames, frame.Id, frame);
 
     public SemanticApplication Snapshot(
         string applicationId,
@@ -38,7 +42,12 @@ internal sealed class SemanticRegistry : ISemanticRegistry
             _parts.Values.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
             _assemblies.Values.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
             _drawings.Values.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
-            buildIdentity);
+            buildIdentity)
+        {
+            Frames = _frames.Values
+                .OrderBy(x => x.Id, StringComparer.Ordinal)
+                .ToArray()
+        };
     }
 
     private static void AddUnique<T>(Dictionary<string, T> target, string id, T value)

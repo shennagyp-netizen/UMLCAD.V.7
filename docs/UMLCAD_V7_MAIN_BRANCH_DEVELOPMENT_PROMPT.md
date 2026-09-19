@@ -755,6 +755,164 @@ Code should make illegal or ambiguous states difficult to represent.
 
 ---
 
+# 20.1 .NET LIBRARY AND SERVICE CONVENTION
+
+In UMLCAD.V.7, **Library** and **Service** are related but different concepts.
+
+### Library
+
+A .NET library is a reusable assembly/project boundary. It may contain:
+
+- domain models;
+- semantic contracts;
+- interfaces;
+- value objects and records;
+- implementations;
+- algorithms that belong to that library's authority;
+- serialization/DTO contracts;
+- extension methods;
+- DI registration helpers;
+- services.
+
+A library is not required to contain only stateless code, and a service is not required to have its own project.
+
+### Service
+
+A **Service** means the normal .NET/ASP.NET Core/Blazor architectural concept: a class and/or interface representing a responsibility that is supplied to consumers through dependency injection when DI is appropriate.
+
+Examples include:
+
+```
+IPartService      -> PartService
+IDrawingService   -> DrawingService
+ICamService       -> CamService
+IRustKernelService -> RustKernelService
+```
+
+A service may live inside the same class library as its domain models and contracts. Do not create a separate project merely because a type is named *Service*.
+
+### Project/reference rule
+
+Project references must follow the authoritative domain dependency graph, not the names of classes.
+
+Use this form:
+
+```
+Consumer Library / Service
+        ↓
+Stable Contract / Abstraction
+        ↓
+Authoritative Producer / Provider
+        ↓
+Concrete Implementation
+```
+
+Do not confuse:
+
+- a **library/project boundary** with a DI service boundary;
+- a **service** with a process, HTTP endpoint, microservice, or hosted application;
+- a **contract assembly** with a requirement that every interface have a separate project;
+- conceptual C4 containers with mandatory one-project-per-container decomposition.
+
+Keep multiple coherent services in an existing library when that preserves the architecture. Extract a new library only when there is a real ownership, dependency, versioning, reuse, deployment, or isolation reason.
+
+### Service lifetime
+
+When a service is registered with Microsoft.Extensions.DependencyInjection, choose its lifetime from its actual state and resource semantics. Do not select a lifetime by naming convention.
+
+The current .NET guidance distinguishes transient, scoped, and singleton services; singleton services must be thread-safe, and scoped services must remain within an appropriate scope. Disposable-service lifetime requires explicit attention.
+
+Reference:
+- Microsoft Learn — Service lifetimes: https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/service-lifetimes
+- Microsoft Learn — Service registration: https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/service-registration
+- Microsoft Learn — Dependency injection guidelines: https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection/guidelines
+
+### UMLCAD consequence
+
+The current `UMLCAD.Framework` is a .NET class library that already contains semantic types and DI services. `UMLCAD.Kernel.Client` is another class library containing the native/transport boundary. Preserve this pattern unless a real architectural boundary requires extraction.
+
+Never introduce a duplicate semantic service or duplicate domain model merely to create a visually cleaner project tree.
+
+---
+
+# 20.1.1 NEW .NET TYPE / METADATA RESEARCH RULE
+
+For **every new public or semantically important .NET class, interface, record, enum, attribute, metadata field, or option**, research the relevant external practice before committing the design.
+
+This is broader than checking whether an API compiles.
+
+The research must determine, where applicable:
+
+- whether an equivalent concept already exists in modern .NET;
+- established naming and API-shape conventions;
+- serialization and metadata implications;
+- nullability and mutability expectations;
+- DI/service registration conventions;
+- disposal/threading/lifetime requirements;
+- compatibility and versioning behavior;
+- relevant engineering/CAD/STEP/PLM standards or established industry terminology.
+
+For domain-specific UMLCAD concepts, the web research is used to validate **meaning and terminology**, not to copy another product's internal architecture.
+
+For example, semantic reference design must be informed by established CAD/product-data concepts such as shape portions, product occurrences, external models and representation relationships before UMLCAD defines its own semantic contracts. ISO 10303-1032:2024 explicitly covers identification of shape portions, relationships between shape portions, occurrence-context shape, and representation association; ISO 10303-1033:2014 covers externally supplied 3D geometric representations. Current Siemens Designcenter/NX material also documents persistent relations and external references as first-class engineering concepts. These sources inform terminology and coverage but do not override UMLCAD's authority model. See [ISO/TS 10303-1032:2024](https://www.iso.org/standard/89563.html), [ISO/TS 10303-1033:2014](https://www.iso.org/standard/64313.html), and [Siemens Designcenter/NX external references](https://blogs.sw.siemens.com/designcenter/whats-new-in-nx-june-2024-advanced-design/).
+
+Do not add a public type merely because its name sounds appropriate. Every new type must have a documented semantic owner, reason to exist, consumer, dependency direction, identity impact, and verification strategy.
+
+# 20.2 EXTERNAL DOCUMENTATION AND API RESEARCH LAW
+
+**Before introducing or materially changing any external framework/library type, package, attribute, metadata contract, or API behavior, perform explicit current external research. Do not rely on model memory.**
+
+This rule applies to, at minimum:
+
+- .NET runtime/framework APIs;
+- Microsoft.Extensions types and DI behavior;
+- ASP.NET Core and Blazor APIs;
+- System.Text.Json metadata/attributes/options;
+- NuGet packages and package versions;
+- third-party libraries;
+- OCCT/C++ APIs;
+- Rust crates and native bindings;
+- serialization schemas;
+- file/exchange formats;
+- industry standards relevant to engineering semantics;
+- compiler/language/runtime behavior when the implementation depends on it.
+
+### Required research sequence
+
+For every materially new external symbol or behavior:
+
+1. Search the internet before implementation.
+2. Prefer the primary authoritative source:
+   - Microsoft Learn / official .NET API reference for Microsoft/.NET APIs;
+   - official vendor documentation for vendor APIs;
+   - upstream repository/source for implementation details;
+   - published standard/specification for standards;
+   - official package/release notes for version-specific behavior.
+3. Verify the **exact target version** used by the repository before applying the API or metadata.
+4. Check:
+   - signature and overloads;
+   - nullability/annotations;
+   - lifetime/disposal behavior;
+   - threading requirements;
+   - serialization behavior;
+   - compatibility/obsolescence;
+   - platform support;
+   - version-specific differences;
+   - documented failure behavior.
+5. When behavior is important to correctness, inspect more than one authoritative source when available (for example official API documentation plus upstream source/release notes).
+6. If authoritative evidence conflicts or is insufficient, stop at the affected boundary and ask a design question rather than inventing semantics.
+7. Record the researched source URLs and the verified version/behavior in the implementation evidence or governing documentation when the external fact materially affects architecture or correctness.
+
+### No invented framework metadata
+
+Never invent an attribute, metadata name, option, package property, API, serializer behavior, DI lifetime rule, or framework capability because it sounds plausible.
+
+A type/property/attribute may be added to UMLCAD semantic models only after its **role, ownership, representation, and identity impact** are established. External metadata may inform the design, but it does not automatically become UMLCAD semantic truth.
+
+### Exact-repository rule remains primary
+
+External research informs implementation details; it does not override the repository's architecture, contracts, mathematical authority, or failure semantics.
+
 # 21. EXACT EXECUTION PROCEDURE FOR EVERY NEXT CHANGE
 
 For each capability:

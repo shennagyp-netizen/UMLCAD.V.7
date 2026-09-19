@@ -90,6 +90,9 @@ public interface ICompiledModelService
 internal sealed class CompiledModelService : ICompiledModelService
 {
     private const string Schema = "uml-cad-compiled-model/1.1.0";
+    private readonly ISemanticReferenceService _referenceService;
+
+    public CompiledModelService(ISemanticReferenceService referenceService) => _referenceService = referenceService;
 
     public CompiledModelManifest Create(SemanticApplication application)
     {
@@ -101,7 +104,7 @@ internal sealed class CompiledModelService : ICompiledModelService
         foreach (var part in application.Parts.OrderBy(x => x.Id, StringComparer.Ordinal))
         {
             var definitionId = DefinitionId("Part", part.Id);
-            var children = AddPartChildren(part, definitionId, nodes, relationships);
+            var children = AddPartChildren(application, part, definitionId, nodes, relationships);
             AddNode(nodes, new CompiledNode(
                 definitionId,
                 part.Name,
@@ -157,7 +160,8 @@ internal sealed class CompiledModelService : ICompiledModelService
             [], [], [], []);
     }
 
-    private static IReadOnlyList<string> AddPartChildren(
+    private IReadOnlyList<string> AddPartChildren(
+        SemanticApplication application,
         PartSemantic part,
         string parentId,
         IDictionary<string, CompiledNode> nodes,
@@ -172,6 +176,37 @@ internal sealed class CompiledModelService : ICompiledModelService
             children.Add(nodeId);
         }
 
+        var topologyBindings = part.TopologyBindings.ToDictionary(x => x.Id, StringComparer.Ordinal);
+        foreach (var publication in part.Publications.OrderBy(x => x.Id, StringComparer.Ordinal))
+        {
+            var binding = topologyBindings[publication.TopologyBindingId];
+            var nodeId = NodeChildId(parentId, "face", publication.Id);
+            var metadata = new SortedDictionary<string, JsonElement>(StringComparer.Ordinal)
+            {
+                ["publicationId"] = JsonSerializer.SerializeToElement(publication.Id),
+                ["targetId"] = JsonSerializer.SerializeToElement(publication.TargetId),
+                ["targetKind"] = JsonSerializer.SerializeToElement(publication.TargetKind),
+                ["resultIdentity"] = JsonSerializer.SerializeToElement(publication.ResultIdentity),
+                ["topologyBindingId"] = JsonSerializer.SerializeToElement(publication.TopologyBindingId),
+                ["authoritativeTopologyId"] = JsonSerializer.SerializeToElement(binding.AuthoritativeTopologyId)
+            };
+
+            AddNode(nodes, new CompiledNode(
+                nodeId,
+                publication.TargetId,
+                "Face",
+                parentId,
+                [],
+                metadata,
+                [],
+                [],
+                new CompiledCapabilities(true, true, true, true),
+                null,
+                new Dictionary<string, string>(StringComparer.Ordinal)));
+
+            children.Add(nodeId);
+        }
+
         foreach (var constraint in part.Constraints.OrderBy(x => x.Id, StringComparer.Ordinal))
         {
             var nodeId = NodeChildId(parentId, "constraint", constraint.Id);
@@ -180,9 +215,29 @@ internal sealed class CompiledModelService : ICompiledModelService
 
             foreach (var reference in constraint.References.OrderBy(x => x, StringComparer.Ordinal))
             {
-                var targetId = NodeChildId(parentId, "geometry", reference);
+                var semanticReference = new SemanticReference(
+                    part.Id,
+                    reference,
+                    "geometry");
+
+                var resolution = _referenceService.Resolve(application, semanticReference);
+                if (!resolution.IsResolved)
+                {
+                    var category = resolution.Status switch
+                    {
+                        SemanticReferenceStatus.Missing => "REFERENCE_MISSING",
+                        SemanticReferenceStatus.Ambiguous => "REFERENCE_AMBIGUOUS",
+                        SemanticReferenceStatus.Indeterminate => "REFERENCE_INDETERMINATE",
+                        SemanticReferenceStatus.Unsupported => "REFERENCE_UNSUPPORTED",
+                        _ => "REFERENCE_FAILURE"
+                    };
+
+                    throw new InvalidOperationException($"{category}: {resolution.DiagnosticCode}: {resolution.Message}");
+                }
+
+                var targetId = NodeChildId(parentId, "geometry", resolution.Target!.TargetId);
                 AddRelationship(relationships, new CompiledRelationship(
-                    $"relationship:{nodeId}:references:{EncodeSegment(reference)}", "references", nodeId, [targetId], new Dictionary<string, JsonElement>()));
+                    $"relationship:{nodeId}:references:{EncodeSegment(resolution.Target.TargetId)}", "references", nodeId, [targetId], new Dictionary<string, JsonElement>()));
             }
             children.Add(nodeId);
         }
@@ -220,7 +275,7 @@ internal sealed class CompiledModelService : ICompiledModelService
         else if (occurrence.DefinitionKind == "part")
         {
             var definition = application.Parts.Single(x => x.Id == occurrence.DefinitionId);
-            childIds.AddRange(AddPartChildren(definition, nodeId, nodes, relationships));
+            childIds.AddRange(AddPartChildren(application, definition, nodeId, nodes, relationships));
         }
 
         AddNode(nodes, new CompiledNode(

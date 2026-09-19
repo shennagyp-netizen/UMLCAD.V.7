@@ -143,17 +143,29 @@ class Runner:
 
         listed_tests = re.findall(r"^\s+UMLCAD\.Framework\.Tests\.[^\r\n]+$", output, re.MULTILINE)
         total = len(listed_tests)
-        has_e2e = any("RustKernelEndToEndTests." in test for test in listed_tests)
-        ok = returncode == 0 and total > 0 and has_e2e
+        required_suites = {
+            "UMLCAD.Framework.Tests.RustKernelEndToEndTests.",
+            "UMLCAD.Framework.Tests.SemanticReferenceIntegrationTests.",
+            "UMLCAD.Framework.Tests.SystemCadAcceptanceTests.",
+            "UMLCAD.Framework.Tests.SystemCadRedTeamTests.",
+            "UMLCAD.Framework.Tests.SystemCadVerticalSliceGateTests.",
+            "UMLCAD.Framework.Tests.SemanticFrameTests.",
+        }
+        missing_suites = [
+            suite for suite in sorted(required_suites)
+            if not any(test.startswith(suite) for test in listed_tests)
+        ]
+        ok = returncode == 0 and total > 0 and not missing_suites
         if not ok and returncode == 0:
             output += (
-                "\nDISCOVERY ERROR: Framework test list did not expose expected "
-                "UMLCAD.Framework.Tests entries including RustKernelEndToEndTests."
+                "\nDISCOVERY ERROR: Framework test list did not expose every required "
+                "System-CAD/E2E suite. Missing: " + ", ".join(missing_suites)
             )
         self.results.append(Result(name, command, returncode if ok else 1, duration, output[-8000:]))
         if self.verbose or not ok:
             print(output, end="" if output.endswith("\n") else "\n")
-        self.log(f"{'PASS' if ok else 'FAIL'} {name}: discovered {total} tests")
+        suite_summary = "all required suites present" if not missing_suites else "missing suites: " + ", ".join(missing_suites)
+        self.log(f"{'PASS' if ok else 'FAIL'} {name}: discovered {total} tests; {suite_summary}")
         return ok
 
     def start_kernel(self) -> None:

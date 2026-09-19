@@ -17,6 +17,12 @@ use crate::functions::{
 
 #[derive(Clone, Debug)]
 pub enum KernelRequest {
+    EvaluateAxisAlignedBox {
+        evaluation_identity: String,
+        result_identity: String,
+        box_geometry: AxisAlignedBox,
+        tolerance: Tolerance,
+    },
     Validate {
         snapshot: SemanticSnapshot,
     },
@@ -47,7 +53,19 @@ pub enum KernelRequest {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct AxisAlignedBoxEvaluationResult {
+    pub evaluation_identity: String,
+    pub result_identity: String,
+    pub min: [f64; 3],
+    pub max: [f64; 3],
+    pub volume: f64,
+    pub surface_area: f64,
+    pub centroid: [f64; 3],
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum KernelResponse {
+    AxisAlignedBox(AxisAlignedBoxEvaluationResult),
     Diagnostics(Vec<crate::functions::validation::Diagnostic>),
     Linear(crate::functions::solver::LinearSolveReport),
     Solve(ConstraintSolveResult),

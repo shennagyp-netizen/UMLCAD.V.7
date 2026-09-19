@@ -3,7 +3,7 @@ use std::net::{TcpListener, TcpStream};
 use std::thread;
 
 use serde_json::{json, Value};
-use umlcad_kernel_rust::api::{dispatch, KernelRequest, KernelResponse};
+use umlcad_kernel_rust::api::{dispatch, AxisAlignedBox, KernelRequest, KernelResponse, Tolerance, Vec3};
 use umlcad_kernel_rust::functions::snapshot::{Constraint, GeometryItem, SemanticSnapshot};
 use umlcad_kernel_rust::functions::validation::Severity;
 use umlcad_kernel_rust::{Arc, Circle, Geometry, Line, Point};
@@ -27,6 +27,7 @@ fn handle(mut stream: TcpStream) -> std::io::Result<()> {
     let (method, path, body) = parse_request(&request)?;
     let (status, response) = match (method.as_str(), path.as_str()) {
         ("POST", "/v1/build/evaluate") => evaluate(&body),
+        ("POST", "/v1/solid/axis-aligned-box/evaluate") => evaluate_axis_aligned_box_http(&body),
         ("GET", "/health") => (200, json!({"status":"ok"})),
         _ => (404, failure("KERNEL_NOT_FOUND", "Unknown kernel endpoint.")),
     };
@@ -299,6 +300,146 @@ fn evaluate(body: &[u8]) -> (u16, Value) {
             "diagnostics": []
         }),
     )
+}
+
+fn evaluate_axis_aligned_box_http(body: &[u8]) -> (u16, Value) {
+    let root: Value = match serde_json::from_slice(body) {
+        Ok(value) => value,
+        Err(error) => {
+            return (
+                422,
+                failure(
+                    "KERNEL_INVALID_JSON",
+                    &format!("The AxisAlignedBox request is not valid JSON: {error}."),
+                ),
+            )
+        }
+    };
+
+    if root.get("schema").and_then(Value::as_str) != Some("uml-cad-axis-aligned-box/1.0.0") {
+        return (
+            422,
+            failure(
+                "KERNEL_BOX_SCHEMA",
+                "Unsupported AxisAlignedBox evaluation schema.",
+            ),
+        );
+    }
+
+    let evaluation_identity = match non_empty_string(&root, "evaluationIdentity") {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_BOX_REQUEST", message)),
+    };
+    let result_identity = match non_empty_string(&root, "resultIdentity") {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_BOX_REQUEST", message)),
+    };
+    let min = match vec3_from_array(&root, "min") {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_BOX_REQUEST", message)),
+    };
+    let max = match vec3_from_array(&root, "max") {
+        Ok(value) => value,
+        Err(message) => return (422, failure("KERNEL_BOX_REQUEST", message)),
+    };
+    let absolute_tolerance = match finite_number(&root, "absoluteTolerance") {
+        Ok(value) if value >= 0.0 => value,
+        Ok(_) => return (422, failure("KERNEL_BOX_REQUEST", "absoluteTolerance must be nonnegative.")),
+        Err(message) => return (422, failure("KERNEL_BOX_REQUEST", message)),
+    };
+    let relative_tolerance = match finite_number(&root, "relativeTolerance") {
+        Ok(value) if value >= 0.0 => value,
+        Ok(_) => return (422, failure("KERNEL_BOX_REQUEST", "relativeTolerance must be nonnegative.")),
+        Err(message) => return (422, failure("KERNEL_BOX_REQUEST", message)),
+    };
+
+    let tolerance = match Tolerance::new(absolute_tolerance, relative_tolerance) {
+        Ok(value) => value,
+        Err(_) => return (422, failure("KERNEL_BOX_REQUEST", "Tolerance is invalid.")),
+    };
+
+    let request = KernelRequest::EvaluateAxisAlignedBox {
+        evaluation_identity,
+        result_identity,
+        box_geometry: AxisAlignedBox { min, max },
+        tolerance,
+    };
+
+    match dispatch(request) {
+        Ok(KernelResponse::AxisAlignedBox(result)) => (
+            200,
+            json!({
+                "succeeded": true,
+                "result": {
+                    "evaluationIdentity": result.evaluation_identity,
+                    "resultIdentity": result.result_identity,
+                    "min": result.min,
+                    "max": result.max,
+                    "volume": result.volume,
+                    "surfaceArea": result.surface_area,
+                    "centroid": result.centroid
+                },
+                "diagnostics": []
+            }),
+        ),
+        Ok(_) => (
+            500,
+            failure(
+                "KERNEL_DISPATCH",
+                "AxisAlignedBox dispatch returned the wrong response.",
+            ),
+        ),
+        Err(error) => (
+            422,
+            failure("KERNEL_BOX_EVALUATION", &error.to_string()),
+        ),
+    }
+}
+
+fn non_empty_string(root: &Value, key: &str) -> Result<String, &'static str> {
+    let value = root
+        .get(key)
+        .and_then(Value::as_str)
+        .ok_or("AxisAlignedBox request field is missing.")?;
+    if value.trim().is_empty() {
+        return Err("AxisAlignedBox request identity cannot be empty.");
+    }
+    Ok(value.to_string())
+}
+
+fn vec3_from_array(root: &Value, key: &str) -> Result<Vec3, &'static str> {
+    let values = root
+        .get(key)
+        .and_then(Value::as_array)
+        .ok_or("AxisAlignedBox bound must be an array.")?;
+
+    if values.len() != 3 {
+        return Err("AxisAlignedBox bounds must contain exactly three coordinates.");
+    }
+
+    let mut coordinates = [0.0_f64; 3];
+    for (index, value) in values.iter().enumerate() {
+        let coordinate = value
+            .as_f64()
+            .ok_or("AxisAlignedBox coordinates must be JSON numbers.")?;
+        if !coordinate.is_finite() {
+            return Err("AxisAlignedBox coordinates must be finite.");
+        }
+        coordinates[index] = coordinate;
+    }
+
+    Ok(Vec3::new(coordinates[0], coordinates[1], coordinates[2]))
+}
+
+fn finite_number(root: &Value, key: &str) -> Result<f64, &'static str> {
+    let value = root
+        .get(key)
+        .and_then(Value::as_f64)
+        .ok_or("AxisAlignedBox tolerance must be a JSON number.")?;
+    if !value.is_finite() {
+        return Err("AxisAlignedBox tolerance must be finite.");
+    }
+    Ok(value)
 }
 
 fn snapshot_from_package(

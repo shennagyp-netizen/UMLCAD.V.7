@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using UMLCAD.Framework;
 using UMLCAD.Framework.Semantics;
 using UMLCAD.Kernel.Client;
@@ -33,6 +34,117 @@ public sealed class KernelBlackBoxE2ETests
         Assert.Contains(compiled.Manifest.Nodes, x => x.Id == "definition:part:plate/geometry:top");
         Assert.Contains(compiled.Manifest.Nodes, x => x.Id == "definition:part:plate/geometry:left");
         Assert.Contains(compiled.Manifest.Nodes, x => x.Id == "definition:part:plate/constraint:horizontal-bottom");
+    }
+
+    [Fact]
+    [Trait("Category", "KernelIntegration")]
+    public async Task Axis_aligned_box_contract_returns_authoritative_numeric_evidence()
+    {
+        using var client = new HttpClient { BaseAddress = KernelBaseAddress, Timeout = TimeSpan.FromSeconds(10) };
+        var payload = new
+        {
+            schema = "uml-cad-axis-aligned-box/1.0.0",
+            evaluationIdentity = "eval-box-1",
+            resultIdentity = "result-box-1",
+            min = new[] { 0.0, 0.0, 0.0 },
+            max = new[] { 1.0, 2.0, 3.0 },
+            absoluteTolerance = 0.0,
+            relativeTolerance = 1.0e-12
+        };
+
+        using var response = await client.PostAsJsonAsync(
+            "v1/solid/axis-aligned-box/evaluate",
+            payload);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        Assert.NotNull(body);
+        var root = body!.RootElement;
+
+        Assert.True(root.GetProperty("succeeded").GetBoolean());
+        var result = root.GetProperty("result");
+        Assert.Equal("eval-box-1", result.GetProperty("evaluationIdentity").GetString());
+        Assert.Equal("result-box-1", result.GetProperty("resultIdentity").GetString());
+        Assert.Equal(6.0, result.GetProperty("volume").GetDouble());
+        Assert.Equal(22.0, result.GetProperty("surfaceArea").GetDouble());
+        Assert.Equal(0.5, result.GetProperty("centroid")[0].GetDouble());
+        Assert.Equal(1.0, result.GetProperty("centroid")[1].GetDouble());
+        Assert.Equal(1.5, result.GetProperty("centroid")[2].GetDouble());
+    }
+
+    [Fact]
+    [Trait("Category", "KernelIntegration")]
+    public async Task Axis_aligned_box_contract_rejects_degenerate_geometry()
+    {
+        using var client = new HttpClient { BaseAddress = KernelBaseAddress, Timeout = TimeSpan.FromSeconds(10) };
+        var payload = new
+        {
+            schema = "uml-cad-axis-aligned-box/1.0.0",
+            evaluationIdentity = "eval-box-degenerate",
+            resultIdentity = "result-box-degenerate",
+            min = new[] { 0.0, 0.0, 0.0 },
+            max = new[] { 0.0, 2.0, 3.0 },
+            absoluteTolerance = 0.0,
+            relativeTolerance = 1.0e-12
+        };
+
+        using var response = await client.PostAsJsonAsync(
+            "v1/solid/axis-aligned-box/evaluate",
+            payload);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Contains("KERNEL_BOX_EVALUATION", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    [Trait("Category", "KernelIntegration")]
+    public async Task Axis_aligned_box_contract_rejects_non_finite_geometry()
+    {
+        using var client = new HttpClient { BaseAddress = KernelBaseAddress, Timeout = TimeSpan.FromSeconds(10) };
+        var payload = """
+            {
+              "schema":"uml-cad-axis-aligned-box/1.0.0",
+              "evaluationIdentity":"eval-box-nonfinite",
+              "resultIdentity":"result-box-nonfinite",
+              "min":[0,0,0],
+              "max":[1,2,"Infinity"],
+              "absoluteTolerance":0,
+              "relativeTolerance":1e-12
+            }
+            """;
+
+        using var response = await client.PostAsync(
+            "v1/solid/axis-aligned-box/evaluate",
+            JsonContent.Create(JsonSerializer.Deserialize<JsonDocument>(payload)!.RootElement));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Contains("KERNEL_BOX_EVALUATION", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    [Trait("Category", "KernelIntegration")]
+    public async Task Axis_aligned_box_contract_is_repeat_deterministic()
+    {
+        using var client = new HttpClient { BaseAddress = KernelBaseAddress, Timeout = TimeSpan.FromSeconds(10) };
+        var payload = new
+        {
+            schema = "uml-cad-axis-aligned-box/1.0.0",
+            evaluationIdentity = "eval-box-repeat",
+            resultIdentity = "result-box-repeat",
+            min = new[] { -2.0, 4.0, 8.0 },
+            max = new[] { 3.0, 10.0, 11.0 },
+            absoluteTolerance = 0.0,
+            relativeTolerance = 1.0e-12
+        };
+
+        using var first = await client.PostAsJsonAsync("v1/solid/axis-aligned-box/evaluate", payload);
+        using var second = await client.PostAsJsonAsync("v1/solid/axis-aligned-box/evaluate", payload);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(
+            await first.Content.ReadAsStringAsync(),
+            await second.Content.ReadAsStringAsync());
     }
 
     [Fact]

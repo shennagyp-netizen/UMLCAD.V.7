@@ -70,6 +70,53 @@ public sealed class CompiledModelTests
     }
 
     [Fact]
+    public void Compiler_uses_semantic_reference_service_for_constraint_targets()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "part", part =>
+            part.Geometry("line-1", "line", new Dictionary<string, string>
+            {
+                ["start"] = "0,0",
+                ["end"] = "100,0"
+            })
+            .Constraint("horizontal-1", "horizontal", ["line-1"], new Dictionary<string, string>()));
+
+        using var app = builder.Build();
+        var manifest = app.CreateCompiledModelManifest();
+
+        var partNode = manifest.Nodes.Single(x => x.Id == "definition:part:part");
+        var constraintNode = manifest.Nodes.Single(x => x.Id == "definition:part:part/constraint:horizontal-1");
+        var geometryNode = manifest.Nodes.Single(x => x.Id == "definition:part:part/geometry:line-1");
+
+        Assert.Contains(geometryNode.Id, partNode.ChildIds);
+        var relationship = manifest.Relationships.Single(x =>
+            x.SourceId == constraintNode.Id &&
+            x.Kind == "references");
+
+        Assert.Equal([geometryNode.Id], relationship.TargetIds);
+    }
+
+    [Fact]
+    public void Published_face_compiles_as_a_semantic_target_with_result_and_provenance_identity()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("topology-front", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "topology-front");
+        });
+
+        using var app = builder.Build();
+        var manifest = app.CreateCompiledModelManifest();
+
+        var face = manifest.Nodes.Single(x => x.Id == "definition:part:part/face:front");
+        Assert.Equal("Face", face.Kind);
+        Assert.Equal("result-r1", face.Metadata["resultIdentity"].GetString());
+        Assert.Equal("topology-front", face.Metadata["topologyBindingId"].GetString());
+        Assert.Equal("brep-face-6", face.Metadata["authoritativeTopologyId"].GetString());
+    }
+
+    [Fact]
     public void Occurrence_ids_may_repeat_in_different_assemblies_but_compiled_ids_are_unique()
     {
         var builder = CadApplication.CreateBuilder();

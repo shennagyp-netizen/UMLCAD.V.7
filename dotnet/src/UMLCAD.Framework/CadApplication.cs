@@ -22,6 +22,7 @@ public sealed class CadApplicationBuilder
     private readonly List<PartDefinition> _parts = [];
     private readonly List<AssemblyDefinition> _assemblies = [];
     private readonly List<DrawingDefinition> _drawings = [];
+    private readonly List<SemanticFrame> _frames = [];
 
     public IServiceCollection Services => _userServices;
     public IConfigurationManager Configuration => _configuration;
@@ -62,6 +63,21 @@ public sealed class CadApplicationBuilder
         return this;
     }
 
+    public CadApplicationBuilder Frame(
+        string id,
+        SemanticFrameKind kind,
+        string? parentId = null,
+        IReadOnlyList<double>? transform = null)
+    {
+        _frames.Add(new SemanticFrame(
+            RequireText(id, nameof(id)),
+            kind,
+            parentId is null ? null : RequireText(parentId, nameof(parentId)),
+            TransformSemantic.FromArray(transform ?? TransformSemantic.Identity.Matrix)));
+
+        return this;
+    }
+
     public CadApplication Build()
     {
         ValidateDefinitions();
@@ -75,6 +91,9 @@ public sealed class CadApplicationBuilder
         services.AddSingleton<ICadConfiguration>(_ => new CadConfiguration(_configuration));
         services.AddSingleton<IBuildHistory>(_buildHistory);
         services.AddSingleton<ISemanticApplication>(semanticState);
+        services.AddSingleton<ISemanticReferenceService, SemanticReferenceService>();
+        services.AddSingleton<IAuthoritativeResultIntegrationService, AuthoritativeResultIntegrationService>();
+        services.AddSingleton<ISemanticFrameService, SemanticFrameService>();
         services.AddSingleton<IPartSemanticService, PartSemanticService>();
         services.AddSingleton<IDrawingSemanticService, DrawingSemanticService>();
         services.AddSingleton<ISheetSemanticService, SheetSemanticService>();
@@ -98,6 +117,10 @@ public sealed class CadApplicationBuilder
                 registry.RegisterAssembly(assembly.ToSemantic());
             foreach (var drawing in _drawings)
                 registry.RegisterDrawing(drawing.ToSemantic());
+            foreach (var frame in _frames)
+                registry.RegisterFrame(frame);
+
+            ValidateFrames();
 
             var configuration = ResolveConfiguration();
             var canonicalWithoutIdentity = new
@@ -108,7 +131,8 @@ public sealed class CadApplicationBuilder
                 Configuration = configuration,
                 Parts = _parts.OrderBy(x => x.Id, StringComparer.Ordinal),
                 Assemblies = _assemblies.OrderBy(x => x.Id, StringComparer.Ordinal),
-                Drawings = _drawings.OrderBy(x => x.Id, StringComparer.Ordinal)
+                Drawings = _drawings.OrderBy(x => x.Id, StringComparer.Ordinal),
+                Frames = _frames.OrderBy(x => x.Id, StringComparer.Ordinal)
             };
 
             var bytes = JsonSerializer.SerializeToUtf8Bytes(canonicalWithoutIdentity, JsonDefaults.Options);
@@ -126,6 +150,60 @@ public sealed class CadApplicationBuilder
         }
     }
 
+    private void ValidateFrames()
+    {
+        var frames = _frames.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var frame in frames)
+        {
+            if (!ids.Add(frame.Id))
+                throw new InvalidOperationException($"FRAME_AMBIGUOUS: frame identity '{frame.Id}' is duplicated.");
+
+            if (frame.Kind == SemanticFrameKind.World)
+            {
+                if (frame.ParentId is not null)
+                    throw new InvalidOperationException($"FRAME_WORLD_PARENT: world frame '{frame.Id}' cannot have a parent.");
+                if (!frame.TransformToParent.Matrix.SequenceEqual(TransformSemantic.Identity.Matrix))
+                    throw new InvalidOperationException($"FRAME_WORLD_TRANSFORM: world frame '{frame.Id}' must use the identity transform.");
+            }
+            else if (string.IsNullOrWhiteSpace(frame.ParentId))
+            {
+                throw new InvalidOperationException($"FRAME_PARENT_MISSING: frame '{frame.Id}' requires a parent.");
+            }
+        }
+
+        var worldCount = frames.Count(x => x.Kind == SemanticFrameKind.World);
+        if (worldCount > 1)
+            throw new InvalidOperationException("FRAME_WORLD_AMBIGUOUS: more than one World frame is defined.");
+
+        var byId = frames.ToDictionary(x => x.Id, StringComparer.Ordinal);
+        foreach (var frame in frames)
+            if (frame.ParentId is not null && !byId.ContainsKey(frame.ParentId))
+                throw new InvalidOperationException($"FRAME_PARENT_MISSING: frame '{frame.Id}' references missing parent '{frame.ParentId}'.");
+
+        var active = new HashSet<string>(StringComparer.Ordinal);
+        var done = new HashSet<string>(StringComparer.Ordinal);
+
+        void Visit(string frameId)
+        {
+            if (done.Contains(frameId))
+                return;
+            if (!active.Add(frameId))
+                throw new InvalidOperationException($"FRAME_CYCLE: frame hierarchy contains a cycle at '{frameId}'.");
+
+            var parent = byId[frameId].ParentId;
+            if (parent is not null)
+                Visit(parent);
+
+            active.Remove(frameId);
+            done.Add(frameId);
+        }
+
+        foreach (var frame in frames)
+            Visit(frame.Id);
+    }
+
     private void ValidateDefinitions()
     {
         var definitionIds = new HashSet<string>(StringComparer.Ordinal);
@@ -135,9 +213,60 @@ public sealed class CadApplicationBuilder
         foreach (var assembly in _assemblies)
             if (!definitionIds.Add(assembly.Id))
                 throw new InvalidOperationException($"A semantic definition with ID '{assembly.Id}' is already defined.");
+        foreach (var drawing in _drawings)
+            if (!definitionIds.Add(drawing.Id))
+                throw new InvalidOperationException($"A semantic definition with ID '{drawing.Id}' is already defined.");
+
+        if (definitionIds.Contains(ApplicationId))
+            throw new InvalidOperationException($"Application ID '{ApplicationId}' collides with a semantic definition ID.");
 
         var assemblyLookup = _assemblies.ToDictionary(x => x.Id, StringComparer.Ordinal);
         var partLookup = _parts.ToDictionary(x => x.Id, StringComparer.Ordinal);
+
+        foreach (var part in _parts)
+        {
+            var publicationIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var publication in part.Publications)
+            {
+                if (!publicationIds.Add(publication.Id))
+                    throw new InvalidOperationException($"Part '{part.Id}' contains duplicate publication ID '{publication.Id}'.");
+
+                if (!part.TopologyBindings.Any(x => string.Equals(x.Id, publication.TopologyBindingId, StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Part '{part.Id}' publication '{publication.Id}' references missing topology binding '{publication.TopologyBindingId}'.");
+            }
+
+            var topologyBindingIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var binding in part.TopologyBindings)
+            {
+                if (!topologyBindingIds.Add(binding.Id))
+                    throw new InvalidOperationException($"Part '{part.Id}' contains duplicate topology binding ID '{binding.Id}'.");
+            }
+
+            foreach (var publication in part.Publications)
+            {
+                var binding = part.TopologyBindings.Single(x => string.Equals(x.Id, publication.TopologyBindingId, StringComparison.Ordinal));
+                if (!string.Equals(binding.TopologyKind, publication.TargetKind, StringComparison.Ordinal) ||
+                    !string.Equals(binding.SemanticTargetId, publication.TargetId, StringComparison.Ordinal) ||
+                    !string.Equals(binding.ResultIdentity, publication.ResultIdentity, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Part '{part.Id}' publication '{publication.Id}' does not match topology binding '{publication.TopologyBindingId}'.");
+                }
+            }
+
+            foreach (var binding in part.TopologyBindings)
+            {
+                if (!part.Publications.Any(x => string.Equals(x.TopologyBindingId, binding.Id, StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Part '{part.Id}' contains orphan topology binding '{binding.Id}'.");
+            }
+        }
+
+        foreach (var drawing in _drawings)
+        {
+            foreach (var partReference in drawing.PartReferences)
+                if (!partLookup.ContainsKey(partReference))
+                    throw new InvalidOperationException($"Drawing '{drawing.Id}' references unknown part definition '{partReference}'.");
+        }
 
         foreach (var assembly in _assemblies)
         {
@@ -248,6 +377,8 @@ public sealed class PartBuilder
     private readonly List<ConstraintSemantic> _constraints = [];
     private readonly List<string> _references = [];
     private readonly List<string> _components = [];
+    private readonly List<ShapePublicationSemantic> _publications = [];
+    private readonly List<TopologyBindingSemantic> _topologyBindings = [];
     private readonly Dictionary<string, string> _customMetadata = new(StringComparer.Ordinal);
     private string _name;
     private string? _partNumber;
@@ -314,6 +445,38 @@ public sealed class PartBuilder
         return this;
     }
 
+    public PartBuilder Publication(
+        string id,
+        string targetKind,
+        string targetId,
+        string resultIdentity,
+        string topologyBindingId)
+    {
+        _publications.Add(new ShapePublicationSemantic(
+            RequireText(id, nameof(id)),
+            RequireText(targetKind, nameof(targetKind)),
+            RequireText(targetId, nameof(targetId)),
+            RequireText(resultIdentity, nameof(resultIdentity)),
+            RequireText(topologyBindingId, nameof(topologyBindingId))));
+        return this;
+    }
+
+    public PartBuilder TopologyBinding(
+        string id,
+        string topologyKind,
+        string semanticTargetId,
+        string resultIdentity,
+        string authoritativeTopologyId)
+    {
+        _topologyBindings.Add(new TopologyBindingSemantic(
+            RequireText(id, nameof(id)),
+            RequireText(topologyKind, nameof(topologyKind)),
+            RequireText(semanticTargetId, nameof(semanticTargetId)),
+            RequireText(resultIdentity, nameof(resultIdentity)),
+            RequireText(authoritativeTopologyId, nameof(authoritativeTopologyId))));
+        return this;
+    }
+
     internal PartDefinition Build() => new(
         _id,
         _name,
@@ -323,6 +486,8 @@ public sealed class PartBuilder
         _constraints.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
         _references.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
         _components.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+        _publications.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
+        _topologyBindings.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
         new CadMetadata(_partNumber, _description, _material, _manufacturer, _vendor, _revision, _lifecycleState, _author, _documentCode,
             new SortedDictionary<string, string>(_customMetadata, StringComparer.Ordinal)));
 
@@ -502,13 +667,17 @@ internal sealed record PartDefinition(
     IReadOnlyList<ConstraintSemantic> Constraints,
     IReadOnlyList<string> References,
     IReadOnlyList<string> Components,
+    IReadOnlyList<ShapePublicationSemantic> Publications,
+    IReadOnlyList<TopologyBindingSemantic> TopologyBindings,
     CadMetadata Metadata)
 {
     public PartSemantic ToSemantic() => new(Id, PartType, Parameters, Geometry, Constraints, References, Components)
     {
         Name = Name,
         StructuredMetadata = Metadata,
-        Metadata = Metadata
+        Metadata = Metadata,
+        Publications = Publications,
+        TopologyBindings = TopologyBindings
     };
 }
 

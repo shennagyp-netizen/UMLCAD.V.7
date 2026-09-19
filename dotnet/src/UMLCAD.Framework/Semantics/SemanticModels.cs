@@ -2,6 +2,55 @@ namespace UMLCAD.Framework.Semantics;
 
 public sealed record ParameterSemantic(string Name, string Value, string? Unit = null);
 
+public enum SemanticFrameKind
+{
+    World,
+    Document,
+    Part,
+    Body,
+    Sketch,
+    Face,
+    Occurrence,
+    DrawingView,
+    ManufacturingSetup,
+    Simulation
+}
+
+public sealed record SemanticFrame(
+    string Id,
+    SemanticFrameKind Kind,
+    string? ParentId,
+    TransformSemantic TransformToParent);
+
+public sealed record SemanticFrameResolution(
+    string FrameId,
+    SemanticReferenceStatus Status,
+    IReadOnlyList<SemanticFrame> Candidates,
+    string DiagnosticCode,
+    string Message)
+{
+    public bool IsResolved => Status == SemanticReferenceStatus.Resolved;
+
+    public SemanticFrame? Frame =>
+        IsResolved && Candidates.Count == 1 ? Candidates[0] : null;
+}
+
+public enum AuthoritativeResultStatus
+{
+    Authoritative,
+    Rejected,
+    Indeterminate
+}
+
+public sealed record AuthoritativeResultSemantic(
+    string Id,
+    string ProducerId,
+    string FrameId,
+    string OperationIdentity,
+    string ContractIdentity,
+    string EvidenceIdentity,
+    AuthoritativeResultStatus Status);
+
 public sealed record CadMetadata(
     string? PartNumber = null,
     string? Description = null,
@@ -56,6 +105,20 @@ public sealed record GeometrySemantic(
     string Id,
     string Kind,
     IReadOnlyDictionary<string, string> Properties) : SemanticEntity(Id, Kind);
+
+public sealed record ShapePublicationSemantic(
+    string Id,
+    string TargetKind,
+    string TargetId,
+    string ResultIdentity,
+    string TopologyBindingId);
+
+public sealed record TopologyBindingSemantic(
+    string Id,
+    string TopologyKind,
+    string SemanticTargetId,
+    string ResultIdentity,
+    string AuthoritativeTopologyId);
 
 public sealed record ConstraintSemantic(
     string Id,
@@ -116,6 +179,10 @@ public sealed record PartSemantic(
 {
     public string Name { get; init; } = Id;
     public CadMetadata StructuredMetadata { get; init; } = CadMetadata.Empty;
+    public IReadOnlyList<ShapePublicationSemantic> Publications { get; init; } =
+        Array.Empty<ShapePublicationSemantic>();
+    public IReadOnlyList<TopologyBindingSemantic> TopologyBindings { get; init; } =
+        Array.Empty<TopologyBindingSemantic>();
 }
 
 public sealed record SheetSemantic(
@@ -148,4 +215,11 @@ public sealed record SemanticApplication(
     IReadOnlyList<PartSemantic> Parts,
     IReadOnlyList<AssemblySemantic> Assemblies,
     IReadOnlyList<DrawingSemantic> Drawings,
-    string BuildIdentity);
+    string BuildIdentity)
+{
+    public IReadOnlyList<SemanticFrame> Frames { get; init; } =
+        Array.Empty<SemanticFrame>();
+
+    public IReadOnlyList<AuthoritativeResultSemantic> AuthoritativeResults { get; init; } =
+        Array.Empty<AuthoritativeResultSemantic>();
+}

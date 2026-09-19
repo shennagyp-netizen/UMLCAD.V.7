@@ -302,6 +302,11 @@ internal static class KernelOperationResponseValidator
             if (string.IsNullOrWhiteSpace(response.EvidenceHash))
                 throw new InvalidOperationException(
                     "Successful kernel operation has no authoritative evidence hash.");
+
+            if (response.HistoryIdentity is null ||
+                string.IsNullOrWhiteSpace(response.HistoryIdentity.Value.Value))
+                throw new InvalidOperationException(
+                    "Successful kernel operation has no kernel history identity.");
         }
 
         if (response.Status != CadEvaluationStatus.Succeeded &&

@@ -58,11 +58,11 @@ The Rust kernel is deliberately thin. The complete CAD system is therefore **not
 
 ### Application Layer classification
 
-All production .NET libraries under `dotnet/src/` belong to one architectural **Application Layer**. They own System-CAD and engineering meaning and may be internally decomposed into contracts, semantics, engines, domains, orchestration, presentation, and infrastructure-facing services.
+All new production .NET libraries under `app/framework/libraries/` belong to one architectural **Application Layer**. The older `dotnet/` implementation remains legacy and is intentionally outside the new dependency graph. They own System-CAD and engineering meaning and may be internally decomposed into contracts, semantics, engines, domains, orchestration, presentation, and infrastructure-facing services.
 
 The mathematical kernel is outside the Application Layer under `kernel/`. It is the mathematical authority, not another .NET application library.
 
-Kernel access from the Application Layer is centralized through exactly one dedicated .NET kernel-access library. The current implementation is `UMLCAD.Kernel.Client`; its current Rust/HTTP mechanics are transitional implementation details and must not leak into other Application Layer libraries.
+Kernel access from the Application Layer is centralized through exactly one dedicated .NET kernel-access library. The new implementation gateway is `app/framework/libraries/UMLCAD.Kernel`. Its Rust/HTTP/native mechanics are implementation details confined to that library and must not leak into other Application Layer libraries.
 
 The Application Layer may contain many libraries and an internal dependency DAG, but that DAG must remain acyclic.
 
@@ -709,7 +709,7 @@ The repository enforces the following executable architectural rules:
 - kernel transport, native-process, Rust-kernel implementation, and current kernel-host endpoint knowledge may exist only inside that gateway;
 - no other Application Layer library may call the native kernel directly or reproduce the kernel transport;
 - a kernel gateway may be consumed by Application Layer services, but it must not depend back on consumers in a way that creates a reverse architectural cycle;
-- these rules are checked by `app_e2e` and are required in CI.
+- these rules are checked by `app_e2e` against the new `app/` tree and are required in CI.
 
 A written dependency diagram is therefore not the enforcement mechanism. The repository's architecture gate is.
 

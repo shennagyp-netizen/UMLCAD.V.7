@@ -7,6 +7,7 @@ public readonly record struct CadId(string Value)
 
 public readonly record struct CadResultId(string Value);
 public readonly record struct CadEvaluationIdentity(string Value);
+public readonly record struct KernelHistoryIdentity(string Value);
 
 public enum CadResultKind { SketchProfile, Body }
 public enum CadEvaluationStatus { Succeeded, Failed, Unsupported, Ambiguous, Indeterminate, Cancelled }
@@ -35,7 +36,8 @@ public sealed record KernelOperationRequest(
     KernelEvaluationMode Mode,
     CadResultId? IncrementalBaseResultId,
     IReadOnlyList<CadResultId> InputResultIds,
-    IReadOnlyDictionary<string, string> SemanticInputs);
+    IReadOnlyDictionary<string, string> SemanticInputs,
+    KernelHistoryIdentity? BaseHistoryIdentity = null);
 
 public sealed record KernelOperationResponse(
     string ContractVersion,
@@ -45,7 +47,8 @@ public sealed record KernelOperationResponse(
     CadResultId? AuthoritativeResultId,
     string? EvidenceHash,
     IReadOnlyList<KernelTopologyBinding> Topology,
-    IReadOnlyList<CadDiagnostic> Diagnostics)
+    IReadOnlyList<CadDiagnostic> Diagnostics,
+    KernelHistoryIdentity? HistoryIdentity = null)
 {
     public static KernelOperationResponse Success(
         KernelOperationRequest request,
@@ -61,7 +64,8 @@ public sealed record KernelOperationResponse(
             resultId,
             evidenceHash,
             topology ?? Array.Empty<KernelTopologyBinding>(),
-            diagnostics ?? Array.Empty<CadDiagnostic>());
+            diagnostics ?? Array.Empty<CadDiagnostic>(),
+            new KernelHistoryIdentity("demo:" + request.EvaluationIdentity.Value));
 
     public static KernelOperationResponse Failure(
         KernelOperationRequest request,

@@ -168,7 +168,7 @@ public sealed record CadEvaluationHistory(
 {
     public static CadEvaluationHistory Empty { get; } =
         Create(
-            Array.Empty<CadId>(),
+            new CadEvaluationPlan(Array.Empty<CadId>()),
             new Dictionary<CadId, CadEvaluationOutcome>());
 
     public CadHistoryEntry? Find(CadId operationId) =>

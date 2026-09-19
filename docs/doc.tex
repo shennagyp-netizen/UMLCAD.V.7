@@ -91,8 +91,8 @@ There are two separate truths that must never be confused:
 \toprule
 Term & Meaning \\
 \midrule
-\current & Code and files verified to exist in the current \\texttt{main} repository state. \\
-\target & Architectural direction expressed by the current development law and the architecture implied by the requested System-CAD model. It may not yet have an implementation on \\texttt{main}. \\
+\current & Code and files verified to exist in the current \texttt{main} repository state. \\
+\target & Architectural direction expressed by the current development law and the architecture implied by the requested System-CAD model. It may not yet have an implementation on \texttt{main}. \\
 \bottomrule
 \end{tabularx}
 
@@ -101,7 +101,7 @@ A class, interface, endpoint, test, or documentation statement is not by itself 
 The mathematical roadmap M0-M16 is closed for its declared certified domains. That closure means the mathematical authority is treated as the existing foundation for the next system-CAD layer; it does not mean every possible CAD mathematical operation is implemented.
 
 \section{Repository fact at the audit point}
-At the audit point, the repository contains the mature Rust mathematical/native foundation, the existing \texttt{UMLCAD.Framework} and \texttt{UMLCAD.Kernel.Client} .NET surface, the legacy TypeScript kernel API, the OCCT backend/contracts, the demo/E2E harness, and the CI workflows described later. Some newer System-CAD domain projects described in earlier handbook text are not present on the exact current \\texttt{main} tree and are therefore documented here as target architecture rather than current implementation.
+At the audit point, the repository contains the mature Rust mathematical/native foundation, the existing \texttt{UMLCAD.Framework} and \texttt{UMLCAD.Kernel.Client} .NET surface, the legacy TypeScript kernel API, the OCCT backend/contracts, the demo/E2E harness, and the CI workflows described later. Some newer System-CAD domain projects described in earlier handbook text are not present on the exact current \texttt{main} tree and are therefore documented here as target architecture rather than current implementation.
 
 \chapter{Executive Architecture}
 
@@ -162,7 +162,7 @@ Container / subsystem & Responsibility \\
 \pathref{dotnet/src/UMLCAD.Kernel.Client} & Current .NET transport adapter to the Rust kernel. Handles timeout, response limits, JSON, stable diagnostics, cancellation, and compiled-result validation. \\
 \pathref{projects/demo} & Executable demonstration and integrated runtime path. The E2E mode starts the kernel and validates the compiled model without opening the viewer. \\
 \pathref{tests/e2e} & System-level process/wire gate and red-team harness. \\
-\pathref{viewer} & Presentation boundary. The current repository proves the viewer package manifest and demo integration assumptions; implementation details that are not present on the exact \\texttt{main} tree are not claimed here as implemented. \\
+\pathref{viewer} & Presentation boundary. The current repository proves the viewer package manifest and demo integration assumptions; implementation details that are not present on the exact \texttt{main} tree are not claimed here as implemented. \\
 \bottomrule
 
 \end{tabularx}
@@ -1058,7 +1058,7 @@ The complete and authoritative System-CAD architecture is maintained in \pathref
 
 This handbook intentionally summarizes those rules in its C4 and domain sections above rather than maintaining a second detailed target-domain specification here. Any future architectural change must update the active architecture document first and then keep this handbook synchronized.
 
-The target architecture does not claim that every named domain is already implemented on \\texttt{main}.
+The target architecture does not claim that every named domain is already implemented on \texttt{main}.
 
 \chapter{CATIA Capability Traceability}
 
@@ -1346,14 +1346,14 @@ Never substitute a percentage for a gate.
 
 \begin{enumerate}
 \item The repository is not yet a full CATIA-scale System-CAD application.
-\item The current audited \\texttt{main} tree does not contain every future specialized .NET domain project described by the target architecture.
+\item The current audited \texttt{main} tree does not contain every future specialized .NET domain project described by the target architecture.
 \item Framework build/compiled-model functionality is not by itself a canonical feature-evaluation engine.
 \item \texttt{uml-cad-build-package/1.0.0} is a current compatibility bridge, not a mandate for the long-term System-CAD semantic model.
 \item General curved-face sewing, unrestricted B-Rep Boolean construction, arbitrary topology-aware fillet/chamfer, universal trimmed-surface filling, and universal closest-point/intersection solving are not silently certified by M0-M16.
 \item Metal hardware validation does not make Metal an authoritative f64 geometry backend.
 \item CUDA hardware validation remains unclaimed without an actual NVIDIA runner execution record.
 \item Representation and tessellation are derived/approximate domains and never replace semantic truth.
-\item This handbook does not define a competing feature sequence. \pathref{docs/SYSTEM_CAD_ARCHITECTURE.md} defines the intended architecture; the continuation/gap state at the exact \\texttt{main} head determines the next implementation increment.
+\item This handbook does not define a competing feature sequence. \pathref{docs/SYSTEM_CAD_ARCHITECTURE.md} defines the intended architecture; the continuation/gap state at the exact \texttt{main} head determines the next implementation increment.
 \end{enumerate}
 
 \chapter{Final Architectural Invariants}
@@ -1381,7 +1381,7 @@ Never substitute a percentage for a gate.
 \item Drawing consumes authoritative CAD/product state and does not reconstruct semantic truth from presentation geometry.
 \item PLM owns lifecycle/product integration without becoming geometry authority.
 \item The viewer is presentation only.
-\item The active System-CAD architecture document determines ownership and dependency direction; the exact \\texttt{main} continuation/gap state determines what is implemented next.
+\item The active System-CAD architecture document determines ownership and dependency direction; the exact \texttt{main} continuation/gap state determines what is implemented next.
 \end{enumerate}
 
 \chapter*{Revision Note}

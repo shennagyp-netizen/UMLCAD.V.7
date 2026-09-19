@@ -45,6 +45,7 @@ public enum AuthoritativeResultStatus
 public sealed record AuthoritativeResultSemantic(
     string Id,
     string ProducerId,
+    string FrameId,
     string OperationIdentity,
     string ContractIdentity,
     string EvidenceIdentity,

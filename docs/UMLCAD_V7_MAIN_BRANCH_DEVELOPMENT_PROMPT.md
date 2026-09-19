@@ -763,6 +763,7 @@ For each capability:
 1. Read the governing repository documents.
 2. Inspect exact current implementation.
 3. Inspect existing tests.
+3a. Run `python3 app_e2e/run.py` and require the Application Layer architecture gate to pass before implementation is accepted.
 4. Determine the exact missing boundary.
 5. Define the authoritative system acceptance scenario.
 6. Run RED before completing the implementation.

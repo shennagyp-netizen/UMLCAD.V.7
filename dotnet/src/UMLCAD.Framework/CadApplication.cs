@@ -146,6 +146,44 @@ public sealed class CadApplicationBuilder
         var assemblyLookup = _assemblies.ToDictionary(x => x.Id, StringComparer.Ordinal);
         var partLookup = _parts.ToDictionary(x => x.Id, StringComparer.Ordinal);
 
+        foreach (var part in _parts)
+        {
+            var publicationIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var publication in part.Publications)
+            {
+                if (!publicationIds.Add(publication.Id))
+                    throw new InvalidOperationException($"Part '{part.Id}' contains duplicate publication ID '{publication.Id}'.");
+
+                if (!part.TopologyBindings.Any(x => string.Equals(x.Id, publication.TopologyBindingId, StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Part '{part.Id}' publication '{publication.Id}' references missing topology binding '{publication.TopologyBindingId}'.");
+            }
+
+            var topologyBindingIds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var binding in part.TopologyBindings)
+            {
+                if (!topologyBindingIds.Add(binding.Id))
+                    throw new InvalidOperationException($"Part '{part.Id}' contains duplicate topology binding ID '{binding.Id}'.");
+            }
+
+            foreach (var publication in part.Publications)
+            {
+                var binding = part.TopologyBindings.Single(x => string.Equals(x.Id, publication.TopologyBindingId, StringComparison.Ordinal));
+                if (!string.Equals(binding.TopologyKind, publication.TargetKind, StringComparison.Ordinal) ||
+                    !string.Equals(binding.SemanticTargetId, publication.TargetId, StringComparison.Ordinal) ||
+                    !string.Equals(binding.ResultIdentity, publication.ResultIdentity, StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"Part '{part.Id}' publication '{publication.Id}' does not match topology binding '{publication.TopologyBindingId}'.");
+                }
+            }
+
+            foreach (var binding in part.TopologyBindings)
+            {
+                if (!part.Publications.Any(x => string.Equals(x.TopologyBindingId, binding.Id, StringComparison.Ordinal)))
+                    throw new InvalidOperationException($"Part '{part.Id}' contains orphan topology binding '{binding.Id}'.");
+            }
+        }
+
         foreach (var drawing in _drawings)
         {
             foreach (var partReference in drawing.PartReferences)

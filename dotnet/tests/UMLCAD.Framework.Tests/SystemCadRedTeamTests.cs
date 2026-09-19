@@ -274,23 +274,4 @@ public sealed class SystemCadRedTeamTests
         Assert.Equal(targetKind, result.Target.TargetKind);
     }
 
-    private sealed class TestApplicationBuilder(CadApplicationBuilder builder)
-    {
-        public CadApplication Build(SemanticApplication semantic)
-        {
-            // This test-only bridge validates resolver behavior against a manually
-            // constructed semantic snapshot without adding a production API solely
-            // to make adversarial tests convenient.
-            builder.AddPart("anchor", "part");
-            var app = builder.Build();
-            return new SemanticOverrideApplication(app, semantic);
-        }
-    }
-
-    private sealed class SemanticOverrideApplication(CadApplication source, SemanticApplication semantic) : CadApplicationProxy(source, semantic);
-    private abstract class CadApplicationProxy(CadApplication source, SemanticApplication semantic)
-    {
-        protected CadApplication Source { get; } = source;
-        protected SemanticApplication SemanticOverride { get; } = semantic;
-    }
 }

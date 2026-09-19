@@ -75,7 +75,7 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
         if (part is not null)
         {
             if (string.Equals(reference.TargetKind, "face", StringComparison.Ordinal))
-                return ResolvePublishedFace(part, reference);
+                return ResolvePublishedFace(part, application, reference);
 
             return Classify(
                 reference,
@@ -128,6 +128,7 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
 
     private static SemanticReferenceResolution ResolvePublishedFace(
         PartSemantic part,
+        SemanticApplication application,
         SemanticReference reference)
     {
         var publications = part.Publications
@@ -145,11 +146,54 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                 $"No face publication for target '{reference.TargetId}' exists under producer '{reference.ProducerId}'.");
 
         var candidates = new List<SemanticReferenceCandidate>();
+        var resultMissing = false;
+        var resultOwnerMismatch = false;
+        var resultAmbiguous = false;
+        var resultNotAuthoritative = false;
+        var resultInvalid = false;
         var provenanceMissing = false;
         var provenanceMismatch = false;
 
         foreach (var publication in publications)
         {
+            var results = application.AuthoritativeResults
+                .Where(x => string.Equals(x.Id, publication.ResultIdentity, StringComparison.Ordinal))
+                .ToArray();
+
+            if (results.Length == 0)
+            {
+                resultMissing = true;
+                continue;
+            }
+
+            if (results.Length > 1)
+            {
+                resultAmbiguous = true;
+                continue;
+            }
+
+            var result = results[0];
+            if (string.IsNullOrWhiteSpace(result.ProducerId) ||
+                string.IsNullOrWhiteSpace(result.OperationIdentity) ||
+                string.IsNullOrWhiteSpace(result.ContractIdentity) ||
+                string.IsNullOrWhiteSpace(result.EvidenceIdentity))
+            {
+                resultInvalid = true;
+                continue;
+            }
+
+            if (!string.Equals(result.ProducerId, part.Id, StringComparison.Ordinal))
+            {
+                resultOwnerMismatch = true;
+                continue;
+            }
+
+            if (result.Status != AuthoritativeResultStatus.Authoritative)
+            {
+                resultNotAuthoritative = true;
+                continue;
+            }
+
             var binding = part.TopologyBindings.FirstOrDefault(
                 x => string.Equals(x.Id, publication.TopologyBindingId, StringComparison.Ordinal));
 
@@ -180,16 +224,27 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
 
         if (candidates.Count == 0)
         {
-            var code = provenanceMissing
-                ? "REFERENCE_PROVENANCE_MISSING"
-                : provenanceMismatch
-                    ? "REFERENCE_PROVENANCE_MISMATCH"
-                    : "REFERENCE_PUBLICATION_MISSING";
+            var code = resultInvalid
+                ? "REFERENCE_RESULT_INVALID"
+                : resultAmbiguous
+                    ? "REFERENCE_RESULT_AMBIGUOUS"
+                    : resultOwnerMismatch
+                        ? "REFERENCE_RESULT_OWNER_MISMATCH"
+                        : resultNotAuthoritative
+                            ? "REFERENCE_RESULT_NOT_AUTHORITATIVE"
+                            : resultMissing
+                                ? "REFERENCE_RESULT_MISSING"
+                                : provenanceMissing
+                                    ? "REFERENCE_PROVENANCE_MISSING"
+                                    : provenanceMismatch
+                                        ? "REFERENCE_PROVENANCE_MISMATCH"
+                                        : "REFERENCE_PUBLICATION_MISSING";
+
             return Fail(
                 reference,
                 SemanticReferenceStatus.Indeterminate,
                 code,
-                $"Face publication '{reference.TargetId}' has no matching authoritative topology provenance.");
+                $"Face publication '{reference.TargetId}' has no single authoritative result with matching topology provenance.");
         }
 
         return Classify(

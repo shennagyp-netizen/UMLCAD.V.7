@@ -10,6 +10,12 @@ public enum ReferenceTargetKind { Result, Topology, Publication, Semantic }
 
 public abstract record SketchGeometry(CadId Id, SketchGeometryKind Kind)
 {
+    protected SketchGeometry
+    {
+        if (string.IsNullOrWhiteSpace(Id.Value))
+            throw new ArgumentException("Geometry ID is required.", nameof(Id));
+    }
+
     public abstract string CanonicalForm { get; }
 }
 
@@ -17,6 +23,18 @@ public sealed record LineGeometry(
     CadId Id, double X1, double Y1, double X2, double Y2)
     : SketchGeometry(Id, SketchGeometryKind.Line)
 {
+    public LineGeometry
+    {
+        if (!double.IsFinite(X1) || !double.IsFinite(Y1) ||
+            !double.IsFinite(X2) || !double.IsFinite(Y2))
+            throw new ArgumentOutOfRangeException(
+                nameof(X1),
+                "Line coordinates must be finite.");
+        if (X1 == X2 && Y1 == Y2)
+            throw new ArgumentException(
+                "A line cannot have identical endpoints.");
+    }
+
     public override string CanonicalForm =>
         $"line:{Id}:{X1:R}:{Y1:R}:{X2:R}:{Y2:R}";
 }
@@ -41,6 +59,25 @@ public sealed record SketchConstraint(
     IReadOnlyList<CadId> GeometryIds,
     CadExpression? Value = null)
 {
+    public SketchConstraint
+    {
+        if (!Id.IsValid)
+            throw new ArgumentException("Constraint ID is required.", nameof(Id));
+        ArgumentNullException.ThrowIfNull(GeometryIds);
+
+        GeometryIds = GeometryIds.ToArray();
+
+        if (GeometryIds.Count == 0)
+            throw new ArgumentException(
+                "A sketch constraint must reference geometry.",
+                nameof(GeometryIds));
+
+        if (GeometryIds.Distinct().Count() != GeometryIds.Count)
+            throw new ArgumentException(
+                "Sketch constraint geometry references must be unique.",
+                nameof(GeometryIds));
+    }
+
     public string CanonicalForm =>
         $"{Id}:{Kind}:{string.Join(",", GeometryIds.OrderBy(x => x.Value, StringComparer.Ordinal))}:{Value?.CanonicalForm ?? "-"}";
 }
@@ -82,15 +119,30 @@ public sealed record Sketch(
 {
     public Sketch
     {
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Sketch name is required.", nameof(Name));
+        if (!Id.IsValid || string.IsNullOrWhiteSpace(Name))
+            throw new ArgumentException("Sketch identity/name is required.");
         ArgumentNullException.ThrowIfNull(Geometry);
         ArgumentNullException.ThrowIfNull(Constraints);
         ArgumentNullException.ThrowIfNull(Supports);
 
+        Geometry = Geometry.ToArray();
+        Constraints = Constraints.ToArray();
+        Supports = Supports.ToArray();
+
         var geometryIds = Geometry.Select(x => x.Id).ToArray();
         if (geometryIds.Distinct().Count() != geometryIds.Length)
             throw new ArgumentException("Sketch geometry IDs must be unique.");
+
+        var constraintIds = Constraints.Select(x => x.Id).ToArray();
+        if (constraintIds.Distinct().Count() != constraintIds.Length)
+            throw new ArgumentException("Sketch constraint IDs must be unique.");
+
+        var geometrySet = geometryIds.ToHashSet();
+        if (Constraints.Any(
+                constraint => constraint.GeometryIds.Any(
+                    geometryId => !geometrySet.Contains(geometryId))))
+            throw new ArgumentException(
+                "A sketch constraint references geometry that is not in the sketch.");
     }
 
     public IReadOnlySet<string> ParameterNames =>
@@ -121,6 +173,29 @@ public abstract record CadOperation(
     string OperationKind,
     IReadOnlyList<CadId> InputOperationIds)
 {
+    protected CadOperation
+    {
+        if (!Id.IsValid || !BodyId.IsValid ||
+            string.IsNullOrWhiteSpace(OperationKind))
+            throw new ArgumentException(
+                "Operation identity/body/kind is required.");
+
+        ArgumentNullException.ThrowIfNull(InputOperationIds);
+        InputOperationIds = InputOperationIds.ToArray();
+
+        if (InputOperationIds.Distinct().Count() != InputOperationIds.Count)
+            throw new ArgumentException(
+                "Operation dependencies must be unique.",
+                nameof(InputOperationIds));
+
+        if (InputOperationIds.Contains(Id))
+            throw new ArgumentException(
+                "An operation cannot depend on itself.",
+                nameof(InputOperationIds));
+    }
+
+    public abstract CadResultKind OutputKind { get; }
+
     public virtual IReadOnlySet<string> ParameterNames =>
         new HashSet<string>(StringComparer.Ordinal);
 
@@ -163,6 +238,9 @@ public sealed record SketchOperation(
     Sketch Definition)
     : CadOperation(Id, BodyId, "Cad.Sketch", Array.Empty<CadId>)
 {
+    public override CadResultKind OutputKind =>
+        CadResultKind.SketchProfile;
+
     public override IReadOnlySet<string> ParameterNames =>
         Definition.ParameterNames;
 
@@ -178,6 +256,9 @@ public sealed record ExtrusionOperation(
     string Direction)
     : CadOperation(Id, BodyId, "Cad.Extrusion", new[] { SketchOperationId })
 {
+    public override CadResultKind OutputKind =>
+        CadResultKind.Body;
+
     public override IReadOnlySet<string> ParameterNames =>
         Distance.ParameterNames;
 
@@ -202,6 +283,9 @@ public sealed record HoleOperation(
     CadExpression Depth)
     : CadOperation(Id, BodyId, "Cad.Hole", new[] { BaseOperationId })
 {
+    public override CadResultKind OutputKind =>
+        CadResultKind.Body;
+
     public override IReadOnlySet<string> ParameterNames =>
         Diameter.ParameterNames
             .Concat(Depth.ParameterNames)
@@ -238,12 +322,17 @@ public sealed record CadPartDefinition(
 {
     public CadPartDefinition
     {
-        if (string.IsNullOrWhiteSpace(Name))
-            throw new ArgumentException("Part name is required.", nameof(Name));
+        if (!Id.IsValid || string.IsNullOrWhiteSpace(Name))
+            throw new ArgumentException("Part identity/name is required.");
         ArgumentNullException.ThrowIfNull(Bodies);
         ArgumentNullException.ThrowIfNull(Parameters);
         ArgumentNullException.ThrowIfNull(Publications);
         ArgumentNullException.ThrowIfNull(Operations);
+
+        Bodies = Bodies.ToArray();
+        Parameters = Parameters.ToArray();
+        Publications = Publications.ToArray();
+        Operations = Operations.ToArray();
 
         EnsureUnique(Bodies.Select(x => x.Id), "body");
         EnsureUnique(Parameters.Select(x => x.Name), "parameter");

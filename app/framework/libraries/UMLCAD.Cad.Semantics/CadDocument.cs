@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using UMLCAD.Cad.Contracts;
 
 namespace UMLCAD.Cad.Semantics;

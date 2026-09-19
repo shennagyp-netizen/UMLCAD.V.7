@@ -211,6 +211,12 @@ public static class RustKernelServiceCollectionExtensions
             client.Timeout = options.RequestTimeout;
         });
 
+        services.AddHttpClient<IAxisAlignedBoxKernelService, AxisAlignedBoxKernelService>(client =>
+        {
+            client.BaseAddress = options.BaseAddress;
+            client.Timeout = options.RequestTimeout;
+        });
+
         return services;
     }
 }

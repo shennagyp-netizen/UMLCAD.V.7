@@ -187,8 +187,7 @@ internal sealed class CompiledModelService : ICompiledModelService
                 var semanticReference = new SemanticReference(
                     part.Id,
                     reference,
-                    "geometry",
-                    application.BuildIdentity);
+                    "geometry");
 
                 var resolution = _referenceService.Resolve(application, semanticReference);
                 if (!resolution.IsResolved)

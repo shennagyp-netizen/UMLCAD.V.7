@@ -104,14 +104,25 @@ public sealed class EngineeringRuntimeTests
     public void EngineeringContext_Copies_FeatureIndex()
     {
         var store = NewStore();
+        var store = NewStore();
+        store.Snapshot();
+        var seeded = new InMemoryCadControlService(store);
+        seeded.AddFeature(
+            new CadFeatureDefinition(
+                new CadId("seed"),
+                CadFeatureKind.Feature,
+                "Seed"));
+        seeded.Commit();
+
         var snapshot = store.Snapshot();
         var source = snapshot.Features.ToDictionary(feature => feature.Id);
 
         var context = new EngineeringContext(snapshot, source);
         source.Clear();
 
-        Assert.True(context.TryGetFeature(new CadId("created-after-simulation"), out _ ) is false);
-        Assert.Empty(context.FeatureIndex);
+        Assert.True(context.TryGetFeature(new CadId("seed"), out var feature));
+        Assert.Equal("Seed", feature!.Name);
+        Assert.Single(context.FeatureIndex);
     }
 
 
@@ -124,9 +135,7 @@ public sealed class EngineeringRuntimeTests
             new ChangeRule(
                 new EngineeringRuleIdentity("rule.first", "1.0.0"),
                 EngineeringRuleOutcomeKind.ApplyChange),
-            new ChangeRule(
-                new EngineeringRuleIdentity("rule.second", "1.0.0"),
-                EngineeringRuleOutcomeKind.Reject)
+            new RejectRule()
         };
 
         var result = await new EngineeringBuildValidator().ValidateAsync(
@@ -319,6 +328,27 @@ public sealed class EngineeringRuntimeTests
         }
     }
 
+
+
+    private sealed class RejectRule : IEngineeringRule
+    {
+        public EngineeringRuleIdentity Identity { get; } =
+            new("rule.reject", "1.0.0");
+
+        public ValueTask<EngineeringRuleResult> ExecuteAsync(
+            EngineeringContext context,
+            IEngineeringServices services,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.FromResult(
+                new EngineeringRuleResult(
+                    EngineeringRuleOutcomeKind.Reject,
+                    [
+                        new EngineeringDiagnostic(
+                            "RULE_REJECTED",
+                            "Rejected by test rule.",
+                            [])
+                    ]));
+    }
 
     private sealed class DependentChangeRule : IEngineeringRule
     {

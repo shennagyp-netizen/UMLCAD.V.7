@@ -22,7 +22,7 @@ public sealed class SemanticReferenceServiceTests
         var service = app.GetRequiredService<ISemanticReferenceService>();
 
         var result = service.Resolve(app.Semantic,
-            new SemanticReference("part", "edge", "geometry", app.Semantic.BuildIdentity));
+            new SemanticReference("part", "edge", "geometry"));
 
         Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
         Assert.True(result.IsResolved);
@@ -34,17 +34,39 @@ public sealed class SemanticReferenceServiceTests
     public void Reports_stale_result_identity_as_indeterminate()
     {
         var builder = CadApplication.CreateBuilder();
-        builder.AddPart("part", "part", part => part.Geometry("edge", "line", new Dictionary<string, string>()));
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("topology-front", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "topology-front");
+        });
 
         using var app = builder.Build();
         var service = app.GetRequiredService<ISemanticReferenceService>();
 
         var result = service.Resolve(app.Semantic,
-            new SemanticReference("part", "edge", "geometry", "stale-build"));
+            new SemanticReference("part", "front-face", "face", "stale-build"));
 
         Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
         Assert.Equal("REFERENCE_STALE_RESULT", result.DiagnosticCode);
         Assert.False(result.IsResolved);
+    }
+
+    [Fact]
+    public void Matching_authoritative_result_identity_resolves_published_face()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("topology-front", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "topology-front");
+        });
+
+        using var app = builder.Build();
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(app.Semantic, new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
+        Assert.Equal("result-r1", result.Target!.ResultIdentity);
     }
 
     [Fact]

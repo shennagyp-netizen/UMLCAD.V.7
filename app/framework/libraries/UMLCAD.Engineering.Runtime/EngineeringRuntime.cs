@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Engine;
 using UMLCAD.Cad.Semantics;
@@ -106,7 +107,10 @@ public sealed class EngineeringContext
         IReadOnlyDictionary<CadId, CadFeatureDefinition> featureIndex)
     {
         Document = document ?? throw new ArgumentNullException(nameof(document));
-        FeatureIndex = featureIndex ?? throw new ArgumentNullException(nameof(featureIndex));
+        ArgumentNullException.ThrowIfNull(featureIndex);
+
+        FeatureIndex = new ReadOnlyDictionary<CadId, CadFeatureDefinition>(
+            new Dictionary<CadId, CadFeatureDefinition>(featureIndex));
     }
 
     public CadDocumentSnapshot Document { get; }

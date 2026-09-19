@@ -11,7 +11,7 @@ public sealed class KernelGatewayTests
     {
         Assert.True(typeof(UmlcadKernel).IsSealed);
         Assert.False(typeof(UmlcadKernel).IsAbstract);
-        Assert.Null(typeof(UMLCAD.Kernel).Assembly.GetType("UMLCAD.Kernel.IRustKernelService"));
+        Assert.Null(typeof(UmlcadKernel).Assembly.GetType("UMLCAD.Kernel.IRustKernelService"));
     }
 
     [Fact]

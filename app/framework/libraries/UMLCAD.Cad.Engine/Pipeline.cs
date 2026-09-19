@@ -6,6 +6,140 @@ using UMLCAD.Cad.Semantics;
 
 namespace UMLCAD.Cad.Engine;
 
+public static class CadOperationPayloadSerializer
+{
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions =
+        new()
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+
+    public static string Serialize(CadOperation operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+
+        var payload = new
+        {
+            contract = CadContractVersions.Semantic,
+            operationId = operation.Id.Value,
+            bodyId = operation.BodyId.Value,
+            operationKind = operation.OperationKind,
+            dependencies = operation.InputOperationIds
+                .OrderBy(x => x.Value, StringComparer.Ordinal)
+                .Select(x => x.Value)
+                .ToArray(),
+            references = operation.References
+                .OrderBy(x => x.Id.Value, StringComparer.Ordinal)
+                .Select(ReferencePayload)
+                .ToArray(),
+            operation = OperationPayload(operation)
+        };
+
+        return System.Text.Json.JsonSerializer.Serialize(payload, JsonOptions);
+    }
+
+    private static object OperationPayload(CadOperation operation) =>
+        operation switch
+        {
+            SketchOperation sketch => new
+            {
+                kind = "sketch",
+                sketchId = sketch.Definition.Id.Value,
+                name = sketch.Definition.Name,
+                geometry = sketch.Definition.Geometry
+                    .OrderBy(x => x.Id.Value, StringComparer.Ordinal)
+                    .Select(GeometryPayload)
+                    .ToArray(),
+                constraints = sketch.Definition.Constraints
+                    .OrderBy(x => x.Id.Value, StringComparer.Ordinal)
+                    .Select(x => new
+                    {
+                        id = x.Id.Value,
+                        kind = x.Kind.ToString(),
+                        geometryIds = x.GeometryIds
+                            .OrderBy(id => id.Value, StringComparer.Ordinal)
+                            .Select(id => id.Value)
+                            .ToArray(),
+                        value = x.Value?.CanonicalForm
+                    })
+                    .ToArray()
+            },
+
+            ExtrusionOperation extrusion => new
+            {
+                kind = "extrusion",
+                sketchOperationId = extrusion.SketchOperationId.Value,
+                distance = extrusion.Distance.CanonicalForm,
+                direction = extrusion.Direction
+            },
+
+            HoleOperation hole => new
+            {
+                kind = "hole",
+                baseOperationId = hole.BaseOperationId.Value,
+                diameter = hole.Diameter.CanonicalForm,
+                depth = hole.Depth.CanonicalForm
+            },
+
+            _ => new
+            {
+                kind = operation.OperationKind,
+                inputs = operation.Inputs
+                    .OrderBy(x => x.Key, StringComparer.Ordinal)
+                    .ToDictionary(x => x.Key, x => x.Value, StringComparer.Ordinal)
+            }
+        };
+
+    private static object ReferencePayload(CadReference reference) =>
+        new
+        {
+            id = reference.Id.Value,
+            targetKind = reference.TargetKind.ToString(),
+            resultId = reference.ResultId?.Value,
+            topologyKind = reference.TopologyKind,
+            topologyKey = reference.TopologyKey,
+            publicationId = reference.PublicationId?.Value
+        };
+
+    private static object GeometryPayload(SketchGeometry geometry) =>
+        geometry switch
+        {
+            LineGeometry line => new
+            {
+                id = line.Id.Value,
+                kind = "line",
+                x1 = line.X1.CanonicalForm,
+                y1 = line.Y1.CanonicalForm,
+                x2 = line.X2.CanonicalForm,
+                y2 = line.Y2.CanonicalForm
+            },
+
+            CircleGeometry circle => new
+            {
+                id = circle.Id.Value,
+                kind = "circle",
+                x = circle.X.CanonicalForm,
+                y = circle.Y.CanonicalForm,
+                radius = circle.Radius.CanonicalForm
+            },
+
+            ArcGeometry arc => new
+            {
+                id = arc.Id.Value,
+                kind = "arc",
+                centerX = arc.CenterX.CanonicalForm,
+                centerY = arc.CenterY.CanonicalForm,
+                radius = arc.Radius.CanonicalForm,
+                startAngle = arc.StartAngle.CanonicalForm,
+                endAngle = arc.EndAngle.CanonicalForm
+            },
+
+            _ => throw new NotSupportedException(
+                $"Unsupported sketch geometry '{geometry.GetType().Name}'.")
+        };
+}
+
 public sealed record CadEvaluationPlan(IReadOnlyList<CadId> OperationIds);
 
 public sealed class CadDependencyGraph
@@ -217,7 +351,7 @@ public static class CadEvaluationIdentityBuilder
         var builder = new StringBuilder()
             .Append("contract=").Append(CadContractVersions.Semantic)
             .Append("|part=").Append(part.Id.Value)
-            .Append("|operation=").Append(operation.CanonicalDefinition())
+            .Append("|operation-payload=").Append(CadOperationPayloadSerializer.Serialize(operation))
             .Append("|configuration=").Append(options.ConfigurationIdentity)
             .Append("|tolerance=").Append(options.TolerancePolicyIdentity)
             .Append("|representation=").Append(options.RepresentationPolicyIdentity);
@@ -380,6 +514,7 @@ public sealed class CadEvaluationEngine
                 .ToArray();
 
             var incrementalBase = inputResults.LastOrDefault();
+            var semanticPayload = CadOperationPayloadSerializer.Serialize(operation);
 
             var request = new KernelOperationRequest(
                 CadContractVersions.Kernel,
@@ -394,6 +529,7 @@ public sealed class CadEvaluationEngine
                     ? incrementalBase
                     : null,
                 inputResults,
+                semanticPayload,
                 operation.Inputs);
 
             KernelOperationResponse response;

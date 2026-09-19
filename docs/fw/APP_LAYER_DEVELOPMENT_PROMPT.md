@@ -69,13 +69,13 @@ There shall be exactly one dedicated production .NET kernel-access library.
 The current transitional implementation is:
 
 ~~~
-UMLCAD.Kernel
+UMLCAD.Kernel.Client
 ~~~
 
 The long-term architectural concept is:
 
 ~~~
-UMLCAD.Kernel
+UMLCAD.Kernel.Client
 ~~~
 
 The implementation name may change, but the architectural invariant does not.

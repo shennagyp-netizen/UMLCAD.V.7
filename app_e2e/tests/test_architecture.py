@@ -326,6 +326,54 @@ class ApplicationArchitectureTests(unittest.TestCase):
 
         self.assertIsNone(cycle_in_graph(synthetic))
 
+    def test_complete_app_project_graph_is_acyclic(self) -> None:
+        app_projects: dict[Path, Project] = {}
+
+        for project_file in sorted((ROOT / "app").rglob("*.csproj")):
+            tree = ET.parse(project_file)
+            references: list[Path] = []
+
+            for element in tree.getroot().iter():
+                if local_name(element.tag) != "ProjectReference":
+                    continue
+
+                include = element.attrib.get("Include")
+                if not include:
+                    raise AssertionError(
+                        f"{project_file}: ProjectReference has no Include."
+                    )
+
+                target = (project_file.parent / include).resolve()
+                references.append(target)
+
+            app_projects[project_file.resolve()] = Project(
+                project_file.resolve(),
+                project_name(project_file, tree),
+                tuple(references),
+            )
+
+        self.assertTrue(app_projects, "No .NET project exists under app/.")
+
+        unresolved = [
+            f"{project.name} -> {target}"
+            for project in app_projects.values()
+            for target in project.references
+            if target not in app_projects
+        ]
+        self.assertFalse(
+            unresolved,
+            "The complete app project graph contains unresolved ProjectReferences:\n"
+            + "\n".join(unresolved),
+        )
+
+        cycle = cycle_in_graph(app_projects)
+        rendered = " -> ".join(app_projects[node].name for node in cycle) if cycle else ""
+        self.assertIsNone(
+            cycle,
+            "CIRCULAR APP PROJECT DEPENDENCY DETECTED"
+            + (f": {rendered}" if rendered else ""),
+        )
+
     def test_project_references_are_internal_and_acyclic(self) -> None:
         violations: list[str] = []
 

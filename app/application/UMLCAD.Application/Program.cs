@@ -1,21 +1,53 @@
-using UMLCAD.Cad.Contracts;
+using UMLCAD.Cad.Engine;
 using UMLCAD.Cad.Expressions;
 using UMLCAD.Cad.Semantics;
-using UMLCAD.Framework;
-var part=CadPartProgram.Create("bench-vise","Bench Vise")
- .Sketch(new SketchOperation(new CadId("sketch"),new CadId("body"),new Sketch(new CadId("sketch"),"Profile",new SketchGeometry[]{new CircleGeometry(new CadId("circle"),0,0,25)},Array.Empty<SketchConstraint>(),Array.Empty<CadReference>())))
- .Extrude(new ExtrusionOperation(new CadId("extrude"),new CadId("body"),new CadId("sketch"),CadExpression.Constant(80),"+Z"))
- .Hole(new HoleOperation(new CadId("hole"),new CadId("body"),new CadId("extrude"),CadExpression.Constant(10),CadExpression.Constant(25)));
-using var app=new UmlcadApplication(new DemoKernel());
-var snapshot=await app.BuildAsync(part.Part);
-Console.WriteLine($"Pipeline: {string.Join(" -> ",snapshot.Plan.OperationIds)}");
-Console.WriteLine($"Current Body: {snapshot.CurrentBody(new CadId("body"))}");
-sealed class DemoKernel:IKernelGateway
+
+namespace UMLCAD.Application;
+
+public static class BenchViseScenario
 {
- public Task<KernelOperationResponse> EvaluateAsync(KernelOperationRequest r,CancellationToken c=default)
- {
-   c.ThrowIfCancellationRequested();
-   var id=r.OperationKind switch{"Cad.Sketch"=>"demo:sketch","Cad.Extrusion"=>"demo:body1","Cad.Hole"=>"demo:body2",_=>"demo:unknown"};
-   return Task.FromResult(KernelOperationResponse.Success(r,new CadResultId(id),"demo:"+r.EvaluationIdentity.Value,new KernelHistoryIdentity("demo-history:"+r.OperationId.Value),new[]{new KernelTopologyBinding("operation",r.OperationId.Value)}));
- }
+    public static CadPart Create()
+    {
+        return CadPartProgram.Create("bench-vise", "Bench Vise")
+            .Sketch(new SketchOperation(
+                new CadId("sketch"),
+                new CadId("body"),
+                new Sketch(
+                    new CadId("sketch"),
+                    "Profile",
+                    new SketchGeometry[]
+                    {
+                        new CircleGeometry(new CadId("circle"), 0, 0, 25)
+                    },
+                    Array.Empty<SketchConstraint>(),
+                    Array.Empty<CadReference>())))
+            .Extrude(new ExtrusionOperation(
+                new CadId("extrude"),
+                new CadId("body"),
+                new CadId("sketch"),
+                CadExpression.Constant(80),
+                "+Z"))
+            .Hole(new HoleOperation(
+                new CadId("hole"),
+                new CadId("body"),
+                new CadId("extrude"),
+                CadExpression.Constant(10),
+                CadExpression.Constant(25)))
+            .Part;
+    }
+
+    public static string Describe()
+    {
+        var part = Create();
+        var plan = new CadDependencyGraph(part).Plan();
+        return string.Join(" -> ", plan.OperationIds);
+    }
+}
+
+internal static class Program
+{
+    private static void Main()
+    {
+        Console.WriteLine($"Semantic pipeline: {BenchViseScenario.Describe()}");
+    }
 }

@@ -9,6 +9,7 @@ import re
 import signal
 import socket
 import subprocess
+import sys
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -20,6 +21,7 @@ FRAMEWORK_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Framework.Tests/UMLCAD.Fram
 BLACKBOX_TEST_PROJECT = ROOT / "dotnet/tests/UMLCAD.Kernel.Integration.Tests/UMLCAD.Kernel.Integration.Tests.csproj"
 DEMO_PROJECT = ROOT / "projects/demo/Demo.csproj"
 RUST_MANIFEST = ROOT / "kernel/native/Cargo.toml"
+APPLICATION_ARCHITECTURE_RUNNER = ROOT / "app_e2e/run.py"
 CARGO_RESULT_RE = re.compile(
     r"test result: (?:ok|FAILED)\.\s+(\d+) passed;\s+(\d+) failed;\s+(\d+) ignored;\s+(\d+) measured;\s+(\d+) filtered out;"
 )
@@ -107,6 +109,7 @@ class Runner:
             "Framework test project": FRAMEWORK_TEST_PROJECT,
             "black-box test project": BLACKBOX_TEST_PROJECT,
             "demo project": DEMO_PROJECT,
+            "application architecture test project": APPLICATION_ARCHITECTURE_RUNNER,
         }
         missing = [f"{label}: {path}" for label, path in required.items() if not path.exists()]
         if missing:
@@ -346,6 +349,11 @@ def main() -> int:
     passed = True
     try:
         runner.validate_paths()
+        passed &= runner.run(
+            "application-architecture-gate",
+            [sys.executable, str(APPLICATION_ARCHITECTURE_RUNNER)],
+            300,
+        )
         passed &= runner.run(
             "rust-regression-debug",
             ["cargo", "test", "--manifest-path", str(RUST_MANIFEST)],

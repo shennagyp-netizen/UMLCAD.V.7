@@ -86,6 +86,7 @@ public sealed class SystemCadRedTeamTests
                 new AuthoritativeResultSemantic(
                     "result-valid",
                     "part",
+                    "world",
                     "operation-1",
                     "contract-v1",
                     "evidence-1",
@@ -119,6 +120,7 @@ public sealed class SystemCadRedTeamTests
                 new AuthoritativeResultSemantic(
                     "result-r1",
                     "part",
+                    "world",
                     "operation-1",
                     "contract-v1",
                     "evidence-1",
@@ -152,6 +154,7 @@ public sealed class SystemCadRedTeamTests
                 new AuthoritativeResultSemantic(
                     "result-r1",
                     "other-part",
+                    "world",
                     "operation-1",
                     "contract-v1",
                     "evidence-1",
@@ -185,6 +188,7 @@ public sealed class SystemCadRedTeamTests
                 new AuthoritativeResultSemantic(
                     "result-r1",
                     "part",
+                    "world",
                     "operation-1",
                     "contract-v1",
                     "evidence-1",
@@ -192,6 +196,7 @@ public sealed class SystemCadRedTeamTests
                 new AuthoritativeResultSemantic(
                     "result-r1",
                     "part",
+                    "world",
                     "operation-2",
                     "contract-v1",
                     "evidence-2",

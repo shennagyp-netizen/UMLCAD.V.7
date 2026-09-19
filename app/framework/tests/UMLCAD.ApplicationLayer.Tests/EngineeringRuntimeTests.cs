@@ -1,7 +1,9 @@
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Engine;
 using UMLCAD.Cad.Semantics;
+using System.Threading;
 using UMLCAD.Engineering.Runtime;
+using UMLCAD.Science;
 
 namespace UMLCAD.ApplicationLayer.Tests;
 
@@ -20,7 +22,7 @@ public sealed class EngineeringRuntimeTests
         var result = await new EngineeringRuleRuntime().ExecuteAsync(
             rule,
             context,
-            new EngineeringServices(control));
+            new EngineeringServices(control, new EmptySimulationService()));
 
         Assert.Equal(EngineeringRuleOutcomeKind.ApplyChange, result.Outcome);
         Assert.Contains(store.Snapshot().Features, feature => feature.Id.Value == "created");
@@ -126,4 +128,17 @@ public sealed class EngineeringRuntimeTests
             throw new InvalidOperationException("intentional");
         }
     }
+
+    private sealed class EmptySimulationService : IPhenomenaSimulationService
+    {
+        public Task<SimulationResult> GetOrRunAsync(
+            SimulationRequest request,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new SimulationResult(
+                request,
+                SimulationResultStatus.Completed,
+                [],
+                []));
+    }
+
 }

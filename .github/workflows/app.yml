@@ -14,6 +14,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Run Application Layer architecture gate
+        run: python3 app_e2e/run.py
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -36,7 +39,7 @@ jobs:
           done < <(find app -name '*.csproj' -print0)
 
       - name: Run Application Layer tests
-        run: dotnet test app/framework/tests/UMLCAD.ApplicationLayer.Tests/UMLCAD.ApplicationLayer.Tests.csproj --configuration Release --no-restore --logger "console;verbosity=normal"
+        run: dotnet test app/framework/UMLCAD.ApplicationLayer.sln --configuration Release --no-restore --logger "console;verbosity=normal"
 
       - name: Run semantic application demo
         run: dotnet run --project app/application/UMLCAD.Application/UMLCAD.Application.csproj --configuration Release --no-restore

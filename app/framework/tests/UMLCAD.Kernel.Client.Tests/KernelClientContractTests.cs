@@ -19,7 +19,6 @@ public sealed class KernelClientContractTests
                 request,
                 new CadResultId("result:1"),
                 "evidence:1",
-                new KernelHistoryIdentity("history:1"),
                 new[] { new KernelTopologyBinding("body", "face:1") });
 
             return JsonResponse(response);
@@ -39,6 +38,7 @@ public sealed class KernelClientContractTests
         Assert.Equal(request.EvaluationIdentity, result.EvaluationIdentity);
         Assert.Equal(request.OperationId, result.OperationId);
         Assert.Equal(new CadResultId("result:1"), result.AuthoritativeResultId);
+        Assert.Null(result.GetType().GetProperty("HistoryIdentity"));
         Assert.Equal("POST", handler.Method);
         Assert.Equal("/v2/cad/operation", handler.Path);
     }
@@ -52,8 +52,7 @@ public sealed class KernelClientContractTests
             var response = KernelOperationResponse.Success(
                     request,
                     new CadResultId("result:1"),
-                    "evidence:1",
-                    new KernelHistoryIdentity("history:mismatch"))
+                    "evidence:1")
                 with
                 {
                     OperationId = new CadId("other-operation")

@@ -1,1 +1,9 @@
-<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><AssemblyName>UMLCAD.BenchVise</AssemblyName></PropertyGroup><ItemGroup><ProjectReference Include="../../../framework/libraries/UMLCAD.Framework/UMLCAD.Framework.csproj" /></ItemGroup></Project>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>UMLCAD.BenchVise</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UMLCAD.Application/UMLCAD.Application.csproj" />
+  </ItemGroup>
+</Project>

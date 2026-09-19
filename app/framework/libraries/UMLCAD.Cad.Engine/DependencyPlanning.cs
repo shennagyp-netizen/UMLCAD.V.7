@@ -53,8 +53,6 @@ public sealed class CadDependencyGraph
             }
         }
 
-        order.Reverse();
-
         return new CadEvaluationPlan(
             CadEvaluationPlanStatus.Ready,
             order,

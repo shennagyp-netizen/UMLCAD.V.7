@@ -53,6 +53,10 @@ public interface ICadControlService
     CadCommandResult AddFeature(CadFeatureDefinition feature);
     CadCommandResult RemoveFeature(CadId featureId);
     CadCommandResult RenameFeature(CadId featureId, string name);
+}
+
+public interface ITransactionalCadControlService : ICadControlService
+{
     CadCommandResult Commit();
     void Rollback();
 }
@@ -80,7 +84,7 @@ public sealed record CadCommandResult(
         new(CadCommandStatus.Failed, targetId, code, message);
 }
 
-public sealed class InMemoryCadControlService : ICadControlService, IEngineeringTransaction
+public sealed class InMemoryCadControlService : ITransactionalCadControlService
 {
     private readonly CadDocumentStore _store;
     private readonly List<CadCommand> _pending = [];
@@ -181,12 +185,6 @@ public sealed class InMemoryCadControlService : ICadControlService, IEngineering
         if (_completed)
             throw new InvalidOperationException("The CAD transaction is already completed.");
     }
-}
-
-public interface IEngineeringTransaction
-{
-    CadCommandResult Commit();
-    void Rollback();
 }
 
 public sealed class CadDocumentStore

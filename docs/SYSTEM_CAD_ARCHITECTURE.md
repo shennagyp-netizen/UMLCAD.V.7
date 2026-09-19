@@ -62,7 +62,7 @@ All new production .NET libraries under `app/framework/libraries/` belong to one
 
 The mathematical kernel is outside the Application Layer under `kernel/`. It is the mathematical authority, not another .NET application library.
 
-Kernel access from the Application Layer is centralized through exactly one dedicated .NET kernel-access library. The new implementation gateway is `app/framework/libraries/UMLCAD.Kernel`. Its Rust/HTTP/native mechanics are implementation details confined to that library and must not leak into other Application Layer libraries.
+Kernel access from the Application Layer is centralized through exactly one dedicated .NET kernel-access library. The active implementation gateway is `app/framework/libraries/UMLCAD.Kernel.Client`. Its Rust/HTTP/native mechanics are implementation details confined to that library and must not leak into other Application Layer libraries.
 
 The Application Layer may contain many libraries and an internal dependency DAG, but that DAG must remain acyclic.
 

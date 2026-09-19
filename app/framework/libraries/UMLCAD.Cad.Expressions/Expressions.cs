@@ -75,10 +75,7 @@ public sealed record SumExpression : CadExpression
     public override double Evaluate(IReadOnlyDictionary<string, double> values) =>
         Terms.Sum(x => x.Evaluate(values));
 
-    public override IReadOnlySet<string> ParameterNames { get; } =
-        new HashSet<string>(StringComparer.Ordinal);
-
-    public IReadOnlySet<string> Names =>
+    public override IReadOnlySet<string> ParameterNames =>
         Terms.SelectMany(x => x.ParameterNames)
             .ToHashSet(StringComparer.Ordinal);
 }

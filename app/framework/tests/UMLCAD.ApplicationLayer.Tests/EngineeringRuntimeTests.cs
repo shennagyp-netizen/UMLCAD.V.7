@@ -57,7 +57,7 @@ public sealed class EngineeringRuntimeTests
         var result = await new EngineeringRuleRuntime().ExecuteAsync(
             new ThrowingRule(),
             context,
-            new EngineeringServices(control));
+            new EngineeringServices(control, new EmptySimulationService()));
 
         Assert.Equal(EngineeringRuleOutcomeKind.Failed, result.Outcome);
         Assert.Contains(
@@ -104,8 +104,6 @@ public sealed class EngineeringRuntimeTests
     public void EngineeringContext_Copies_FeatureIndex()
     {
         var store = NewStore();
-        var store = NewStore();
-        store.Snapshot();
         var seeded = new InMemoryCadControlService(store);
         seeded.AddFeature(
             new CadFeatureDefinition(

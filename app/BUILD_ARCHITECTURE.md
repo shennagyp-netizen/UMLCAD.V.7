@@ -14,7 +14,7 @@ The engine plans the operation DAG, computes invalidation closure, builds determ
 
 No Feature Tree is permitted as semantic authority.
 
-Each FP operation advances the authoritative operation/result lineage and the kernel history/state; an operation node does not request rendering. The kernel history is the realization context for incremental execution. Representation/rendering is downstream and is requested separately from an authoritative current result when a consumer requires it.
+Each FP operation advances the authoritative operation/result lineage and produces a new immutable .NET evaluation-history snapshot; an operation node does not request rendering. The mathematical kernel remains stateless from the System-CAD perspective: it evaluates explicit immutable inputs and returns a new immutable mathematical result. Incremental reuse is governed by .NET dependency/result history, not kernel-owned state. Representation/rendering is downstream and is requested separately from an authoritative current result when a consumer requires it.
 
 
 ## Kernel boundary

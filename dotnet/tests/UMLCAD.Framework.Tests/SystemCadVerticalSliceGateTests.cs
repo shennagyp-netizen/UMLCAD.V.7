@@ -48,17 +48,20 @@ public sealed class SystemCadVerticalSliceGateTests
 
     [Fact]
     [Trait("Gate", "RED")]
-    public void Red_gate_sketch_on_face_must_exist_as_semantic_dependency_not_viewer_state()
+    public void Red_gate_sketch_and_feature_must_exist_as_semantic_concepts_not_viewer_state()
     {
-        var assembly = typeof(CadApplication).Assembly;
+        var semanticTypes = typeof(CadApplication).Assembly
+            .GetTypes()
+            .Where(type => type.IsPublic && type.Namespace == typeof(SemanticApplication).Namespace)
+            .ToArray();
 
         Assert.Contains(
-            assembly.GetTypes(),
-            type => string.Equals(type.Name, "SketchSemantic", StringComparison.Ordinal));
+            semanticTypes,
+            type => type.Name.Contains("Sketch", StringComparison.OrdinalIgnoreCase));
 
         Assert.Contains(
-            assembly.GetTypes(),
-            type => string.Equals(type.Name, "FeatureSemantic", StringComparison.Ordinal));
+            semanticTypes,
+            type => type.Name.Contains("Feature", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

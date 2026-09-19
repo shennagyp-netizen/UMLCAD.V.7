@@ -70,7 +70,7 @@
 \vspace{6mm}
 {\large Audited against the exact repository state immediately before this document revision:\par}
 \vspace{2mm}
-{\ttfamily 8b883f8f5c8b2583dea8178ccc8e694dd18227bd\par}
+{\ttfamily ada5d21206c63ebe6fc999186ae6518d69f8b4db\par}
 \vfill
 {\large The repository is the source of truth.\par}
 {\large This document distinguishes implemented code from target architecture.\par}
@@ -751,7 +751,7 @@ These are semantic transformations, not prescribed inheritance classes.
 
 The current file \texttt{app/framework/libraries/UMLCAD.Cad.Semantics/CadDocument.cs} still contains \texttt{CadFeatureDefinition}, \texttt{CadFeatureKind}, and the command names \texttt{AddFeature}, \texttt{RemoveFeature}, and \texttt{RenameFeature}. These are transitional scaffolding.
 
-They must \textbf{not} be expanded into a larger traditional CAD feature hierarchy. The next semantic implementation must replace that abstraction with typed Part/Body/Sketch/Reference/Publication/Parameter/Operation/Result objects and the functional evaluation pipeline defined here.
+The active implementation must continue expanding typed Part/Body/Sketch/Reference/Publication/Parameter/Operation/Result objects and the functional evaluation pipeline defined here. No new traditional Feature hierarchy is permitted.
 
 \section{Application Layer to kernel}
 

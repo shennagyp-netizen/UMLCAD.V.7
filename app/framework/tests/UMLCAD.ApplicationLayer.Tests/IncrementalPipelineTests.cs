@@ -8,8 +8,8 @@ public sealed class IncrementalPipelineTests
 {
  [Fact]public async Task HoleChangeUsesIncrementalPathForHoleOnly()
  {
-   var p=Factory.Create();var g=new Gateway();var e=new CadEvaluationEngine(g);await e.EvaluateAsync(p);g.Requests.Clear();
-   var s=await e.RebuildAsync(p,new HashSet<CadId>{new("hole")});
+   var p=Factory.Create();var g=new Gateway();var e=new CadEvaluationEngine(g);await e.EvaluateAsync(p, cancellationToken: TestContext.Current.CancellationToken);g.Requests.Clear();
+   var s=await e.RebuildAsync(p,new HashSet<CadId>{new("hole")}, cancellationToken: TestContext.Current.CancellationToken);
    Assert.True(s.Succeeded);Assert.Equal(KernelEvaluationMode.Incremental,s.Mode);Assert.Equal(new[]{"Cad.Hole"},g.Requests.Select(x=>x.OperationKind));Assert.Equal(new KernelHistoryIdentity("test-history:hole"),g.Requests.Single().BaseHistoryIdentity);Assert.Equal(new CadResultId("r:hole"),s.CurrentBody(new CadId("body")));
  }
  static class Factory

@@ -73,7 +73,42 @@ public sealed class CadEvaluationEngine
             var inputResults=upstreamResults.Select(x=>x.Id).ToArray();
             var request=new KernelOperationRequest(CadContractVersions.KernelOperation,identity,part.Id.Value,op.Id,op.OperationKind,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,incremental?inputResults.LastOrDefault():null,inputResults,op.SemanticInputs);
             KernelOperationResponse response;
-            try{response=await _kernel.EvaluateAsync(request,cancellationToken);}catch(OperationCanceledException){throw;}catch(Exception ex){response=new KernelOperationResponse(CadEvaluationStatus.Failed,null,null,Array.Empty<KernelTopologyBinding>(),new[]{new CadDiagnostic("KERNEL_EXCEPTION",ex.Message,CadEvaluationStatus.Failed,id)});}
+            try
+            {
+                response = await _kernel.EvaluateAsync(request, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                response = KernelOperationResponse.Failure(
+                    request,
+                    "KERNEL_EXCEPTION",
+                    ex.Message);
+            }
+
+            if (response.ContractVersion != request.ContractVersion ||
+                response.EvaluationIdentity != request.EvaluationIdentity ||
+                response.OperationId != request.OperationId)
+            {
+                outcomes[id] = new CadEvaluationOutcome(
+                    id,
+                    op.OperationKind,
+                    identity,
+                    CadEvaluationStatus.Failed,
+                    null,
+                    new[]
+                    {
+                        new CadDiagnostic(
+                            "KERNEL_RESPONSE_IDENTITY_MISMATCH",
+                            "Kernel response identity does not match the submitted operation.",
+                            CadEvaluationStatus.Failed,
+                            id)
+                    });
+                break;
+            }
             if(response.Status!=CadEvaluationStatus.Succeeded||response.AuthoritativeResultId is null||string.IsNullOrWhiteSpace(response.EvidenceHash)){outcomes[id]=new CadEvaluationOutcome(id,op.OperationKind,identity,response.Status,null,response.Diagnostics);break;}
             var kind=op is SketchOperation?CadResultKind.SketchProfile:CadResultKind.Body;
             var result=new CadResult(response.AuthoritativeResultId.Value,kind,id,inputResults,response.EvidenceHash!,response.Topology);

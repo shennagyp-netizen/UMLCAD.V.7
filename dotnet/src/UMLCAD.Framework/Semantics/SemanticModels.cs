@@ -2,6 +2,21 @@ namespace UMLCAD.Framework.Semantics;
 
 public sealed record ParameterSemantic(string Name, string Value, string? Unit = null);
 
+public enum AuthoritativeResultStatus
+{
+    Authoritative,
+    Rejected,
+    Indeterminate
+}
+
+public sealed record AuthoritativeResultSemantic(
+    string Id,
+    string ProducerId,
+    string OperationIdentity,
+    string ContractIdentity,
+    string EvidenceIdentity,
+    AuthoritativeResultStatus Status);
+
 public sealed record CadMetadata(
     string? PartNumber = null,
     string? Description = null,
@@ -166,4 +181,8 @@ public sealed record SemanticApplication(
     IReadOnlyList<PartSemantic> Parts,
     IReadOnlyList<AssemblySemantic> Assemblies,
     IReadOnlyList<DrawingSemantic> Drawings,
-    string BuildIdentity);
+    string BuildIdentity)
+{
+    public IReadOnlyList<AuthoritativeResultSemantic> AuthoritativeResults { get; init; } =
+        Array.Empty<AuthoritativeResultSemantic>();
+}

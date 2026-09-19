@@ -218,7 +218,7 @@ public sealed class AdversarialEdgeCaseTests
         using var app = builder.Build();
 
         var exception = Assert.Throws<InvalidOperationException>(() => app.CreateCompiledModelManifest());
-        Assert.Contains("does not resolve", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("REFERENCE_MISSING:", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

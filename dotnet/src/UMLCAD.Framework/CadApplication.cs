@@ -262,6 +262,8 @@ public sealed class PartBuilder
     private readonly List<ConstraintSemantic> _constraints = [];
     private readonly List<string> _references = [];
     private readonly List<string> _components = [];
+    private readonly List<ShapePublicationSemantic> _publications = [];
+    private readonly List<TopologyBindingSemantic> _topologyBindings = [];
     private readonly Dictionary<string, string> _customMetadata = new(StringComparer.Ordinal);
     private string _name;
     private string? _partNumber;
@@ -328,6 +330,38 @@ public sealed class PartBuilder
         return this;
     }
 
+    public PartBuilder Publication(
+        string id,
+        string targetKind,
+        string targetId,
+        string resultIdentity,
+        string topologyBindingId)
+    {
+        _publications.Add(new ShapePublicationSemantic(
+            RequireText(id, nameof(id)),
+            RequireText(targetKind, nameof(targetKind)),
+            RequireText(targetId, nameof(targetId)),
+            RequireText(resultIdentity, nameof(resultIdentity)),
+            RequireText(topologyBindingId, nameof(topologyBindingId))));
+        return this;
+    }
+
+    public PartBuilder TopologyBinding(
+        string id,
+        string topologyKind,
+        string semanticTargetId,
+        string resultIdentity,
+        string authoritativeTopologyId)
+    {
+        _topologyBindings.Add(new TopologyBindingSemantic(
+            RequireText(id, nameof(id)),
+            RequireText(topologyKind, nameof(topologyKind)),
+            RequireText(semanticTargetId, nameof(semanticTargetId)),
+            RequireText(resultIdentity, nameof(resultIdentity)),
+            RequireText(authoritativeTopologyId, nameof(authoritativeTopologyId))));
+        return this;
+    }
+
     internal PartDefinition Build() => new(
         _id,
         _name,
@@ -337,6 +371,8 @@ public sealed class PartBuilder
         _constraints.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
         _references.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
         _components.OrderBy(x => x, StringComparer.Ordinal).ToArray(),
+        _publications.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
+        _topologyBindings.OrderBy(x => x.Id, StringComparer.Ordinal).ToArray(),
         new CadMetadata(_partNumber, _description, _material, _manufacturer, _vendor, _revision, _lifecycleState, _author, _documentCode,
             new SortedDictionary<string, string>(_customMetadata, StringComparer.Ordinal)));
 
@@ -516,13 +552,17 @@ internal sealed record PartDefinition(
     IReadOnlyList<ConstraintSemantic> Constraints,
     IReadOnlyList<string> References,
     IReadOnlyList<string> Components,
+    IReadOnlyList<ShapePublicationSemantic> Publications,
+    IReadOnlyList<TopologyBindingSemantic> TopologyBindings,
     CadMetadata Metadata)
 {
     public PartSemantic ToSemantic() => new(Id, PartType, Parameters, Geometry, Constraints, References, Components)
     {
         Name = Name,
         StructuredMetadata = Metadata,
-        Metadata = Metadata
+        Metadata = Metadata,
+        Publications = Publications,
+        TopologyBindings = TopologyBindings
     };
 }
 

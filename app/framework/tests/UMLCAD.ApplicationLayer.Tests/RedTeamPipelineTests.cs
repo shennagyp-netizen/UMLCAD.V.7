@@ -115,7 +115,8 @@ public sealed class RedTeamPipelineTests
                 KernelOperationResponse.Success(
                         request,
                         new CadResultId("wrong-result"),
-                        "evidence")
+                        "evidence",
+                        new KernelHistoryIdentity("history:wrong"))
                     with
                     {
                         OperationId = new CadId("wrong-operation")
@@ -138,6 +139,7 @@ public sealed class RedTeamPipelineTests
                         request,
                         new CadResultId("result:" + request.OperationId.Value),
                         "evidence:" + request.OperationId.Value,
+                        new KernelHistoryIdentity("history:" + request.OperationId.Value),
                         new[]
                         {
                             new KernelTopologyBinding("operation", request.OperationId.Value)

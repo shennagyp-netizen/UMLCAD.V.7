@@ -145,6 +145,19 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                 "REFERENCE_PUBLICATION_MISSING",
                 $"No face publication for target '{reference.TargetId}' exists under producer '{reference.ProducerId}'.");
 
+        var selectedPublications = reference.ExpectedResultIdentity is null
+            ? publications
+            : publications
+                .Where(x => string.Equals(x.ResultIdentity, reference.ExpectedResultIdentity, StringComparison.Ordinal))
+                .ToArray();
+
+        if (selectedPublications.Length == 0 && reference.ExpectedResultIdentity is not null)
+            return Fail(
+                reference,
+                SemanticReferenceStatus.Indeterminate,
+                "REFERENCE_STALE_RESULT",
+                $"No face publication for target '{reference.TargetId}' is associated with expected result identity '{reference.ExpectedResultIdentity}'.");
+
         var candidates = new List<SemanticReferenceCandidate>();
         var resultMissing = false;
         var resultOwnerMismatch = false;
@@ -154,7 +167,7 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
         var provenanceMissing = false;
         var provenanceMismatch = false;
 
-        foreach (var publication in publications)
+        foreach (var publication in selectedPublications)
         {
             var results = application.AuthoritativeResults
                 .Where(x => string.Equals(x.Id, publication.ResultIdentity, StringComparison.Ordinal))
@@ -222,6 +235,29 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                 publication.TopologyBindingId));
         }
 
+        if (reference.ExpectedResultIdentity is null &&
+            (resultInvalid || resultAmbiguous || resultOwnerMismatch || resultNotAuthoritative ||
+             resultMissing || provenanceMissing || provenanceMismatch))
+        {
+            return Fail(
+                reference,
+                SemanticReferenceStatus.Indeterminate,
+                resultInvalid
+                    ? "REFERENCE_RESULT_INVALID"
+                    : resultAmbiguous
+                        ? "REFERENCE_RESULT_AMBIGUOUS"
+                        : resultOwnerMismatch
+                            ? "REFERENCE_RESULT_OWNER_MISMATCH"
+                            : resultNotAuthoritative
+                                ? "REFERENCE_RESULT_NOT_AUTHORITATIVE"
+                                : resultMissing
+                                    ? "REFERENCE_RESULT_MISSING"
+                                    : provenanceMissing
+                                        ? "REFERENCE_PROVENANCE_MISSING"
+                                        : "REFERENCE_PROVENANCE_MISMATCH",
+                $"Face publication '{reference.TargetId}' cannot be resolved safely because not all matching publications have valid authoritative result provenance.");
+        }
+
         if (candidates.Count == 0)
         {
             var code = resultInvalid
@@ -238,7 +274,7 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                                     ? "REFERENCE_PROVENANCE_MISSING"
                                     : provenanceMismatch
                                         ? "REFERENCE_PROVENANCE_MISMATCH"
-                                        : "REFERENCE_PUBLICATION_MISSING";
+                                        : "REFERENCE_STALE_RESULT";
 
             return Fail(
                 reference,

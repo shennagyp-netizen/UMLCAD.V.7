@@ -91,8 +91,8 @@ There are two separate truths that must never be confused:
 \toprule
 Term & Meaning \\
 \midrule
-\current & Code and files verified to exist in the current \texttt{main} repository state. \\
-\target & Architectural direction expressed by the current development law and the architecture implied by the requested System-CAD model. It may not yet have an implementation on \texttt{main}. \\
+\current & Code and files verified to exist in the current \t\\texttt{main} repository state. \\
+\target & Architectural direction expressed by the current development law and the architecture implied by the requested System-CAD model. It may not yet have an implementation on \t\\texttt{main}. \\
 \bottomrule
 \end{tabularx}
 
@@ -101,70 +101,51 @@ A class, interface, endpoint, test, or documentation statement is not by itself 
 The mathematical roadmap M0-M16 is closed for its declared certified domains. That closure means the mathematical authority is treated as the existing foundation for the next system-CAD layer; it does not mean every possible CAD mathematical operation is implemented.
 
 \section{Repository fact at the audit point}
-At the audit point, the repository contains the mature Rust mathematical/native foundation, the existing \texttt{UMLCAD.Framework} and \texttt{UMLCAD.Kernel.Client} .NET surface, the legacy TypeScript kernel API, the OCCT backend/contracts, the demo/E2E harness, and the CI workflows described later. Some newer System-CAD domain projects described in earlier handbook text are not present on the exact current \texttt{main} tree and are therefore documented here as target architecture rather than current implementation.
+At the audit point, the repository contains the mature Rust mathematical/native foundation, the existing \texttt{UMLCAD.Framework} and \texttt{UMLCAD.Kernel.Client} .NET surface, the legacy TypeScript kernel API, the OCCT backend/contracts, the demo/E2E harness, and the CI workflows described later. Some newer System-CAD domain projects described in earlier handbook text are not present on the exact current \t\\texttt{main} tree and are therefore documented here as target architecture rather than current implementation.
 
 \chapter{Executive Architecture}
 
-The stable conceptual architecture is:
+The architecture has conceptual authority strata, but these are not a linear runtime dependency chain.
 
 \begin{center}
-\begin{tikzpicture}[
-  box/.style={draw,rounded corners,align=center,minimum width=43mm,minimum height=10mm,font=\small},
-  a/.style={box,fill=blue!6}, b/.style={box,fill=green!7}, c/.style={box,fill=orange!9}, d/.style={box,fill=gray!10},
-  >=Latex
-]
-\node[a] (platform) {Platform Foundation};
-\node[a,below=5mm of platform] (math) {Rust Mathematical Authority};
-\node[b,below=5mm of math] (science) {Science};
-\node[b,below=5mm of science] (cad) {CAD Core / Product Semantics};
-\node[c,below=5mm of cad] (resources) {Engineering Resources};
-\node[c,below=5mm of resources] (domains) {Specialized Engineering Domains};
-\node[d,below=5mm of domains] (app) {Application / Workflow / Presentation};
-\draw[->] (platform)--(math);
-\draw[->] (math)--(science);
-\draw[->] (science)--(cad);
-\draw[->] (cad)--(resources);
-\draw[->] (resources)--(domains);
-\draw[->] (domains)--(app);
-\end{tikzpicture}
+\begin{tabularx}{0.78\textwidth}{@{}l@{}}
+\toprule
+Platform Foundation \\
+Mathematical Authority \\
+Science / Phenomena Services \\
+CAD Core / Product Semantics \\
+Engineering Resources \\
+Specialized Engineering Domains \\
+Application / Workflow / Presentation \\
+\bottomrule
+\end{tabularx}
 \end{center}
 
-The important point is not that every layer must be one project. The point is ownership and dependency direction.
-
-\section{Authority hierarchy}
-
-\begin{enumerate}
-\item \textbf{Rust mathematics}: normative numerical authority for the mathematical contracts it declares and certifies.
-\item \textbf{System-CAD semantics}: authoritative owner of CAD meaning, product meaning, engineering intent, references, evaluation orchestration, lifecycle state, and downstream domain composition.
-\item \textbf{Providers/adapters}: implementation mechanisms behind stable service contracts.
-\item \textbf{Representation/viewer}: derived consumer assets only; never authority.
-\end{enumerate}
-
-The Rust kernel is intentionally thin. The complete CAD system must not be compared with it as though they were equivalent architectural layers.
+The actual runtime dependency graph is contract-driven and is defined in the domain-boundary section. A specialized domain can consume multiple authoritative producers; no layer is required to depend only on its neighboring stratum.
 
 \chapter{C4 Level 1 - System Context}
 
+C4 Level 1 describes UMLCAD.V.7 as one software system and shows only people and external systems. The Rust mathematical kernel is an internal UMLCAD container and therefore appears at Level 2, not as an external system.
+
 \begin{center}
 \begin{tikzpicture}[
-  ext/.style={draw,rounded corners,align=center,minimum width=27mm,minimum height=9mm,font=\scriptsize,fill=gray!10},
-  sys/.style={draw,rounded corners,align=center,minimum width=38mm,minimum height=11mm,font=\scriptsize,fill=blue!8},
+  ext/.style={draw,rounded corners,align=center,minimum width=29mm,minimum height=9mm,font=\scriptsize,fill=gray!10},
+  sys/.style={draw,rounded corners,align=center,minimum width=42mm,minimum height=12mm,font=\scriptsize,fill=blue!8},
   >=Latex
 ]
 \node[ext] (engineer) {Engineer / System User};
-\node[sys,right=12mm of engineer] (cadapp) {UMLCAD.V.7\ System-CAD};
-\node[sys,below=11mm of cadapp] (kernel) {Rust Mathematical\ Kernel};
-\node[ext,right=12mm of cadapp] (providers) {Engineering / Scientific\ Providers};
-\node[ext,below=10mm of providers] (plm) {PLM / PDM / ERP};
-\node[ext,below=10mm of engineer] (machine) {Manufacturing Machine / Controller};
+\node[sys,right=14mm of engineer] (cadapp) {UMLCAD.V.7\\System-CAD};
+\node[ext,right=14mm of cadapp] (providers) {Simulation / Solver\\Providers};
+\node[ext,below=11mm of providers] (plm) {PLM / PDM / ERP};
+\node[ext,below=11mm of engineer] (machine) {Manufacturing / NC\\Consumer};
 \draw[->] (engineer)--node[above]{design / inspect} (cadapp);
-\draw[->] (cadapp)--node[right]{contracted mathematics} (kernel);
 \draw[<->] (cadapp)--node[above]{provider contracts} (providers);
-\draw[<->] (cadapp)--node[right]{lifecycle / product data} (plm);
+\draw[<->] (cadapp)--node[right]{product / lifecycle data} (plm);
 \draw[->] (cadapp)--node[left]{deterministic NC} (machine);
 \end{tikzpicture}
 \end{center}
 
-\target{} treats PLM, simulation, machine-control, and other external systems as integrations rather than hidden dependencies inside CAD semantics.
+Internal UMLCAD containers, including Rust Mathematical Authority, Native Kernel Host, CAD Core, Science, Simulation Service, Engineering Resources, Persistence, Integration Adapters, Workflow, and Presentation, are decomposed at C4 Level 2.
 
 \chapter{C4 Level 2 - Containers}
 
@@ -181,7 +162,7 @@ Container / subsystem & Responsibility \\
 \pathref{dotnet/src/UMLCAD.Kernel.Client} & Current .NET transport adapter to the Rust kernel. Handles timeout, response limits, JSON, stable diagnostics, cancellation, and compiled-result validation. \\
 \pathref{projects/demo} & Executable demonstration and integrated runtime path. The E2E mode starts the kernel and validates the compiled model without opening the viewer. \\
 \pathref{tests/e2e} & System-level process/wire gate and red-team harness. \\
-\pathref{viewer} & Presentation boundary. The current repository proves the viewer package manifest and demo integration assumptions; implementation details that are not present on the exact \texttt{main} tree are not claimed here as implemented. \\
+\pathref{viewer} & Presentation boundary. The current repository proves the viewer package manifest and demo integration assumptions; implementation details that are not present on the exact \t\\texttt{main} tree are not claimed here as implemented. \\
 \bottomrule
 
 \end{tabularx}
@@ -348,47 +329,56 @@ Exact circular geometry must not be replaced by a polygon solely to make the wor
 
 \chapter{C4 Domain Boundaries and Dependency Direction}
 
-The System-CAD domain graph is:
+The architecture separates authority placement from actual dependencies.
+
+\section{Conceptual authority strata}
 
 \begin{lstlisting}
 Platform Foundation
-      ->
-Mathematics
-      ->
-Science
-      ->
+Mathematical Authority
+Science / Phenomena Services
 CAD Engineering Core / Product Structure
-      ->
-Engineering Resource Model
-      ->
+Engineering Resources
 Specialized Engineering Domains
-      ->
 Application / Workflow / Presentation
 \end{lstlisting}
 
-Science exposes reusable material/physical facts and a provider-neutral Phenomena Simulation Service. Engineering Resources owns Machine, Tool, Fixture, Process and Capability facts. Specialized domains consume these contracts; they do not acquire one another's private state.
+These strata do not prescribe project references or implementation order.
 
-\begin{center}
-\begin{tabularx}{\textwidth}{@{}p{0.24\textwidth}X@{}}
-\toprule
-Domain & Architectural responsibility \\
-\midrule
-CAD Core / Product Structure & Product, Part, Body, Sketch, Feature, Assembly, Occurrence, references, publications, frames, dependencies, evaluation, authoritative results, topology provenance, configuration, templates/components and product composition. \\
-Science & Material/physical properties, quantities, phenomena semantics, assumptions and reusable scientific services. \\
-Engineering Resources & Machine, Tool, Fixture, Process and Capability facts. \\
-Sheet Metal & Thickness, bend/flange/relief, folding/unfolding, flat pattern and related design/manufacturing semantics. \\
-CAM & Manufacturing definition, setups, operations, strategies, toolpaths, simulation-service consumption, postprocessing and deterministic G-code/NC. \\
-Drawing / PMI & Sheets, views, projections, sections, details, dimensions, tolerances, GD\&T, PMI and BOM views. \\
-Kinematics & Motion/behavior semantics over Product/Assembly structure and mathematical authority. \\
-Knowledge / Configuration & Parameters, expressions, rules, checks, reactions, variants and reusable templates. \\
-Lifecycle / PLM / Integration & Revision, release, workflow, collaboration and external product/document integration. \\
-Viewer / Presentation & Derived representation, semantic inspection and interaction only. \\
-\bottomrule
-\end{tabularx}
-\end{center}
+\section{Actual consumption graph}
 
-No specialized domain creates a hidden second solver or geometry kernel. External implementations enter through stable contracts and adapters.
+For this graph, \texttt{A -> B} means that A consumes an explicit contract or authoritative service supplied by B.
 
+\begin{lstlisting}
+CAD Core -> Mathematical Contracts
+CAD Core -> Science Contracts (where required)
+CAD Core -> Configuration / Knowledge
+
+Sheet Metal -> CAD Core
+Sheet Metal -> Science
+Sheet Metal -> Engineering Resources
+Sheet Metal -> Phenomena Simulation Service (where required)
+
+CAM -> CAD Core / Product Structure / BOM
+CAM -> Engineering Resources
+CAM -> Sheet Metal (where applicable)
+CAM -> Science / Material / Process semantics
+CAM -> Phenomena Simulation Service (where required)
+
+Drawing / PMI -> CAD Core / Product Structure
+Kinematics -> Product / Assembly Structure
+Kinematics -> Mathematical Contracts
+Lifecycle / PLM -> CAD / Product / Configuration state
+Application / Workflow -> CAD Core and domain contracts
+Presentation -> Derived Result / Representation contracts
+
+Simulation Provider -> Phenomena Simulation Service
+Integration Adapter -> external provider/system
+
+CAD Product Structure -> BOM -> Drawing / CAM / PLM
+\end{lstlisting}
+
+No specialized domain acquires another domain's private implementation. Platform Foundation is shared infrastructure, not a business-domain parent.
 
 \chapter{System-CAD Domain Architecture}
 
@@ -1068,7 +1058,7 @@ The complete and authoritative System-CAD architecture is maintained in \pathref
 
 This handbook intentionally summarizes those rules in its C4 and domain sections above rather than maintaining a second detailed target-domain specification here. Any future architectural change must update the active architecture document first and then keep this handbook synchronized.
 
-The target architecture does not claim that every named domain is already implemented on \texttt{main}.
+The target architecture does not claim that every named domain is already implemented on \t\\texttt{main}.
 
 \chapter{CATIA Capability Traceability}
 
@@ -1356,14 +1346,14 @@ Never substitute a percentage for a gate.
 
 \begin{enumerate}
 \item The repository is not yet a full CATIA-scale System-CAD application.
-\item The current audited \texttt{main} tree does not contain every future specialized .NET domain project described by the target architecture.
+\item The current audited \t\\texttt{main} tree does not contain every future specialized .NET domain project described by the target architecture.
 \item Framework build/compiled-model functionality is not by itself a canonical feature-evaluation engine.
 \item \texttt{uml-cad-build-package/1.0.0} is a current compatibility bridge, not a mandate for the long-term System-CAD semantic model.
 \item General curved-face sewing, unrestricted B-Rep Boolean construction, arbitrary topology-aware fillet/chamfer, universal trimmed-surface filling, and universal closest-point/intersection solving are not silently certified by M0-M16.
 \item Metal hardware validation does not make Metal an authoritative f64 geometry backend.
 \item CUDA hardware validation remains unclaimed without an actual NVIDIA runner execution record.
 \item Representation and tessellation are derived/approximate domains and never replace semantic truth.
-\item This handbook does not define a competing feature sequence. \pathref{docs/SYSTEM_CAD_ARCHITECTURE.md} defines the intended architecture; the continuation/gap state at the exact 	exttt{main} head determines the next implementation increment.
+\item This handbook does not define a competing feature sequence. \pathref{docs/SYSTEM_CAD_ARCHITECTURE.md} defines the intended architecture; the continuation/gap state at the exact \\texttt{main} head determines the next implementation increment.
 \end{enumerate}
 
 \chapter{Final Architectural Invariants}
@@ -1391,7 +1381,7 @@ Never substitute a percentage for a gate.
 \item Drawing consumes authoritative CAD/product state and does not reconstruct semantic truth from presentation geometry.
 \item PLM owns lifecycle/product integration without becoming geometry authority.
 \item The viewer is presentation only.
-\item The active System-CAD architecture document determines ownership and dependency direction; the exact 	exttt{main} continuation/gap state determines what is implemented next.
+\item The active System-CAD architecture document determines ownership and dependency direction; the exact \\texttt{main} continuation/gap state determines what is implemented next.
 \end{enumerate}
 
 \chapter*{Revision Note}

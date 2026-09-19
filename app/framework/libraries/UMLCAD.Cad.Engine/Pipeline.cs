@@ -71,7 +71,10 @@ public sealed class CadEvaluationEngine
             var upstreamResults=upstream.Select(x=>x.Result!).ToArray();var identity=CadEvaluationIdentityBuilder.Build(part.Id.Value,op,upstreamResults,options);
             if(incremental&&!invalidated.Contains(id)&&_previous.TryGetValue(id,out var previous)&&previous.EvaluationIdentity==identity&&_cache.TryGet(identity,out var cached)){outcomes[id]=cached;if(cached.Result?.Kind==CadResultKind.Body)bodies[op.BodyId]=cached.Result.Id;continue;}
             var inputResults=upstreamResults.Select(x=>x.Id).ToArray();
-            var request=new KernelOperationRequest(CadContractVersions.KernelOperation,identity,part.Id.Value,op.Id,op.OperationKind,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,incremental?inputResults.LastOrDefault():null,inputResults,op.SemanticInputs);
+            var previousResultId=incremental&&_previous.TryGetValue(id,out var previousForOperation)
+                ? previousForOperation.Result?.Id
+                : null;
+            var request=new KernelOperationRequest(CadContractVersions.KernelOperation,identity,part.Id.Value,op.Id,op.OperationKind,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,previousResultId,inputResults,op.SemanticInputs);
             KernelOperationResponse response;
             try
             {

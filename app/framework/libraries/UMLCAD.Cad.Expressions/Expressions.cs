@@ -103,6 +103,55 @@ public sealed record ProductExpression : CadExpression
             .ToHashSet(StringComparer.Ordinal);
 }
 
+public abstract record CadNumericValue
+{
+    public abstract string CanonicalForm { get; }
+    public abstract double Evaluate(IReadOnlyDictionary<string, double> values);
+    public abstract IReadOnlySet<string> ParameterNames { get; }
+
+    public static CadNumericValue Constant(double value) =>
+        new LiteralNumericValue(value);
+
+    public static CadNumericValue Expression(CadExpression expression) =>
+        new ExpressionNumericValue(expression);
+}
+
+public sealed record LiteralNumericValue(double Value) : CadNumericValue
+{
+    public LiteralNumericValue
+    {
+        if (!double.IsFinite(Value))
+            throw new ArgumentOutOfRangeException(nameof(Value));
+    }
+
+    public override string CanonicalForm =>
+        Value.ToString("R", CultureInfo.InvariantCulture);
+
+    public override double Evaluate(
+        IReadOnlyDictionary<string, double> values) => Value;
+
+    public override IReadOnlySet<string> ParameterNames { get; } =
+        new HashSet<string>(StringComparer.Ordinal);
+}
+
+public sealed record ExpressionNumericValue(CadExpression Expression) : CadNumericValue
+{
+    public ExpressionNumericValue
+    {
+        ArgumentNullException.ThrowIfNull(Expression);
+    }
+
+    public override string CanonicalForm =>
+        "expression(" + Expression.CanonicalForm + ")";
+
+    public override double Evaluate(
+        IReadOnlyDictionary<string, double> values) =>
+        Expression.Evaluate(values);
+
+    public override IReadOnlySet<string> ParameterNames =>
+        Expression.ParameterNames;
+}
+
 public sealed record CadParameter(
     string Name,
     CadExpression Expression,

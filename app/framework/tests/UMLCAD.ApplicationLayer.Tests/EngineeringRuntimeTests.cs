@@ -41,7 +41,7 @@ public sealed class EngineeringRuntimeTests
         var result = await new EngineeringRuleRuntime().ExecuteAsync(
             rule,
             context,
-            new EngineeringServices(control));
+            new EngineeringServices(control, new EmptySimulationService()));
 
         Assert.Equal(EngineeringRuleOutcomeKind.Reject, result.Outcome);
         Assert.DoesNotContain(store.Snapshot().Features, feature => feature.Id.Value == "created");
@@ -64,6 +64,21 @@ public sealed class EngineeringRuntimeTests
             result.Diagnostics,
             diagnostic => diagnostic.Code == "ENGINEERING_RULE_UNHANDLED_EXCEPTION");
         Assert.DoesNotContain(store.Snapshot().Features, feature => feature.Id.Value == "created");
+    }
+
+
+    [Fact]
+    public void Rule_Cad_Interface_Does_Not_Expose_Transaction_Control()
+    {
+        var methods = typeof(ICadControlService)
+            .GetMethods()
+            .Select(method => method.Name)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(
+            ["AddFeature", "RemoveFeature", "RenameFeature"],
+            methods);
     }
 
     private static CadDocumentStore NewStore() =>

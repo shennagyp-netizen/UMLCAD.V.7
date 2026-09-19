@@ -70,6 +70,65 @@ public sealed class SemanticReferenceServiceTests
     }
 
     [Fact]
+    public void Resolves_published_face_only_when_publication_and_topology_provenance_match()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.Geometry("body", "solid", new Dictionary<string, string>());
+            part.TopologyBinding("topology-front", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "topology-front");
+        });
+
+        using var app = builder.Build();
+        var service = app.GetRequiredService<ISemanticReferenceService>();
+
+        var result = service.Resolve(app.Semantic,
+            new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
+        Assert.Equal("REFERENCE_RESOLVED", result.DiagnosticCode);
+        Assert.Equal("result-r1", result.Target!.ResultIdentity);
+        Assert.Equal("topology-front", result.Target.ProvenanceId);
+    }
+
+    [Fact]
+    public void Face_reference_with_missing_publication_is_indeterminate_not_geometry()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.Geometry("body", "solid", new Dictionary<string, string>());
+            part.TopologyBinding("topology-front", "face", "front-face", "result-r1", "brep-face-6");
+        });
+
+        using var app = builder.Build();
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(app.Semantic, new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
+        Assert.Equal("REFERENCE_PUBLICATION_MISSING", result.DiagnosticCode);
+    }
+
+    [Fact]
+    public void Face_reference_with_mismatched_topology_provenance_is_indeterminate()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("topology-front", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r2", "topology-front");
+        });
+
+        using var app = builder.Build();
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(app.Semantic, new SemanticReference("part", "front-face", "face", "result-r2"));
+
+        Assert.Equal(SemanticReferenceStatus.Indeterminate, result.Status);
+        Assert.Equal("REFERENCE_PROVENANCE_MISMATCH", result.DiagnosticCode);
+    }
+
+    [Fact]
     public void Reports_unsupported_face_reference_without_inventing_topology()
     {
         var builder = CadApplication.CreateBuilder();

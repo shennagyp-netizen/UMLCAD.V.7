@@ -158,7 +158,6 @@ public sealed class InMemoryCadControlService : ICadControlService, IEngineering
             }
         }
 
-        _store.Restore(_initialSnapshot);
         _pending.Clear();
         _completed = true;
         return new(CadCommandStatus.Accepted, null, null, null);
@@ -169,6 +168,7 @@ public sealed class InMemoryCadControlService : ICadControlService, IEngineering
         if (_completed)
             return;
 
+        _store.Restore(_initialSnapshot);
         _pending.Clear();
         _completed = true;
     }

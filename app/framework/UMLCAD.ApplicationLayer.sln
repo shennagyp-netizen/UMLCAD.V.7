@@ -2,35 +2,35 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Contracts", "framework/libraries/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj", "{D46B1DD7-DFBD-561B-ADD2-5C2DB421C9D0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Contracts", "libraries/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj", "{D46B1DD7-DFBD-561B-ADD2-5C2DB421C9D0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Engine", "framework/libraries/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj", "{B83564C4-FE7C-57A7-9596-434E2F678EAD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Engine", "libraries/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj", "{B83564C4-FE7C-57A7-9596-434E2F678EAD}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Expressions", "framework/libraries/UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj", "{79DFCC8E-31AE-54CF-AFEF-1E2D54C2C739}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Expressions", "libraries/UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj", "{79DFCC8E-31AE-54CF-AFEF-1E2D54C2C739}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Semantics", "framework/libraries/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj", "{2053526A-7786-5CFA-BBCF-EF58222A7561}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Cad.Semantics", "libraries/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj", "{2053526A-7786-5CFA-BBCF-EF58222A7561}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.Cam", "framework/libraries/UMLCAD.Engineering.Cam/UMLCAD.Engineering.Cam.csproj", "{D8BD899B-4B0D-5589-9029-EC73A6693F2D}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.Cam", "libraries/UMLCAD.Engineering.Cam/UMLCAD.Engineering.Cam.csproj", "{D8BD899B-4B0D-5589-9029-EC73A6693F2D}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.Drawing", "framework/libraries/UMLCAD.Engineering.Drawing/UMLCAD.Engineering.Drawing.csproj", "{8457412D-BB84-5B47-9F6B-550D50B3CA62}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.Drawing", "libraries/UMLCAD.Engineering.Drawing/UMLCAD.Engineering.Drawing.csproj", "{8457412D-BB84-5B47-9F6B-550D50B3CA62}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.Resources", "framework/libraries/UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj", "{1CFC460F-6FB6-5519-8181-BBDC9C92AB16}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.Resources", "libraries/UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj", "{1CFC460F-6FB6-5519-8181-BBDC9C92AB16}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.Runtime", "framework/libraries/UMLCAD.Engineering.Runtime/UMLCAD.Engineering.Runtime.csproj", "{C26659F8-A9E8-520E-A12E-928A8B6023A9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.Runtime", "libraries/UMLCAD.Engineering.Runtime/UMLCAD.Engineering.Runtime.csproj", "{C26659F8-A9E8-520E-A12E-928A8B6023A9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.SheetMetal", "framework/libraries/UMLCAD.Engineering.SheetMetal/UMLCAD.Engineering.SheetMetal.csproj", "{25EF7664-3CF0-5732-92D4-64E4365ABAA3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Engineering.SheetMetal", "libraries/UMLCAD.Engineering.SheetMetal/UMLCAD.Engineering.SheetMetal.csproj", "{25EF7664-3CF0-5732-92D4-64E4365ABAA3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Framework", "framework/libraries/UMLCAD.Framework/UMLCAD.Framework.csproj", "{24F38525-86D3-5C52-BBDC-9F3F73B49E40}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Framework", "libraries/UMLCAD.Framework/UMLCAD.Framework.csproj", "{24F38525-86D3-5C52-BBDC-9F3F73B49E40}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Integration.Simulation", "framework/libraries/UMLCAD.Integration.Simulation/UMLCAD.Integration.Simulation.csproj", "{DB4323FA-6550-52C5-A94B-F5A7E50700C2}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Integration.Simulation", "libraries/UMLCAD.Integration.Simulation/UMLCAD.Integration.Simulation.csproj", "{DB4323FA-6550-52C5-A94B-F5A7E50700C2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Kernel.Client", "framework/libraries/UMLCAD.Kernel.Client/UMLCAD.Kernel.Client.csproj", "{F6384567-F8DD-5791-ACDE-CCD150257CCE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Kernel.Client", "libraries/UMLCAD.Kernel.Client/UMLCAD.Kernel.Client.csproj", "{F6384567-F8DD-5791-ACDE-CCD150257CCE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Science", "framework/libraries/UMLCAD.Science/UMLCAD.Science.csproj", "{FCD7A786-0B87-5294-B7FB-4D73F0FF723F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Science", "libraries/UMLCAD.Science/UMLCAD.Science.csproj", "{FCD7A786-0B87-5294-B7FB-4D73F0FF723F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.ApplicationLayer.Tests", "framework/tests/UMLCAD.ApplicationLayer.Tests/UMLCAD.ApplicationLayer.Tests.csproj", "{CCDB799E-0077-5E8A-895D-D0DF3F83DD22}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.ApplicationLayer.Tests", "tests/UMLCAD.ApplicationLayer.Tests/UMLCAD.ApplicationLayer.Tests.csproj", "{CCDB799E-0077-5E8A-895D-D0DF3F83DD22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Kernel.Client.Tests", "framework/tests/UMLCAD.Kernel.Client.Tests/UMLCAD.Kernel.Client.Tests.csproj", "{685E7846-0EDC-585C-BC84-1CC2F412B4D8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UMLCAD.Kernel.Client.Tests", "tests/UMLCAD.Kernel.Client.Tests/UMLCAD.Kernel.Client.Tests.csproj", "{685E7846-0EDC-585C-BC84-1CC2F412B4D8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

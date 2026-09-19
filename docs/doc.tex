@@ -1384,6 +1384,164 @@ Never substitute a percentage for a gate.
 \item The active System-CAD architecture document determines ownership and dependency direction; the exact \texttt{main} continuation/gap state determines what is implemented next.
 \end{enumerate}
 
+
+\chapter{.NET Kernel Library Reference}
+
+The current production .NET kernel consists of exactly two libraries. The detailed class-by-class companion is \pathref{docs/DOTNET_KERNEL_LIBRARY_REFERENCE.md}. This chapter records the architectural segmentation in the main handbook.
+
+\section{Library map}
+
+\begin{tabularx}{\textwidth}{@{}p{0.28\textwidth}p{0.25\textwidth}X@{}}
+\toprule
+Library & Source project & Architectural responsibility \\
+\midrule
+UMLCAD.Framework & \pathref{dotnet/src/UMLCAD.Framework/UMLCAD.Framework.csproj} & Application authoring, semantic state, deterministic identity, semantic lookup, build history, package generation, and compiled graph generation. \\
+UMLCAD.Kernel.Client & \pathref{dotnet/src/UMLCAD.Kernel.Client/UMLCAD.Kernel.Client.csproj} & HTTP/process boundary to Rust, timeout/cancellation, response-size defense, stable diagnostics, DI registration, and compiled-result integrity validation. \\
+\bottomrule
+\end{tabularx}
+
+\section{UMLCAD.Framework class segmentation}
+
+\begin{longtable}{@{}p{0.28\textwidth}p{0.18\textwidth}p{0.45\textwidth}@{}}
+\toprule
+Class / contract & Visibility & Responsibility \\
+\midrule
+CadApplication & public & Runtime façade over built SemanticApplication, configuration, services, package creation, and compiled-model creation. \\
+CadApplicationBuilder & public & Authoring/composition root; validates definitions, constructs DI, canonicalizes state, computes BuildIdentity, publishes semantic state, and records history. \\
+PartBuilder & public & Authoring DSL for part metadata, parameters, geometry descriptors, constraints, references, and components. \\
+DrawingBuilder & public & Authoring DSL for drawing settings, sheets, and part references. \\
+AssemblyBuilder & public & Authoring DSL for assembly definitions and occurrences plus assembly metadata/settings. \\
+AssemblyOccurrenceBuilder & public & Configures instance transform, configuration, quantity, BOM structure, visibility, suppression, grounded/flexible state, and metadata. \\
+PartDefinition & internal & Builder-stage immutable record converted to PartSemantic. \\
+DrawingDefinition & internal & Builder-stage immutable record converted to DrawingSemantic. \\
+AssemblyDefinition & internal & Builder-stage immutable record converted to AssemblySemantic. \\
+\bottomrule
+\end{longtable}
+
+\section{UMLCAD.Framework semantic contracts}
+
+\begin{longtable}{@{}p{0.31\textwidth}p{0.17\textwidth}p{0.43\textwidth}@{}}
+\toprule
+Type & Kind & Meaning \\
+\midrule
+SemanticEntity & abstract record & Common semantic ID, Kind, Source, and generic metadata. \\
+ParameterSemantic & record & Named semantic parameter with string value and optional unit. \\
+CadMetadata & record/dictionary & Standard CAD metadata plus custom properties. \\
+GeometrySemantic & record & Geometry descriptor: ID, kind, properties; not a Rust geometry object. \\
+ConstraintSemantic & record & Constraint descriptor with target references and properties. \\
+ComponentSemantic & record & Generic component semantic structure. \\
+TransformSemantic & record & 16-value homogeneous transform with structural validation. \\
+AssemblyOccurrenceSemantic & record & Contextual instance state for an assembly occurrence. \\
+PartSemantic & record & Part definition semantic state. \\
+SheetSemantic & record & Sheet identity, name, drawing references, settings. \\
+DrawingSemantic & record & Drawing identity, sheets, part references, settings. \\
+AssemblySemantic & record & Assembly identity, settings, metadata, occurrences. \\
+SemanticApplication & record & Top-level immutable semantic application snapshot and BuildIdentity. \\
+\bottomrule
+\end{longtable}
+
+\section{UMLCAD.Framework service segmentation}
+
+\begin{longtable}{@{}p{0.32\textwidth}p{0.55\textwidth}@{}}
+\toprule
+Contract / implementation & Responsibility \\
+\midrule
+ISemanticApplication / SemanticApplicationState & Publish one current semantic snapshot; reject access before Build() completes. \\
+IPartSemanticService / PartSemanticService & Ordinal-ID part lookup over current application state. \\
+IDrawingSemanticService / DrawingSemanticService & Ordinal-ID drawing lookup over current application state. \\
+ISheetSemanticService / SheetSemanticService & Two-level drawing-ID plus sheet-ID lookup. \\
+IAssemblySemanticService / AssemblySemanticService & Ordinal-ID assembly lookup. \\
+ISemanticRegistry / SemanticRegistry & Construction-time registration and deterministic semantic snapshot assembly. \\
+IBuildHistory / BuildHistory & Thread-safe in-memory build history with independent sequence identity. \\
+IBuildPackageService / BuildPackageService & Current uml-cad-build-package/1.0.0 JSON bridge generation. \\
+ICompiledModelService / CompiledModelService & Semantic-to-compiled graph transformation and graph integrity checks. \\
+ICadConfiguration / CadConfiguration & Framework configuration abstraction over Microsoft.Extensions.Configuration. \\
+\bottomrule
+\end{longtable}
+
+\section{Compiled-model type segmentation}
+
+\begin{longtable}{@{}p{0.31\textwidth}p{0.56\textwidth}@{}}
+\toprule
+Type & Responsibility \\
+\midrule
+CompiledModelPackage & Top-level compiled result including manifest, render artifact, and diagnostics. \\
+CompiledModelManifest & Root/node/relationship/representation/topology/source graph contract. \\
+CompiledNode & Stable graph node with parent/children, metadata, capabilities, source, and state. \\
+CompiledRelationship & Explicit graph edge with source and target IDs. \\
+CompiledRepresentation & Derived representation metadata. \\
+CompiledTopologyBinding & Semantic/topological-to-representation correspondence. \\
+CompiledSourceBinding & File/symbol/span/revision provenance. \\
+CompiledCapabilities & Visibility/selectability/focus capability flags. \\
+CompiledRenderArtifact & Derived render asset metadata and BuildIdentity linkage. \\
+CompiledDiagnostic & Structured compiled-model diagnostic. \\
+\bottomrule
+\end{longtable}
+
+\section{UMLCAD.Kernel.Client class segmentation}
+
+\begin{longtable}{@{}p{0.33\textwidth}p{0.17\textwidth}p{0.42\textwidth}@{}}
+\toprule
+Type & Kind & Responsibility \\
+\midrule
+RustKernelOptions & public class & BaseAddress, evaluation path, timeout, and maximum response size. \\
+IRustKernelService & public interface & One-operation transport contract: EvaluateAsync(BuildPackage). \\
+KernelEvaluationResult & public record & Success flag, compiled result, diagnostics. \\
+KernelDiagnostic & public record & Stable code, severity, message, optional target ID. \\
+RustKernelService & public sealed class & HTTP implementation, bounded response reading, JSON handling, cancellation/timeout semantics, and returned-result validation. \\
+CompiledModelValidator & internal static class & Build/application/graph/render identity and referential-integrity firewall. \\
+RustKernelServiceCollectionExtensions & public static class & DI/options/HttpClient composition. \\
+\bottomrule
+\end{longtable}
+
+\section{Kernel-client failure semantics}
+
+\begin{tabularx}{\textwidth}{@{}p{0.29\textwidth}X@{}}
+\toprule
+Code & Meaning \\
+\midrule
+KERNEL\_RESPONSE\_TOO\_LARGE & Response exceeds the configured byte limit. \\
+KERNEL\_HTTP & Non-success HTTP status from kernel. \\
+KERNEL\_EMPTY\_RESPONSE & Empty or unusable successful response. \\
+KERNEL\_TRANSPORT & HTTP connection/transport failure. \\
+KERNEL\_TIMEOUT & Configured request timeout expired. \\
+KERNEL\_INVALID\_JSON & Response could not be deserialized as the expected JSON contract. \\
+KERNEL\_CLIENT & Unexpected client-side processing failure. \\
+KERNEL\_INVALID\_RESULT & Compiled result violates submitted-build identity or graph invariants. \\
+\bottomrule
+\end{tabularx}
+
+Caller cancellation is propagated rather than converted to KERNEL\_TIMEOUT.
+
+\section{.NET library invariants}
+
+\begin{enumerate}
+\item Framework owns semantic meaning; Kernel Client owns transport.
+\item Builder-stage mutable definitions do not leak as public semantic state.
+\item Semantic IDs use ordinal comparison and deterministic ordering.
+\item BuildIdentity is SHA-256 of canonical semantic content.
+\item History sequence is not semantic identity.
+\item Assembly occurrence identity is contextual instance identity, not definition identity.
+\item Transform structure is validated at the semantic boundary.
+\item Compiled graph relationships are explicit and referentially validated.
+\item Render artifacts are bound to BuildIdentity but remain derived data.
+\item Kernel responses are rejected when valid JSON does not equal a valid result.
+\item The .NET libraries must not implement a duplicate mathematical kernel.
+\end{enumerate}
+
+\section{.NET validation assemblies}
+
+\begin{tabularx}{\textwidth}{@{}p{0.32\textwidth}X@{}}
+\toprule
+Assembly & Boundary covered \\
+\midrule
+UMLCAD.Framework.Tests & Semantic builds, adversarial builder behavior, compiled model, identity collisions, client behavior, and real-kernel Framework E2E. \\
+UMLCAD.Kernel.Integration.Tests & Real process/HTTP black-box behavior, concurrency isolation, assembly graph preservation, schema rejection, stale references, invalid geometry, unsupported geometry. \\
+\bottomrule
+\end{tabularx}
+
+The detailed companion reference is the authoritative class inventory for future additions; every new production type must be added to that document in the same change.
+
 \chapter*{Revision Note}
 This version replaces the former unstable two-column handbook with a stable single-column A4 document. It also removes stale claims about nonexistent current projects, separates current implementation from target System-CAD architecture, records the M0-M16 mathematical authority boundary, and incorporates the stable Science / Phenomena Simulation / Engineering Resources / Sheet Metal / CAM / Product Structure / BOM / Drawing / PLM relationship model.
 

@@ -8,49 +8,119 @@ public enum SketchGeometryKind { Line, Circle, Arc }
 public enum SketchConstraintKind { Horizontal, Vertical, Coincident, Fixed, Distance, Radius, Diameter, Tangent }
 public enum ReferenceTargetKind { Result, Topology, Publication, Semantic }
 
-public abstract record SketchGeometry(CadId Id, SketchGeometryKind Kind)
+public abstract record SketchGeometry(
+    CadId Id,
+    SketchGeometryKind Kind)
 {
     protected SketchGeometry
     {
-        if (string.IsNullOrWhiteSpace(Id.Value))
+        if (!Id.IsValid)
             throw new ArgumentException("Geometry ID is required.", nameof(Id));
     }
 
     public abstract string CanonicalForm { get; }
+    public abstract IReadOnlySet<string> ParameterNames { get; }
 }
 
 public sealed record LineGeometry(
-    CadId Id, double X1, double Y1, double X2, double Y2)
+    CadId Id,
+    UMLCAD.Cad.Expressions.CadNumericValue X1,
+    UMLCAD.Cad.Expressions.CadNumericValue Y1,
+    UMLCAD.Cad.Expressions.CadNumericValue X2,
+    UMLCAD.Cad.Expressions.CadNumericValue Y2)
     : SketchGeometry(Id, SketchGeometryKind.Line)
 {
-    public LineGeometry
-    {
-        if (!double.IsFinite(X1) || !double.IsFinite(Y1) ||
-            !double.IsFinite(X2) || !double.IsFinite(Y2))
-            throw new ArgumentOutOfRangeException(
-                nameof(X1),
-                "Line coordinates must be finite.");
-        if (X1 == X2 && Y1 == Y2)
-            throw new ArgumentException(
-                "A line cannot have identical endpoints.");
-    }
-
     public override string CanonicalForm =>
-        $"line:{Id}:{X1:R}:{Y1:R}:{X2:R}:{Y2:R}";
+        $"line:{Id}:{X1.CanonicalForm}:{Y1.CanonicalForm}:{X2.CanonicalForm}:{Y2.CanonicalForm}";
+
+    public override IReadOnlySet<string> ParameterNames =>
+        X1.ParameterNames
+            .Concat(Y1.ParameterNames)
+            .Concat(X2.ParameterNames)
+            .Concat(Y2.ParameterNames)
+            .ToHashSet(StringComparer.Ordinal);
+
+    public LineGeometry(
+        CadId id,
+        double x1,
+        double y1,
+        double x2,
+        double y2)
+        : this(
+            id,
+            UMLCAD.Cad.Expressions.CadNumericValue.Constant(x1),
+            UMLCAD.Cad.Expressions.CadNumericValue.Constant(y1),
+            UMLCAD.Cad.Expressions.CadNumericValue.Constant(x2),
+            UMLCAD.Cad.Expressions.CadNumericValue.Constant(y2))
+    {
+    }
 }
 
 public sealed record CircleGeometry(
-    CadId Id, double X, double Y, double Radius)
+    CadId Id,
+    UMLCAD.Cad.Expressions.CadNumericValue X,
+    UMLCAD.Cad.Expressions.CadNumericValue Y,
+    UMLCAD.Cad.Expressions.CadNumericValue Radius)
     : SketchGeometry(Id, SketchGeometryKind.Circle)
 {
     public CircleGeometry
     {
-        if (!double.IsFinite(Radius) || Radius <= 0)
-            throw new ArgumentOutOfRangeException(nameof(Radius));
+        ArgumentNullException.ThrowIfNull(X);
+        ArgumentNullException.ThrowIfNull(Y);
+        ArgumentNullException.ThrowIfNull(Radius);
     }
 
     public override string CanonicalForm =>
-        $"circle:{Id}:{X:R}:{Y:R}:{Radius:R}";
+        $"circle:{Id}:{X.CanonicalForm}:{Y.CanonicalForm}:{Radius.CanonicalForm}";
+
+    public override IReadOnlySet<string> ParameterNames =>
+        X.ParameterNames
+            .Concat(Y.ParameterNames)
+            .Concat(Radius.ParameterNames)
+            .ToHashSet(StringComparer.Ordinal);
+
+    public CircleGeometry(
+        CadId id,
+        double x,
+        double y,
+        double radius)
+        : this(
+            id,
+            UMLCAD.Cad.Expressions.CadNumericValue.Constant(x),
+            UMLCAD.Cad.Expressions.CadNumericValue.Constant(y),
+            UMLCAD.Cad.Expressions.CadNumericValue.Constant(radius))
+    {
+    }
+}
+
+public sealed record ArcGeometry(
+    CadId Id,
+    UMLCAD.Cad.Expressions.CadNumericValue CenterX,
+    UMLCAD.Cad.Expressions.CadNumericValue CenterY,
+    UMLCAD.Cad.Expressions.CadNumericValue Radius,
+    UMLCAD.Cad.Expressions.CadNumericValue StartAngle,
+    UMLCAD.Cad.Expressions.CadNumericValue EndAngle)
+    : SketchGeometry(Id, SketchGeometryKind.Arc)
+{
+    public ArcGeometry
+    {
+        ArgumentNullException.ThrowIfNull(CenterX);
+        ArgumentNullException.ThrowIfNull(CenterY);
+        ArgumentNullException.ThrowIfNull(Radius);
+        ArgumentNullException.ThrowIfNull(StartAngle);
+        ArgumentNullException.ThrowIfNull(EndAngle);
+    }
+
+    public override string CanonicalForm =>
+        $"arc:{Id}:{CenterX.CanonicalForm}:{CenterY.CanonicalForm}:{Radius.CanonicalForm}:{StartAngle.CanonicalForm}:{EndAngle.CanonicalForm}";
+
+    public override IReadOnlySet<string> ParameterNames =>
+        CenterX.ParameterNames
+            .Concat(CenterY.ParameterNames)
+            .Concat(Radius.ParameterNames)
+            .Concat(StartAngle.ParameterNames)
+            .Concat(EndAngle.ParameterNames)
+            .ToHashSet(StringComparer.Ordinal);
 }
 
 public sealed record SketchConstraint(
@@ -146,9 +216,12 @@ public sealed record Sketch(
     }
 
     public IReadOnlySet<string> ParameterNames =>
-        Constraints
-            .Where(x => x.Value is not null)
-            .SelectMany(x => x.Value!.ParameterNames)
+        Geometry
+            .SelectMany(x => x.ParameterNames)
+            .Concat(
+                Constraints
+                    .Where(x => x.Value is not null)
+                    .SelectMany(x => x.Value!.ParameterNames))
             .ToHashSet(StringComparer.Ordinal);
 
     public string CanonicalForm =>

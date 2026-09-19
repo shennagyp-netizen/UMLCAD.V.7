@@ -21,12 +21,6 @@ public sealed class ApplicationCompositionTests
         }
         """;
 
-        using var client = new HttpClient(
-            new StubHandler(HttpStatusCode.OK, response))
-        {
-            BaseAddress = new Uri("http://127.0.0.1/")
-        };
-
         using var application = UmlcadApplication.ForTest(UmlcadKernel.ForTest(new StubHandler(HttpStatusCode.OK, response)));
 
         const string semantic = """{"parts":[]}""";

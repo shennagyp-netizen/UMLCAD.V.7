@@ -7,7 +7,7 @@ public sealed class SemanticPipelineTests
 {
  [Fact]public async Task SketchExtrusionHoleProducesCurrentBody()
  {
-   var part=Factory.Create();var g=new Gateway();var s=await new CadEvaluationEngine(g).EvaluateAsync(part);
+   var part=Factory.CreatePart();var g=new Gateway();var s=await new CadEvaluationEngine(g).EvaluateAsync(part);
    Assert.True(s.Succeeded);Assert.Equal(new[]{new CadId("sketch"),new CadId("extrude"),new CadId("hole")},s.Plan.OperationIds);Assert.Equal(new CadResultId("r:hole"),s.CurrentBody(new CadId("body")));
  }
  [Fact]public void SketchChangeInvalidatesDownstream(){var graph=new CadDependencyGraph(Factory.Create());var a=graph.InvalidationClosure(new[]{new CadId("sketch")});Assert.Equal(new[]{"extrude","hole","sketch"},a.OrderBy(x=>x.Value).Select(x=>x.Value));}
@@ -19,6 +19,6 @@ public sealed class SemanticPipelineTests
  sealed class Gateway:IKernelGateway
  {
    public Task<KernelOperationResponse> EvaluateAsync(KernelOperationRequest r,CancellationToken c=default)
-   {var id=r.OperationKind switch{"Cad.Sketch"=>"r:sketch","Cad.Extrusion"=>"r:extrude","Cad.Hole"=>"r:hole",_=>"r:unknown"};return Task.FromResult(new KernelOperationResponse(CadEvaluationStatus.Succeeded,new CadResultId(id),"evidence",new[]{new KernelTopologyBinding("operation",r.OperationId.Value)},Array.Empty<CadDiagnostic>()));}
+   {var id=r.OperationKind switch{"Cad.Sketch"=>"r:sketch","Cad.Extrusion"=>"r:extrude","Cad.Hole"=>"r:hole",_=>"r:unknown"};return Task.FromResult(KernelOperationResponse.Success(r,new CadResultId(id),"evidence",new[]{new KernelTopologyBinding("operation",r.OperationId.Value)}));}
  }
 }

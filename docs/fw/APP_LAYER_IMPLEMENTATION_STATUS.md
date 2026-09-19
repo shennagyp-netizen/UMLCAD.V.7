@@ -53,7 +53,7 @@ The latest BodyResult is the current body state. Earlier results are retained on
 - full/incremental kernel operation requests;
 - authoritative result integration into the semantic pipeline.
 
-`UMLCAD.Kernel`
+`UMLCAD.Kernel.Client`
 - isolated concrete kernel gateway contract/transport boundary;
 - HTTP implementation is intentionally separate from semantic meaning.
 

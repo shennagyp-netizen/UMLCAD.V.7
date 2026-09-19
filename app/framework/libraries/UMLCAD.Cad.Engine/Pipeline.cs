@@ -234,6 +234,7 @@ public static class CadEvaluationIdentityBuilder
         }
 
         foreach (var parameter in part.Parameters
+                     .Where(x => operation.ParameterNames.Contains(x.Name))
                      .OrderBy(x => x.Name, StringComparer.Ordinal))
             builder.Append("|parameter=").Append(parameter.Identity);
 

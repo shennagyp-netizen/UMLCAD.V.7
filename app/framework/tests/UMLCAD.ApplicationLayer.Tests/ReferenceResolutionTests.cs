@@ -10,7 +10,7 @@ public sealed class ReferenceResolutionTests
     [Fact]
     public async Task TopologyReferenceMustResolveAgainstAuthoritativeResult()
     {
-        var part = SemanticPartFactory.Create().AddOperationReference();
+        var part = SemanticPartFactory.CreateWithValidTopologyReference();
 
         var gateway = new TestGateway();
         var snapshot = await new CadEvaluationEngine(gateway)
@@ -82,15 +82,20 @@ public sealed class ReferenceResolutionTests
 
         Assert.Equal(original, second);
 
-        var parameterized = part.AddParameter(
-            new CadParameter(
-                "base_radius",
-                CadExpression.Constant(25),
-                "mm"));
+        var parameterized = part.Definition with
+        {
+            Parameters = new[]
+            {
+                new CadParameter(
+                    "base_radius",
+                    CadExpression.Constant(25),
+                    "mm")
+            }
+        };
 
         var third = CadEvaluationIdentityBuilder.Build(
-            parameterized.Definition,
-            parameterized.Definition.Operations[0],
+            parameterized,
+            parameterized.Operations[0],
             Array.Empty<CadResultEnvelope>(),
             new CadEvaluationOptions());
 
@@ -178,6 +183,35 @@ public sealed class ReferenceResolutionTests
                         new CadId("extrude"),
                         CadExpression.Constant(5),
                         CadExpression.Constant(10)));
+        }
+        
+        public static CadPartProgram CreateWithValidTopologyReference()
+        {
+            var part = Create();
+            var extrusion = (ExtrusionOperation)part.Definition.Operations[1];
+
+            var updated = part.Definition with
+            {
+                Operations = new CadOperation[]
+                {
+                    part.Definition.Operations[0],
+                    extrusion with
+                    {
+                        References = new[]
+                        {
+                            new CadReference(
+                                new CadId("support"),
+                                ReferenceTargetKind.Topology,
+                                new CadResultId("r:sketch"),
+                                "face",
+                                "profile")
+                        }
+                    },
+                    part.Definition.Operations[2]
+                }
+            };
+
+            return new CadPartProgram(updated);
         }
     }
 }

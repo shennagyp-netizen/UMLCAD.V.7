@@ -43,7 +43,7 @@ public sealed class SystemCadVerticalSliceGateTests
         var manifest = app.CreateCompiledModelManifest();
 
         Assert.NotEmpty(manifest.TopologyBindings);
-        Assert.NotEmpty(manifest.SourceBindings);
+        Assert.NotEmpty(manifest.Representations);
     }
 
     [Fact]

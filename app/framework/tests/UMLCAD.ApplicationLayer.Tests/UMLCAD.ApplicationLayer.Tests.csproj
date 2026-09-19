@@ -18,6 +18,8 @@
   <ItemGroup>
     <ProjectReference Include="../../libraries/UMLCAD.Kernel/UMLCAD.Kernel.csproj" />
     <ProjectReference Include="../../libraries/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
+    <ProjectReference Include="../../libraries/UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" />
+    <ProjectReference Include="../../libraries/UMLCAD.Science/UMLCAD.Science.csproj" />
     <ProjectReference Include="../../libraries/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
     <ProjectReference Include="../../libraries/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
     <ProjectReference Include="../../libraries/UMLCAD.Framework/UMLCAD.Framework.csproj" />

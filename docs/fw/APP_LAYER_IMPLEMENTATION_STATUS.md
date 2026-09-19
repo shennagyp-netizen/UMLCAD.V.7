@@ -1,131 +1,112 @@
 # UMLCAD.V.7 — New Application Layer Implementation Status
 
-## Current implementation boundary
+## Active implementation boundary
 
-The new Application Layer is implemented under app/. The legacy dotnet/ tree remains untouched and is not a dependency.
+The production Application Layer is under `app/`.
 
-## Implemented foundations
+The previous experimental Application Layer is preserved under `app_old/`.
 
-- app/framework/libraries/UMLCAD.Kernel
-  - single concrete .NET gateway;
-  - transport/process implementation is private to the gateway;
-  - sealed public API;
-  - bounded response handling;
-  - explicit timeout, transport, schema, and contradictory-result failures.
+The legacy `dotnet/` implementation remains an architectural reference and is not a dependency of the new application tree.
 
-- UMLCAD.Cad.Contracts
-  - stable CAD identifiers;
-  - build identity;
-  - kernel build definition.
+## Semantic architecture actually implemented
 
-- UMLCAD.Cad.Expressions
-  - finite typed expression values with explicit units.
+The active CAD semantic authority is a typed operation/result pipeline:
 
-- UMLCAD.Cad.Semantics
-  - immutable CAD feature definitions;
-  - explicit feature dependencies;
-  - immutable document definitions and snapshots;
-  - typed planar line/circle/arc semantics;
-  - typed planar constraints;
-  - part validation.
+```
+Part
+  -> Sketch
+      -> SketchResult
+  -> Extrusion(SketchResult)
+      -> BodyResult_1
+  -> Hole(BodyResult_1)
+      -> BodyResult_2 = CurrentBody
+```
 
-- UMLCAD.Cad.Engine
-  - semantic CAD command API;
-  - transaction-controlled CAD mutation;
-  - atomic commit and rollback;
-  - deterministic dependency planning;
-  - complete cycle-path reporting;
-  - deterministic transitive invalidation closure;
-  - typed semantic-to-kernel build package generation;
-  - typed CAD evaluation through the concrete kernel gateway.
+There is no traditional CAD Feature Tree in the active `app/` semantic model.
 
-- UMLCAD.Science
-  - typed phenomena;
-  - engineering frames;
-  - deterministic simulation identity;
-  - simulation requests/results;
-  - spatial regions;
-  - scalar fields and finite samples.
+A user-visible action may be named Sketch, Extrusion, Hole, Fillet, Boolean, Pattern, etc., but the semantic abstraction is:
 
-- UMLCAD.Engineering.Runtime
-  - executable engineering rules;
-  - typed EngineeringContext;
-  - CAD control without transaction-control leakage;
-  - framework-managed commit/rollback;
-  - exception-to-diagnostic conversion;
-  - atomic multi-rule build validation;
-  - deterministic rule registration and precedence;
-  - concurrent simulation cache with reusable-result validation.
+```
+Operation(input results, references, expressions, configuration)
+    -> typed Result
+```
 
-- UMLCAD.Framework
-  - top-level application facade;
-  - typed CAD build entry point;
-  - engineering validation entry point;
-  - kernel creation remains below the framework facade.
+The latest BodyResult is the current body state. Earlier results are retained only as immutable lineage when required for references, provenance, cache reuse, invalidation, recomputation, revision, or diagnostics.
 
-- app/application
-  - application host;
-  - typed Bench Vise E2E demo;
-  - application hosts remain outside framework.
+## Current application libraries
 
-## Test coverage authored
+`UMLCAD.Cad.Contracts`
+- shared identifiers, status values, kernel operation request/response contracts and topology bindings.
 
-Framework tests cover:
+`UMLCAD.Cad.Expressions`
+- deterministic expression values, parameter references and expression identity.
 
-- kernel gateway API shape;
-- malformed and contradictory kernel responses;
-- real loopback kernel transport;
-- typed CAD request through the kernel gateway;
-- semantic ID and collection invariants;
-- CAD transaction commit;
-- explicit rollback;
-- rollback after a later command failure;
-- closed transaction behavior;
-- dependency-first evaluation order;
-- cycle-path reporting;
-- unknown dependency rejection;
-- deterministic invalidation closure;
-- programmable rule commit;
-- rule rejection rollback;
-- uncaught rule exception rollback;
-- transaction-control isolation from rule code;
-- rule -> simulation -> CAD change integration;
-- atomic build-time multi-rule validation;
-- previous-rule state visibility;
-- simulation cache deduplication;
-- non-reusable simulation result eviction;
-- semantic simulation identity changes;
-- deterministic rule precedence and duplicate registration rejection;
-- deterministic typed CAD-to-kernel package generation;
-- planar geometry and constraint validation;
-- framework-level engineering validation integration.
+`UMLCAD.Cad.Semantics`
+- Part, Body, Sketch, geometry, constraints, References, Publications, Operation types, Result types and functional Part authoring.
+
+`UMLCAD.Cad.Engine`
+- dependency graph;
+- deterministic topological evaluation order;
+- transitive invalidation closure;
+- evaluation identity construction;
+- cache-backed incremental reuse;
+- full/incremental kernel operation requests;
+- authoritative result integration into the semantic pipeline.
+
+`UMLCAD.Kernel`
+- isolated concrete kernel gateway contract/transport boundary;
+- HTTP implementation is intentionally separate from semantic meaning.
+
+`UMLCAD.Science`
+- phenomena and deterministic simulation identity;
+- concurrent in-flight simulation deduplication.
+
+`UMLCAD.Engineering.Resources`
+- initial machine/tool/fixture/process capability contracts.
+
+`UMLCAD.Engineering.SheetMetal`
+- initial bend/process semantic contracts.
+
+`UMLCAD.Engineering.Cam`
+- initial CAM operation/toolpath contracts.
+
+`UMLCAD.Engineering.Drawing`
+- initial drawing/sheet/view contracts.
+
+`UMLCAD.Integration.Simulation`
+- external phenomena-provider adapter boundary.
+
+`UMLCAD.Engineering.Runtime`
+- initial executable rule contracts and deterministic rule execution order.
+
+`UMLCAD.Framework`
+- application facade over the semantic evaluation engine.
+
+## Tests authored
+
+The active test project verifies:
+
+- Sketch -> SketchResult -> Extrusion -> BodyResult -> Hole -> final Body composition;
+- deterministic semantic dependency planning;
+- transitive Sketch-change invalidation;
+- cycle rejection;
+- incremental rebuild that reuses unchanged upstream operations and reevaluates the changed downstream operation.
 
 ## Validation state
 
-The repository app_e2e architecture gate is the authoritative architecture test and is wired into CI.
+The environment used for this implementation has no .NET SDK, compiler, msbuild, or mono.
 
-The development container has Python 3.13 but no dotnet, csc, mono, or msbuild. Therefore .NET compilation and xUnit execution cannot honestly be reported as locally executed in this environment.
+Therefore C# compilation and xUnit execution are not claimed as locally executed.
 
-GitHub Actions is configured to run:
+The project graph was statically inspected:
 
-~~~
-Application architecture gate
-Application framework build
-Application framework tests
-Application host and demo build
-~~~
+- 16 active .NET projects;
+- no project-reference cycle;
+- active `app/` contains no Feature-named implementation file;
+- previous app implementation is preserved under `app_old/`.
 
-No hardware is required for this Application Layer increment.
+## Kernel integration boundary
 
-## Next declared work
+The existing Rust host currently exposes the older build-package endpoint. The new Application Layer defines an operation-level kernel contract so semantic operations and incremental realization are not forced into the old package model.
 
-The next implementation increment should extend the semantic CAD model and command set toward:
-
-1. richer Part/Body/Sketch/Feature semantics;
-2. semantic references and publications;
-3. parameter/expression binding;
-4. dependency-aware recomputation;
-5. result/provenance identities;
-6. EngineeringContext access to materials, resources, regions, and fields;
-7. rule-driven CAD constraints;
-8. Engineering Supervision revision APIs.
+A real Rust operation-level endpoint/adaptor is the next kernel-integration increment. The application code does not falsely claim that the existing legacy endpoint already implements this new contract.

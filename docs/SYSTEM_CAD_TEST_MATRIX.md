@@ -162,3 +162,17 @@ A System-CAD increment is not complete merely because:
 Completion requires the affected architectural boundary to be demonstrated through the relevant integration, acceptance, red-team and complete vertical-slice gates, with exact execution evidence.
 
 For the current branch, the semantic reference foundation is implemented and heavily tested, while the mandatory cube/face/sketch/feature/result/topology/representation slice remains explicitly RED.
+
+
+## 9. Current incremental status — publication/provenance foundation
+
+The branch now contains a concrete **semantic publication/provenance layer** for published planar/shape targets:
+
+- `ShapePublicationSemantic` records publication identity, semantic target, declared result identity and topology-binding identity.
+- `TopologyBindingSemantic` records the semantic target, result identity and authoritative topology identity supplied by the binding contract.
+- Builder validation rejects duplicate publication IDs, duplicate topology-binding IDs, dangling publications, orphan bindings, and publication/binding mismatches.
+- Face references resolve only through a matching publication and matching topology binding; a bare `solid` geometry record is never interpreted as a Face.
+- Multiple publications of the same face target are ambiguous without a result selector and can be resolved by an exact result identity.
+- Compiled semantic projections retain publication identity separately from face target identity.
+
+This remains a **semantic contract boundary**, not yet authoritative mathematical result integration. The result identity and topology identity are not yet produced/verified by the Rust mathematical evaluation path. Therefore the mandatory cube vertical-slice RED gates remain open.

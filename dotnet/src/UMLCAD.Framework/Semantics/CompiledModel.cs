@@ -192,7 +192,18 @@ internal sealed class CompiledModelService : ICompiledModelService
 
                 var resolution = _referenceService.Resolve(application, semanticReference);
                 if (!resolution.IsResolved)
-                    throw new InvalidOperationException($"{resolution.DiagnosticCode}: {resolution.Message}");
+                {
+                    var category = resolution.Status switch
+                    {
+                        SemanticReferenceStatus.Missing => "REFERENCE_MISSING",
+                        SemanticReferenceStatus.Ambiguous => "REFERENCE_AMBIGUOUS",
+                        SemanticReferenceStatus.Indeterminate => "REFERENCE_INDETERMINATE",
+                        SemanticReferenceStatus.Unsupported => "REFERENCE_UNSUPPORTED",
+                        _ => "REFERENCE_FAILURE"
+                    };
+
+                    throw new InvalidOperationException($"{category}: {resolution.DiagnosticCode}: {resolution.Message}");
+                }
 
                 var targetId = NodeChildId(parentId, "geometry", resolution.Target!.TargetId);
                 AddRelationship(relationships, new CompiledRelationship(

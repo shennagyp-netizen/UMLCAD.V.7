@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "umlcad-app-e2e"
+version = "0.1.0"
+description = "UMLCAD.V.7 application-layer architecture and E2E gate"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+line-length = 120

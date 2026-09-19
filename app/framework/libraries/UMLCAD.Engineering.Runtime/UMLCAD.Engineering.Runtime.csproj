@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>UMLCAD.Engineering.Runtime</RootNamespace>
+    <AssemblyName>UMLCAD.Engineering.Runtime</AssemblyName>
+    <Description>Programmable engineering rules, typed engineering context, and controlled execution.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
+    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
+    <ProjectReference Include="../UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj" />
+  </ItemGroup>
+</Project>

@@ -37,4 +37,45 @@ public sealed class CadSemanticsTests
         Assert.Throws<ArgumentOutOfRangeException>(
             () => new UMLCAD.Cad.Expressions.ExpressionValue(double.NaN, "mm"));
     }
+
+    [Fact]
+    public void Document_Copies_Feature_Collection()
+    {
+        var features = new List<CadFeatureDefinition>
+        {
+            new(new CadId("f1"), CadFeatureKind.Feature, "Original")
+        };
+
+        var document = new CadDocumentDefinition(
+            new CadId("document-1"),
+            "Test",
+            features);
+
+        features.Clear();
+
+        Assert.Single(document.Features);
+        Assert.Equal(new CadId("f1"), document.Features[0].Id);
+    }
+
+    [Fact]
+    public void Snapshot_Cannot_Be_Modified_Through_IReadOnlyList_Cast()
+    {
+        var document = new CadDocumentDefinition(
+            new CadId("document-1"),
+            "Test",
+            [
+                new CadFeatureDefinition(
+                    new CadId("f1"),
+                    CadFeatureKind.Feature,
+                    "Original")
+            ]);
+
+        var snapshot = new UMLCAD.Cad.Semantics.CadDocumentSnapshot(
+            document.Id,
+            document.Name,
+            document.Features);
+
+        Assert.False(snapshot.Features is IList<CadFeatureDefinition>);
+    }
+
 }

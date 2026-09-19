@@ -835,6 +835,29 @@ Never introduce a duplicate semantic service or duplicate domain model merely to
 
 ---
 
+# 20.1.1 NEW .NET TYPE / METADATA RESEARCH RULE
+
+For **every new public or semantically important .NET class, interface, record, enum, attribute, metadata field, or option**, research the relevant external practice before committing the design.
+
+This is broader than checking whether an API compiles.
+
+The research must determine, where applicable:
+
+- whether an equivalent concept already exists in modern .NET;
+- established naming and API-shape conventions;
+- serialization and metadata implications;
+- nullability and mutability expectations;
+- DI/service registration conventions;
+- disposal/threading/lifetime requirements;
+- compatibility and versioning behavior;
+- relevant engineering/CAD/STEP/PLM standards or established industry terminology.
+
+For domain-specific UMLCAD concepts, the web research is used to validate **meaning and terminology**, not to copy another product's internal architecture.
+
+For example, semantic reference design must be informed by established CAD/product-data concepts such as shape portions, product occurrences, external models and representation relationships before UMLCAD defines its own semantic contracts. ISO 10303-1032:2024 explicitly covers identification of shape portions, relationships between shape portions, occurrence-context shape, and representation association; ISO 10303-1033:2014 covers externally supplied 3D geometric representations. Current Siemens Designcenter/NX material also documents persistent relations and external references as first-class engineering concepts. These sources inform terminology and coverage but do not override UMLCAD's authority model. url{ISO/TS 10303-1032:2024}https://www.iso.org/standard/89563.html
+
+Do not add a public type merely because its name sounds appropriate. Every new type must have a documented semantic owner, reason to exist, consumer, dependency direction, identity impact, and verification strategy.
+
 # 20.2 EXTERNAL DOCUMENTATION AND API RESEARCH LAW
 
 **Before introducing or materially changing any external framework/library type, package, attribute, metadata contract, or API behavior, perform explicit current external research. Do not rely on model memory.**

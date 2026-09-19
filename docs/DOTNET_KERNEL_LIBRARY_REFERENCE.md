@@ -1,1829 +1,530 @@
-# UMLCAD.V.7 .NET Kernel — Complete Library and Class Reference
+# UMLCAD.V.7 — Current .NET Libraries Reference
 
-## 1. Scope
+Authoritative baseline: main at merge commit ccdf4a6b7122d945456432a91cfc7398fa1f9738.
 
-This document describes every current production .NET library in dotnet/src on the audited main branch, and then maps every validation assembly that exercises those libraries.
+Scope: production .NET libraries currently present under dotnet/src/.
 
-The current production set contains exactly two libraries:
+This document describes current implementation only. Roadmaps and target-architecture documents remain separate.
 
-| Library | Project | Architectural role |
+IMPORTANT KERNEL BOUNDARY
+The engineering-library integration was selective. It changed no kernel/** files and no existing UMLCAD.Kernel.Client source files.
+
+---
+
+# 1. Current production library set
+
+dotnet/src currently contains exactly 12 production .NET libraries:
+
+| Library | Project | Responsibility |
 |---|---|---|
-| UMLCAD.Framework | dotnet/src/UMLCAD.Framework | Semantic application/build foundation. Owns authoring, semantic state, deterministic identity, registry/snapshot construction, build history, package generation, and compiled graph generation. |
-| UMLCAD.Kernel.Client | dotnet/src/UMLCAD.Kernel.Client | Process/HTTP integration boundary between .NET semantic state and the Rust kernel. Owns transport policy, cancellation, response-size defense, diagnostics, and compiled-result integrity validation. |
+| UMLCAD.Framework | dotnet/src/UMLCAD.Framework | Application composition, authoring API, semantic application state, build identity, package generation, history and compiled semantic graph |
+| UMLCAD.Kernel.Client | dotnet/src/UMLCAD.Kernel.Client | Existing .NET-to-Rust build/evaluation transport boundary |
+| UMLCAD.Cad.Contracts | dotnet/src/UMLCAD.Cad.Contracts | Versioned CAD, kernel-geometry, sketch-solver and representation contracts |
+| UMLCAD.Cad.Expressions | dotnet/src/UMLCAD.Cad.Expressions | Pure arithmetic expressions and deterministic expression identity |
+| UMLCAD.Cad.Semantics | dotnet/src/UMLCAD.Cad.Semantics | Feature semantics, references, authoritative-result semantics and product structure/BOM |
+| UMLCAD.Cad.Engine | dotnet/src/UMLCAD.Cad.Engine | Evaluation graph, planning, invalidation, execution, caching, references and result integration |
+| UMLCAD.Science | dotnet/src/UMLCAD.Science | Quantities, dimensions, materials and phenomena-simulation contracts |
+| UMLCAD.Engineering.Resources | dotnet/src/UMLCAD.Engineering.Resources | Machines, tools, processes, capabilities and compatibility |
+| UMLCAD.Engineering.SheetMetal | dotnet/src/UMLCAD.Engineering.SheetMetal | Sheet-metal semantics, bend expressions and manufacturing validation |
+| UMLCAD.Engineering.Cam | dotnet/src/UMLCAD.Engineering.Cam | CAM operations, toolpaths, postprocessing and deterministic NC/G-code |
+| UMLCAD.Engineering.Drawing | dotnet/src/UMLCAD.Engineering.Drawing | Drawing semantics, views, dimensions, annotations, dress-up, BOM presentation and associativity |
+| UMLCAD.Integration.Simulation | dotnet/src/UMLCAD.Integration.Simulation | Adapter boundary to external simulation applications |
 
-The following are test assemblies, not production libraries:
-
-- UMLCAD.Framework.Tests
-- UMLCAD.Kernel.Integration.Tests
-
-The mathematical kernel itself is Rust. The .NET side must not be interpreted as a second mathematical kernel.
-
----
-
-# 2. Solution and build environment
-
-The .NET solution is dotnet/UMLCAD.sln.
-
-The solution currently includes:
-
-- UMLCAD.Framework
-- UMLCAD.Kernel.Client
-- UMLCAD.Framework.Tests
-- UMLCAD.Demo
-
-The separate Kernel Integration test project exists in the repository and is executed by the system E2E harness even though the solution file is not its architectural authority.
-
-The SDK pin is dotnet/global.json:
-
-- SDK version: 10.0.401
-- rollForward: latestPatch
-- prerelease SDKs disabled
-
-Production projects use:
-
-- TargetFramework: net10.0
-- nullable enabled
-- implicit usings enabled
-- TreatWarningsAsErrors=true
-
-The Framework project uses Microsoft.Extensions configuration, dependency injection, hosting abstractions, and options.
-
-The Kernel Client project uses Microsoft.Extensions.Http and Microsoft.Extensions.Options and references UMLCAD.Framework.
+Test projects are not included in this production-library count.
 
 ---
 
-# 3. Architectural segmentation
+# 2. Global .NET policy
 
-The current .NET libraries are intentionally segmented by responsibility.
+All current production projects target net10.0, enable nullable reference types, enable implicit usings and treat warnings as errors.
 
-| Segment | Owner | Main types |
-|---|---|---|
-| Application entry/facade | Framework | CadApplication |
-| Application authoring/composition | Framework | CadApplicationBuilder |
-| Part authoring | Framework | PartBuilder |
-| Drawing authoring | Framework | DrawingBuilder |
-| Assembly authoring | Framework | AssemblyBuilder, AssemblyOccurrenceBuilder |
-| Semantic contracts | Framework | SemanticEntity and semantic records |
-| Semantic lookup | Framework | semantic service interfaces and implementations |
-| Registry/snapshot | Framework | ISemanticRegistry, SemanticRegistry |
-| History | Framework | IBuildHistory, BuildHistory, BuildSnapshot |
-| Package | Framework | IBuildPackageService, BuildPackageService, BuildPackage |
-| Compiled model | Framework | ICompiledModelService, CompiledModelService and result records |
-| Configuration boundary | Framework | ICadConfiguration, CadConfiguration |
-| Kernel transport configuration | Kernel.Client | RustKernelOptions |
-| Kernel service contract | Kernel.Client | IRustKernelService |
-| Kernel request result | Kernel.Client | KernelEvaluationResult, KernelDiagnostic |
-| Kernel transport implementation | Kernel.Client | RustKernelService |
-| Returned-result validator | Kernel.Client | CompiledModelValidator |
-| DI composition | Kernel.Client | RustKernelServiceCollectionExtensions |
+The SDK is pinned through dotnet/global.json.
 
-This is more important than the namespace names. The type segmentation defines the intended dependency direction.
+The semantic/domain layer uses immutable records, explicit validation, deterministic ordering and failure-closed states.
+
+The fundamental authority split is:
+
+.NET = engineering meaning, contracts and orchestration
+Rust = mathematical authority
+Derived representations = non-authoritative products
 
 ---
 
-# 4. UMLCAD.Framework
+# 3. UMLCAD.Cad.Contracts
 
-## 4.1 Library responsibility
+Project: dotnet/src/UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj
+Dependencies: none.
 
-UMLCAD.Framework is the current .NET semantic/build kernel.
+Purpose: stable versioned boundaries used by CAD evaluation and authoritative providers.
 
-It creates a deterministic semantic application state from authoring calls and produces two important downstream forms:
+Source files:
 
-1. BuildPackage for the current Rust-kernel transport contract.
-2. CompiledModelManifest for a deterministic graph representation of the semantic state.
+~~~
+AxisAlignedBoxSolidContracts.cs
+CadEvaluationContracts.cs
+CircularPrismSolidContracts.cs
+ExtrusionContracts.cs
+GeometryKernelStatus.cs
+KernelContracts.cs
+RepresentationContracts.cs
+SketchSolveContracts.cs
+UMLCAD.Cad.Contracts.csproj
+~~~
 
-It is not currently a full feature-evaluation engine.
+Principal contract groups:
 
-It does not implement:
+- CadId, CadResultId and TopologyEntityId
+- CadFrame, CadVector3 and CadBoundingBox3
+- ReferenceContext, TopologySelector, CadReference and ReferenceResolution
+- Box solid request/result and IAuthoritativeGeometryService
+- Circular-prism request/result and ICircularPrismGeometryService
+- Convex planar extrusion request/result and IExtrusionGeometryService
+- SketchSolveRequest, SketchSolveKernelResult and ISketchConstraintService
+- Generic kernel request/result and input-binding contracts
+- Representation identity, request and result contracts
 
-- general sketch solving;
-- B-Rep construction;
-- CAD topology algorithms;
-- CAM;
-- Sheet Metal;
-- physical simulation;
-- drawing projection mathematics;
-- rendering;
-- PLM.
+CadFrame validates finite origin, unit orthogonal axes and right-handed orientation.
 
-Those capabilities belong above or behind the appropriate domain/contracts.
+Reference states remain explicit: resolved, missing, ambiguous, indeterminate or unsupported.
 
----
-
-# 5. Application facade
-
-## 5.1 CadApplication
-
-File: dotnet/src/UMLCAD.Framework/CadApplication.cs
-
-Kind: public sealed partial class.
-
-### Purpose
-
-CadApplication is the runtime object returned after the authoring/build phase has succeeded.
-
-It is the stable façade for consuming the built semantic state.
-
-### Public creation entry point
-
-CreateBuilder() returns a new CadApplicationBuilder.
-
-### Public state
-
-Semantic:
-the built SemanticApplication snapshot.
-
-Configuration:
-the current IConfiguration.
-
-Services:
-the ServiceProvider created by the build process.
-
-### Public operations
-
-GetRequiredService<T>()
-Retrieves a registered service from the built provider.
-
-CreateBuildPackage()
-Obtains IBuildPackageService and creates the current BuildPackage.
-
-CreateCompiledModelManifest()
-Obtains ICompiledModelService and builds the current compiled semantic graph.
-
-Dispose()
-Disposes the owned ServiceProvider.
-
-### Ownership boundary
-
-CadApplication owns the lifetime of the DI container created for the application. The semantic snapshot itself is immutable record state.
-
-### Invariants
-
-A CadApplication is returned only after:
-
-- definition validation;
-- service-container construction;
-- semantic registration;
-- deterministic configuration normalization;
-- deterministic semantic ordering;
-- SHA-256 identity calculation;
-- semantic snapshot creation;
-- build-history recording.
-
-### Non-responsibilities
-
-CadApplication does not perform direct Rust calls. The transport boundary is UMLCAD.Kernel.Client.
+These contracts describe boundaries; they do not implement a duplicate mathematical kernel.
 
 ---
 
-# 6. Application authoring
+# 4. UMLCAD.Cad.Expressions
 
-## 6.1 CadApplicationBuilder
+Project: dotnet/src/UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj
+Dependencies: none.
 
-File: dotnet/src/UMLCAD.Framework/CadApplication.cs
+Source files:
 
-Kind: public sealed class.
+~~~
+ArithmeticExpression.cs
+ExpressionIdentity.cs
+UMLCAD.Cad.Expressions.csproj
+~~~
 
-CadApplicationBuilder is the primary application composition object.
+Principal types:
 
-### Mutable authoring state
+- ExpressionNode
+- ConstantExpression
+- VariableExpression
+- UnaryExpression
+- BinaryExpression
+- ExpressionIdentity
 
-- user service registrations;
-- ConfigurationManager;
-- BuildHistory instance;
-- application ID;
-- application version;
-- pending part definitions;
-- pending assembly definitions;
-- pending drawing definitions.
+Expressions support deterministic canonicalization and numerical evaluation.
 
-### Properties
+ExpressionIdentity is derived from SHA-256 over canonical expression structure.
 
-Services:
-IServiceCollection used to register application-owned services.
-
-Configuration:
-IConfigurationManager used to build application configuration.
-
-ApplicationId:
-required non-whitespace application identity.
-
-Version:
-required non-whitespace application version.
-
-### AddPart
-
-Accepts:
-
-- part ID;
-- part type;
-- optional PartBuilder configuration delegate.
-
-The builder is created, configured, converted into an internal PartDefinition, and retained until Build().
-
-### AddAssembly
-
-Accepts:
-
-- assembly ID;
-- assembly name;
-- optional AssemblyBuilder delegate.
-
-### AddDrawing
-
-Accepts:
-
-- drawing ID;
-- drawing name;
-- optional DrawingBuilder delegate.
-
-### Build
-
-Build is the most architecturally important method in the Framework.
-
-The sequence is:
-
-1. Validate global semantic definitions.
-2. Construct a new DI service collection.
-3. Copy user service registrations.
-4. Register configuration.
-5. Register build history.
-6. Register semantic application state.
-7. Register semantic lookup services.
-8. Register package service.
-9. Register semantic registry.
-10. Register compiled-model service.
-11. Build the service provider with ValidateScopes=true and ValidateOnBuild=true.
-12. Register the internal PartDefinition, AssemblyDefinition and DrawingDefinition values as semantic records.
-13. Resolve configuration into a sorted dictionary.
-14. Create the canonical pre-identity object.
-15. Serialize it using camel-case, compact JSON.
-16. Compute SHA-256.
-17. Create SemanticApplication.
-18. Publish that snapshot through SemanticApplicationState.
-19. Record the build.
-20. Return CadApplication.
-
-### Failure handling
-
-If post-provider construction fails, the provider is disposed before rethrowing. This avoids leaking the DI container on build failure.
+Identity must not depend on timestamps, object addresses, rendering state or incidental collection order.
 
 ---
 
-# 7. Definition validation
+# 5. UMLCAD.Cad.Semantics
 
-CadApplicationBuilder validates before publishing semantic state.
+Project: dotnet/src/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj
+Dependencies: UMLCAD.Cad.Expressions.
 
-## 7.1 Global definition identity
+Source files:
 
-Part IDs and assembly IDs share one global definition-ID namespace.
+~~~
+AuthoritativeResults.cs
+FeatureSpecifications.cs
+ProductStructure.cs
+References.cs
+UMLCAD.Cad.Semantics.csproj
+~~~
 
-Therefore:
+Principal responsibilities:
 
-Part ID = X
-and
-Assembly ID = X
+## Feature semantics
 
-is invalid.
+Typed feature intent, including the current bounded box/sketch/profile/extrusion structures.
 
-This prevents ambiguous cross-type definition references.
+These are semantic definitions and are never Rust geometry objects.
 
-## 7.2 Occurrence identity
+## Reference semantics
 
-Occurrence IDs must be unique within a containing assembly.
+Current concepts include:
 
-The uniqueness scope is deliberately local to the parent assembly.
+- ReferenceTargetKind
+- ReferenceResolutionStatus
+- ReferenceContextId
+- ReferencePathSegment
+- ReferencePath
+- CadReference
+- SemanticReference
+- GeometricReference
+- TopologyReference
+- ReferenceResolution
+- TopologyEvolution
+- TopologyEvolutionKind
 
-## 7.3 Definition references
+Topology evolution distinguishes preserved, replaced, split, merged, removed, introduced and ambiguous states.
 
-An occurrence can reference:
+## Authoritative result semantics
 
-- a part definition;
-- an assembly definition.
+Current concepts include:
 
-Unknown definitions are rejected.
+- AuthoritativeResultIdentity
+- AuthoritativeResultKind
+- AuthoritativeResultStatus
+- TopologyBinding
+- ResultEvidence
+- AuthoritativeCadResult
 
-Unknown definition kinds are rejected.
+## Product structure/BOM
 
-## 7.4 Assembly cycles
+Current concepts include:
 
-A depth-first visiting/visited algorithm detects circular assembly references.
+- SemanticId
+- ProductComponent
+- ProductOccurrence
+- ProductDefinition
+- BomLine
+- BomService
 
-A cycle such as:
-
-Assembly A -> Assembly B -> Assembly A
-
-fails the build.
-
-This is a semantic graph invariant, not a renderer restriction.
-
----
-
-# 8. PartBuilder
-
-File: dotnet/src/UMLCAD.Framework/CadApplication.cs
-
-Kind: public sealed class.
-
-PartBuilder is a mutable authoring object.
-
-## 8.1 Stored authoring domains
-
-- name
-- part number
-- description
-- material
-- manufacturer
-- vendor
-- revision
-- lifecycle state
-- author
-- document code
-- custom metadata
-- parameters
-- geometry descriptors
-- constraints
-- references
-- component identifiers
-
-## 8.2 Fluent API
-
-Name(value)
-sets the displayed semantic name.
-
-PartNumber(value)
-sets part number.
-
-Description(value)
-sets description.
-
-Material(value)
-sets material metadata.
-
-Manufacturer(value)
-sets manufacturer.
-
-Vendor(value)
-sets vendor.
-
-Revision(value)
-sets revision metadata.
-
-LifecycleState(value)
-sets lifecycle state.
-
-Author(value)
-sets author.
-
-DocumentCode(value)
-sets document/documentation code.
-
-Property(name, value)
-adds or replaces one custom metadata property.
-
-Parameter(name, value, unit)
-adds a semantic parameter.
-
-Geometry(id, kind, properties)
-adds a semantic geometry descriptor.
-
-Constraint(id, kind, references, properties)
-adds a semantic constraint descriptor.
-
-Reference(id)
-adds a semantic reference identifier.
-
-Component(id)
-adds a component identifier.
-
-## 8.3 Deterministic conversion
-
-The internal Build() operation sorts:
-
-- parameters by Name;
-- geometry by ID;
-- constraints by ID;
-- references by ID;
-- components by ID.
-
-It then creates CadMetadata using sorted custom properties.
-
-## 8.4 Important boundary
-
-Geometry() does not receive Rust geometry objects.
-
-The Framework stores descriptions such as:
-
-- kind = line;
-- start = 0,0;
-- end = 100,0.
-
-The authoritative mathematical layer interprets mathematical geometry.
-
-This is the critical separation between CAD semantics and numerical implementation.
+BOM generation groups occurrences by component identity, aggregates quantities and uses deterministic ordering.
 
 ---
 
-# 9. DrawingBuilder
+# 6. UMLCAD.Cad.Engine
 
-File: dotnet/src/UMLCAD.Framework/CadApplication.cs
+Project: dotnet/src/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj
+Dependencies:
 
-Kind: public sealed class.
+- UMLCAD.Cad.Expressions
+- UMLCAD.Cad.Semantics
+- UMLCAD.Cad.Contracts
 
-## Purpose
+Source files:
 
-Defines drawing intent and sheet structure.
+~~~
+AsyncEvaluationEngine.cs
+AuthoritativeCadReferenceResolver.cs
+AxisAlignedBoxSolidEvaluator.cs
+CadEvaluationEngine.cs
+CadModelEvaluator.cs
+ChangeSets.cs
+ConvexProfileExtrusionEvaluator.cs
+EvaluationCache.cs
+EvaluationEngine.cs
+EvaluationGraph.cs
+EvaluationIdentityBuilder.cs
+EvaluationStepFactory.cs
+FeatureEvaluation.cs
+IncrementalEvaluation.cs
+ReferenceResolver.cs
+ResultIntegration.cs
+UMLCAD.Cad.Engine.csproj
+~~~
 
-## State
+Purpose: execute semantic-to-authoritative-result orchestration without embedding a concrete mathematical implementation.
 
-- drawing settings;
-- part references;
-- sheets.
+Major concepts:
 
-## API
+- EvaluationInputIdentity
+- EvaluationStep
+- EvaluationPlan
+- EvaluationPlanner
+- EvaluationIdentity
+- EvaluationCache
+- CadChangeSet
+- IncrementalEvaluationPlan
+- IncrementalEvaluationPlanner
+- IAuthoritativeResultCatalog
+- AuthoritativeResultCatalog
+- ReferenceResolver
+- ICadReferenceResolver
+- AuthoritativeCadReferenceResolver
+- EvaluationOutcome
+- EvaluationEngine
+- AsyncEvaluationEngine
+- FeatureSpecificationCatalog
+- IAuthoritativeFeatureEvaluator
+- AxisAlignedBoxFeatureEvaluator
+- ConvexProfileExtrusionFeatureEvaluator
+- AuthoritativeFeatureStepExecutor
+- FeatureEvaluationExecutorFactory
+- ResultIntegrator
 
-Setting(name, value)
-sets a drawing setting.
+Evaluation identity is based on canonical semantic inputs, dependencies, configuration, tolerance and contract policy.
 
-Sheet(id, name, drawingReferences)
-adds a sheet.
+The cache is keyed by evaluation identity.
 
-PartReference(partId)
-adds a part reference.
+Incremental recomputation is an optimization and must remain semantically equivalent to full recomputation.
 
-## Determinism
-
-Sheets are sorted by ID.
-
-Part references are sorted.
-
-Settings are emitted in a sorted dictionary.
-
-## Non-responsibility
-
-DrawingBuilder does not calculate projections, dimensions, views, sections, or rendering.
-
----
-
-# 10. AssemblyBuilder
-
-File: dotnet/src/UMLCAD.Framework/CadApplication.cs
-
-Kind: public sealed class.
-
-## Purpose
-
-Defines assembly-level product structure and metadata.
-
-## Occurrence methods
-
-Part(occurrenceId, partId, name, configure)
-adds a part occurrence.
-
-Assembly(occurrenceId, assemblyId, name, configure)
-adds a nested assembly occurrence.
-
-Occurrence(occurrenceId, name, definitionId, definitionKind, configure)
-provides the fully generic occurrence construction method.
-
-## Metadata
-
-AssemblyBuilder supports:
-
-- part number;
-- description;
-- manufacturer;
-- vendor;
-- revision;
-- lifecycle state;
-- author;
-- document code;
-- custom properties;
-- settings.
-
-## Determinism
-
-Occurrences are sorted by occurrence ID before being transferred to AssemblyDefinition.
+The Engine orchestrates authoritative operations; it does not implement B-Rep mathematics, NURBS mathematics or the numerical solver.
 
 ---
 
-# 11. AssemblyOccurrenceBuilder
+# 7. UMLCAD.Science
 
-File: dotnet/src/UMLCAD.Framework/CadApplication.cs
+Project: dotnet/src/UMLCAD.Science/UMLCAD.Science.csproj
+Dependencies: UMLCAD.Cad.Expressions.
 
-Kind: public sealed class.
+Source files:
 
-This is the contextual instance object inside an assembly.
+~~~
+PhenomenaSimulationService.cs
+ScienceFoundation.cs
+UMLCAD.Science.csproj
+~~~
 
-## Fields/defaults
+Principal concepts:
 
-Transform:
-identity 4x4 matrix.
-
-Configuration:
-null.
-
-Quantity:
-1.
-
-BOM structure:
-null.
-
-Visible:
-true.
-
-Suppressed:
-false.
-
-Grounded:
-false.
-
-Flexible:
-false.
-
-## API
-
-Transform(matrix)
-sets a validated TransformSemantic.
-
-Configuration(value)
-sets configuration name.
-
-Quantity(value)
-sets occurrence quantity.
-
-BomStructure(value)
-sets BOM structure metadata.
-
-Visible(value)
-changes visibility.
-
-Suppressed(value)
-changes suppression.
-
-Grounded(value)
-marks grounded state.
-
-Flexible(value)
-marks flexible state.
-
-Property(name, value)
-adds occurrence metadata.
-
-## Quantity rules
-
-Quantity rejects:
-
-- zero;
-- negative values;
-- NaN;
-- infinity.
-
-## Architectural meaning
-
-An occurrence is not a second definition.
-
-A PartDefinition is reusable semantic definition state.
-
-An AssemblyOccurrenceSemantic is placement/contextual instance state.
-
-That distinction is fundamental for product structure.
-
----
-
-# 12. Internal definition records
-
-## 12.1 PartDefinition
-
-Internal record.
-
-Fields:
-
-- ID
-- Name
-- PartType
-- Parameters
-- Geometry
-- Constraints
-- References
-- Components
-- CadMetadata
-
-ToSemantic() converts it to PartSemantic.
-
-Its internal nature prevents mutable builder objects from being leaked as public semantic state.
-
-## 12.2 DrawingDefinition
-
-Internal record.
-
-Fields:
-
-- ID
-- Name
-- Sheets
-- PartReferences
-- Settings
-
-ToSemantic() produces DrawingSemantic.
-
-## 12.3 AssemblyDefinition
-
-Internal record.
-
-Fields:
-
-- ID
-- Name
-- Occurrences
-- Settings
-- CadMetadata
-
-ToSemantic() produces AssemblySemantic and preserves occurrence data and structured metadata.
-
----
-
-# 13. SemanticEntity
-
-File: dotnet/src/UMLCAD.Framework/Semantics/SemanticEntity.cs
-
-Kind: public abstract record.
-
-Common semantic identity base.
-
-Fields:
-
-- Id
-- Kind
-- Source
-- Metadata
-
-## Architectural role
-
-Provides shared identity and generic metadata without tying semantic data to a specific geometry implementation, rendering backend, or vendor library.
-
----
-
-# 14. Semantic records
-
-File: dotnet/src/UMLCAD.Framework/Semantics/SemanticModels.cs
-
-## 14.1 ParameterSemantic
-
-Fields:
-
-- Name
-- Value
-- Unit
-
-Current storage is string-based. The record describes semantic intent; numerical interpretation happens at the appropriate evaluation boundary.
-
-## 14.2 CadMetadata
-
-Structured engineering metadata.
-
-Standard properties:
-
-- PartNumber
-- Description
-- Material
-- Manufacturer
-- Vendor
-- Revision
-- LifecycleState
-- Author
-- DocumentCode
-- Custom
-
-CadMetadata implements IReadOnlyDictionary<string,string>.
-
-Known properties are converted to stable keys.
-
-Custom properties use the prefix:
-
-custom:<name>
-
-The generated dictionary is sorted with ordinal comparison.
-
-## 14.3 GeometrySemantic
-
-Fields:
-
-- Id
-- Kind
-- Properties
-
-Derives from SemanticEntity.
-
-This is a semantic geometry descriptor, not a mathematical geometry object.
-
-## 14.4 ConstraintSemantic
-
-Fields:
-
-- Id
-- Kind
-- References
-- Properties
-
-References identify semantic targets.
-
-## 14.5 ComponentSemantic
-
-Fields:
-
-- Id
-- ComponentType
-- Children
-- Parameters
-
-Represents generic semantic component information.
-
-It is not the compiled assembly occurrence graph.
-
-## 14.6 TransformSemantic
-
-Field:
-
-Matrix
-
-The matrix contains 16 double values.
-
-### Identity
-
-Identity is the standard 4x4 homogeneous identity matrix.
-
-### FromArray
-
-Validates:
-
-- non-null input;
-- exactly 16 values;
-- no NaN;
-- no infinity;
-- homogeneous element at index 15 is non-zero.
-
-This validates structural transform input.
-
-It does not claim that every matrix is a valid rigid-body transformation.
-
-## 14.7 AssemblyOccurrenceSemantic
-
-Fields:
-
-- Id
-- Name
-- DefinitionId
-- DefinitionKind
-- Transform
-- Metadata
-- ConfigurationName
+- QuantityDimension
 - Quantity
-- BomStructure
-- Visible
-- Suppressed
-- Grounded
-- Flexible
+- MaterialFamily
+- MaterialProperties
+- Material
+- PhenomenonKind
+- PhenomenaSimulationRequest
+- PhenomenaSimulationResult
+- IPhenomenaSimulationProvider
+- IPhenomenaSimulationService
+- PhenomenaSimulationService
 
-This is the core current occurrence contract.
+Quantity dimensions currently cover length, mass, time and temperature powers.
 
-## 14.8 PartSemantic
+Material semantics provide shared physical properties.
 
-Fields:
+Phenomena simulation is provider-neutral. This library defines the service boundary rather than becoming a general-purpose physics solver.
 
-- Id
-- PartType
-- Parameters
-- Geometry
-- Constraints
-- References
-- Components
+---
 
-Additional properties:
+# 8. UMLCAD.Engineering.Resources
 
-- Name
-- StructuredMetadata
+Project: dotnet/src/UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj
+Dependencies:
 
-This is the semantic part definition, not the resulting B-Rep.
+- UMLCAD.Cad.Expressions
+- UMLCAD.Science
 
-## 14.9 SheetSemantic
+Source file:
 
-Fields:
+~~~
+EngineeringResources.cs
+~~~
 
-- Id
-- Name
-- DrawingReferences
-- Settings
+Principal concepts:
 
-## 14.10 DrawingSemantic
+- MachineKind
+- ToolKind
+- ManufacturingProcessKind
+- MachineCapability
+- ToolDefinition
+- MachineDefinition
+- MachineProcessCompatibility
+- ToolProcessCompatibility
+- MachineToolCompatibility
 
-Fields:
+Current machine categories include machining center, lathe, wire EDM, press brake, laser cutter, waterjet and grinding machine.
 
-- Id
-- Name
-- Sheets
-- PartReferences
-- Settings
+Current manufacturing process categories include milling, turning, wire EDM cutting, sheet-metal bending, laser cutting, waterjet cutting and grinding.
 
-## 14.11 AssemblySemantic
+Compatibility is fail-closed.
 
-Fields:
+Machine capability checks process and stock-thickness range.
 
-- Id
-- Name
-- ComponentReferences
-- Settings
+Tool checks include interface and diameter constraints.
 
-Additional properties:
+---
 
-- StructuredMetadata
-- Occurrences
+# 9. UMLCAD.Engineering.SheetMetal
 
-## 14.12 SemanticApplication
+Project: dotnet/src/UMLCAD.Engineering.SheetMetal/UMLCAD.Engineering.SheetMetal.csproj
+Dependencies:
 
-Top-level snapshot.
+- UMLCAD.Cad.Expressions
+- UMLCAD.Cad.Semantics
+- UMLCAD.Science
+- UMLCAD.Engineering.Resources
 
-Fields:
+Source files:
 
-- Id
-- Version
+~~~
+SheetMetalExpressions.cs
+SheetMetalSemantics.cs
+UMLCAD.Engineering.SheetMetal.csproj
+~~~
+
+Principal concepts:
+
+- SheetMetalPartDefinition
+- BendDefinition
+- SheetMetalValidationResult
+- SheetMetalValidator
+
+The current bend-allowance expression is represented through the shared expression AST using the relationship:
+
+((pi / 180) * (R + (K * T)) * A)
+
+Validation connects material, thickness, ductility, bend radius and manufacturing-resource compatibility.
+
+Current scope is a semantic/manufacturing foundation.
+
+It is not yet a complete exact sheet-metal geometric engine for all flange, relief, folding, unfolding and flat-pattern B-Rep behavior.
+
+---
+
+# 10. UMLCAD.Engineering.Cam
+
+Project: dotnet/src/UMLCAD.Engineering.Cam/UMLCAD.Engineering.Cam.csproj
+Dependencies:
+
+- UMLCAD.Cad.Expressions
+- UMLCAD.Cad.Semantics
+- UMLCAD.Science
+- UMLCAD.Engineering.Resources
+
+Source files:
+
+~~~
+CamAndGCode.cs
+UMLCAD.Engineering.Cam.csproj
+~~~
+
+Principal concepts:
+
+- ToolpathPoint
+- ManufacturingOperation
+- NcProgram
+- INcPostprocessor
+- DeterministicGCodePostprocessor
+- CamPhenomenaAdvisor
+
+NcProgram supports deterministic serialization and SHA-256 content hashing.
+
+DeterministicGCodePostprocessor currently emits bounded milling G-code after machine/tool/process compatibility checks.
+
+Current output semantics include metric units, absolute positioning, tool identification, first-point rapid motion, subsequent linear moves and program termination.
+
+CAM may use Science phenomena services but does not own a second simulation engine.
+
+Current scope is a CAM manufacturing foundation, not a complete B-Rep-driven toolpath planner for every machining strategy.
+
+---
+
+# 11. UMLCAD.Engineering.Drawing
+
+Project: dotnet/src/UMLCAD.Engineering.Drawing/UMLCAD.Engineering.Drawing.csproj
+Dependencies:
+
+- UMLCAD.Cad.Expressions
+- UMLCAD.Cad.Semantics
+- UMLCAD.Science
+
+Source files:
+
+~~~
+DrawingAdvancedSemantics.cs
+DrawingSemantics.cs
+UMLCAD.Engineering.Drawing.csproj
+~~~
+
+Current drafting vocabulary includes:
+
+- DrawingStandard: ISO, ANSI, JIS
+- DrawingViewKind: orthographic, isometric, auxiliary, section, detail, clipping, broken, unfolded and related modes
+- DimensionKind: linear, angular, radius, diameter, coordinate, baseline, chain
+- AnnotationKind: text, note, leader, balloon, datum, datum target, geometric tolerance, surface roughness, welding symbol and flag note
+- DressUpKind: centerline, axis, symmetry line, thread line, hatch/fill, break line and markup
+
+Principal semantic types include:
+
+- DrawingSheet
+- DrawingView
+- DrawingDimension
+- DrawingAnnotation
+- DrawingCapabilityMatrix
+- MechanicalDraftingCapabilityProfile
+- DrawingAssociativityState
+- ViewDisplayMode
+- ViewAxis
+- DrawingViewSpecification
+- DrawingBomItem
+- DrawingBomTable
+- DrawingSheetPresentation
+
+Drawing views are associated with authoritative CAD-result identities.
+
+Associativity explicitly supports Associative, NeedsUpdate, MissingReference, AmbiguousReference and Unsupported states.
+
+Current scope is drawing meaning and association. Complete projection, section and hidden-line mathematical generation remains separate work.
+
+---
+
+# 12. UMLCAD.Integration.Simulation
+
+Project: dotnet/src/UMLCAD.Integration.Simulation/UMLCAD.Integration.Simulation.csproj
+Dependencies: UMLCAD.Science.
+
+Source files:
+
+~~~
+SimulationApplicationAdapter.cs
+UMLCAD.Integration.Simulation.csproj
+~~~
+
+Principal concepts:
+
+- ISimulationApplicationAdapter
+- SimulationApplicationProvider
+
+The provider delegates capability and simulation execution to an external application adapter.
+
+Results are checked against request identity, phenomenon identity and provider identity.
+
+This library is the external-provider boundary and does not own simulation mathematics.
+
+---
+
+# 13. UMLCAD.Framework
+
+Project: dotnet/src/UMLCAD.Framework/UMLCAD.Framework.csproj
+
+External Microsoft.Extensions dependencies:
+
 - Configuration
-- Parts
-- Assemblies
-- Drawings
-- BuildIdentity
-
-This record is the Framework's central semantic state.
-
----
-
-# 15. Semantic application access
-
-File: dotnet/src/UMLCAD.Framework/Semantics/SemanticServices.cs
-
-## 15.1 IPartSemanticService
-
-Get(id)
-returns one PartSemantic or null.
-
-GetAll()
-returns all current parts.
-
-## 15.2 IDrawingSemanticService
-
-Get(id)
-returns one DrawingSemantic or null.
-
-GetAll()
-returns all current drawings.
-
-## 15.3 ISheetSemanticService
-
-Get(drawingId, sheetId)
-resolves a sheet through its containing drawing.
-
-## 15.4 IAssemblySemanticService
-
-Get(id)
-returns one AssemblySemantic or null.
-
-GetAll()
-returns all current assemblies.
-
-## 15.5 ISemanticApplication
-
-Exposes:
-
-Current
-
-This is the controlled state publication boundary.
-
----
-
-# 16. SemanticApplicationState
-
-Internal implementation of ISemanticApplication.
-
-Before Build() completes, Current throws because no valid semantic application exists.
-
-After Build():
-
-SetCurrent(application)
-
-publishes the semantic snapshot.
-
-## Architectural purpose
-
-Lookup services do not own duplicate semantic state.
-
-They all read from the same published SemanticApplication.
-
----
-
-# 17. Semantic lookup implementations
-
-## PartSemanticService
-
-Internal.
-
-Performs ordinal-ID lookup through the current application.
-
-## DrawingSemanticService
-
-Internal.
-
-Performs ordinal-ID lookup through current drawings.
-
-## SheetSemanticService
-
-Internal.
-
-Resolves:
-
-drawing ID -> drawing -> sheet ID -> sheet.
-
-## AssemblySemanticService
-
-Internal.
-
-Performs ordinal-ID lookup through current assemblies.
-
-None of these implementations introduce an independent persistent cache.
-
----
-
-# 18. Semantic registry
-
-File: dotnet/src/UMLCAD.Framework/Semantics/ISemanticRegistry.cs
-
-## 18.1 ISemanticRegistry
-
-Public construction-time interface.
-
-RegisterPart(part)
-RegisterAssembly(assembly)
-RegisterDrawing(drawing)
-
-Snapshot(applicationId, version, configuration, buildIdentity)
-
-## 18.2 SemanticRegistry
-
-Internal implementation.
-
-Maintains three ordinal-keyed dictionaries:
-
-- parts;
-- assemblies;
-- drawings.
-
-### Registration invariants
-
-- IDs cannot be empty;
-- duplicate IDs in each collection are rejected;
-- snapshot order is deterministic.
-
-### Snapshot behavior
-
-Configuration is converted to a sorted dictionary.
-
-Parts, assemblies and drawings are sorted ordinally.
-
-The supplied build identity is carried into the resulting SemanticApplication.
-
----
-
-# 19. Build history
-
-File: dotnet/src/UMLCAD.Framework/Semantics/BuildHistory.cs
-
-## 19.1 BuildSnapshot
-
-Fields:
-
-- Sequence
-- Application
-- CreatedAt
-- PackageIdentity
-
-Sequence is the position in the in-memory history.
-
-PackageIdentity is the semantic/package identity.
-
-They have different meanings and must not be merged.
-
-## 19.2 IBuildHistory
-
-Current:
-returns the latest BuildSnapshot.
-
-GetAll():
-returns all snapshots.
-
-TryGet(sequence):
-looks up a snapshot by sequence.
-
-Record(application, packageIdentity):
-records a new snapshot.
-
-## 19.3 BuildHistory
-
-Internal, thread-safe implementation.
-
-Uses a private gate for:
-
-- current access;
-- list retrieval;
-- lookup;
-- record.
-
-Each record increments the sequence.
-
-CreatedAt uses UTC.
-
-### Scope
-
-This is application-memory history.
-
-It is not yet persistent PDM/PLM lifecycle history.
-
----
-
-# 20. Build package
-
-File: dotnet/src/UMLCAD.Framework/Semantics/BuildPackage.cs
-
-## 20.1 BuildPackage
-
-Fields:
-
-- Schema
-- ApplicationId
-- ApplicationVersion
-- BuildIdentity
-- Semantic
-
-Current schema:
-
-uml-cad-build-package/1.0.0
-
-This is the current bridge contract to kernel evaluation.
-
-## 20.2 IBuildPackageService
-
-CreatePackage(application)
-
-Serialize(package)
-
-SerializeToString(package)
-
-## 20.3 BuildPackageService
-
-Internal implementation.
-
-Serialization uses:
-
-- camel-case naming;
-- compact JSON;
-- explicit null handling.
-
-It can produce UTF-8 bytes or a string.
-
-### Architectural limitation
-
-This package is the current transport bridge. It should not automatically become the permanent canonical System-CAD interchange format.
-
----
-
-# 21. Compiled model contract
-
-File: dotnet/src/UMLCAD.Framework/Semantics/CompiledModel.cs
-
-## 21.1 CompiledModelPackage
-
-Fields:
-
-- Schema
-- ApplicationId
-- ApplicationVersion
-- BuildIdentity
-- Manifest
-- RenderArtifact
-- Diagnostics
-
-## 21.2 CompiledModelManifest
-
-Fields:
-
-- Schema
-- ApplicationId
-- ApplicationVersion
-- BuildIdentity
-- RootNodeIds
-- Nodes
-- Relationships
-- Representations
-- TopologyBindings
-- SourceBindings
-- Diagnostics
-
-This is the current compiled semantic graph contract.
-
----
-
-# 22. CompiledNode
-
-Fields:
-
-- Id
-- Name
-- Kind
-- ParentId
-- ChildIds
-- Metadata
-- RelationshipIds
-- RepresentationIds
-- Capabilities
-- Source
-- State
-
-A node is a semantic graph object after compilation.
-
-The node does not derive its identity from array position.
-
----
-
-# 23. CompiledRelationship
-
-Fields:
-
-- Id
-- Kind
-- SourceId
-- TargetIds
-- Metadata
-
-Relationships are explicit graph edges.
-
-They are not reconstructed from child order.
-
----
-
-# 24. CompiledRepresentation
-
-Fields:
-
-- Id
-- Kind
-- ArtifactId
-- RenderNodeId
-- Bounds
-- Capabilities
-- SelectableSubTargets
-
-Represents derived consumer/presentation information.
-
-It does not become geometry authority.
-
----
-
-# 25. CompiledTopologyBinding
-
-Fields:
-
-- Id
-- TopologyKind
-- SemanticNodeId
-- ArtifactId
-- RenderPrimitiveId
-- Name
-- Nomenclature
-- Number
-- Bounds
-- Metadata
-
-This type bridges semantic/topological meaning to a representation primitive.
-
-It is not a declaration that the render primitive defines topology.
-
----
-
-# 26. CompiledSourceBinding
-
-Fields:
-
-- File
-- Symbol
-- Start
-- End
-- Revision
-
-This is provenance metadata.
-
-It answers where source information came from without making a source path the semantic identity.
-
----
-
-# 27. CompiledCapabilities
-
-Fields:
-
-- Visible
-- Hideable
-- Selectable
-- Focusable
-
-These describe presentation capabilities.
-
-They are not engineering properties.
-
----
-
-# 28. CompiledRenderArtifact
-
-Fields:
-
-- ArtifactId
-- BuildIdentity
-- Format
-- MediaType
-- AssetIdentity
-- SizeBytes
-- IntegritySha256
-- Uri
-- InlineBase64
-- Properties
-
-The BuildIdentity link is critical: derived assets are attached to the same semantic build identity as the authoritative result.
-
----
-
-# 29. CompiledDiagnostic
-
-Fields:
-
-- Code
-- Severity
-- Message
-- TargetId
-
-Diagnostics provide structured non-success and informational evidence at compiled-model level.
-
----
-
-# 30. ICompiledModelService
-
-Public interface.
-
-Create(application)
-
-Produces a CompiledModelManifest from SemanticApplication.
-
-This is the Framework semantic-to-compiled-graph boundary.
-
----
-
-# 31. CompiledModelService
-
-Internal implementation.
-
-## 31.1 Part compilation
-
-For each part, ordered by ID:
-
-1. create definition ID;
-2. compile geometry child nodes;
-3. compile constraint child nodes;
-4. create constraint-reference relationships;
-5. create the part definition node.
-
-## 31.2 Assembly compilation
-
-For each assembly, ordered by ID:
-
-1. create assembly definition node;
-2. process each occurrence in sorted order;
-3. recursively compile nested assemblies;
-4. recursively compile part geometry/constraint children;
-5. create instantiation relationships.
-
-## 31.3 Root calculation
-
-An assembly is a root if it is not referenced by another assembly.
-
-A part is a root if it is not referenced by an assembly occurrence.
-
-The root list is deterministic.
-
-## 31.4 Graph validation
-
-The compiler rejects:
-
-- missing root;
-- missing parent;
-- missing child;
-- child whose ParentId does not point back;
-- missing relationship source;
-- missing relationship target;
-- duplicate node identity;
-- duplicate relationship identity.
-
-## 31.5 Identity construction
-
-Definition IDs use:
-
-definition:part:<encoded-id>
-definition:assembly:<encoded-id>
-
-Occurrence IDs use:
-
-occurrence:<assembly-id>/<occurrence-id>
-
-Child IDs use parent-scoped paths.
-
-User ID segments are URI-encoded.
-
-This is specifically designed to avoid collisions from user IDs containing slash, colon or other structural delimiters.
-
----
-
-# 32. Configuration library segment
-
-File: dotnet/src/UMLCAD.Framework/Configuration/CadConfiguration.cs
-
-## ICadConfiguration
-
-Public abstraction.
-
-Current:
-returns IConfiguration.
-
-## CadConfiguration
-
-Internal adapter around Microsoft.Extensions.Configuration.
-
-It contains no CAD business semantics.
-
-Its architectural purpose is dependency inversion: consumers can depend on the Framework abstraction instead of introducing a custom configuration implementation.
-
----
-
-# 33. UMLCAD.Kernel.Client
-
-## 33.1 Library responsibility
-
-This library is the .NET-to-Rust process boundary.
-
-It must remain thin.
-
-It does not own:
-
-- CAD semantic definitions;
-- feature-tree authority;
-- mathematical geometry;
-- solver algorithms;
-- B-Rep;
-- rendering;
-- CAM;
-- simulation.
-
-It owns the communication contract and the integrity checks required when data crosses the process boundary.
-
----
-
-# 34. RustKernelOptions
-
-File: dotnet/src/UMLCAD.Kernel.Client/RustKernelService.cs
-
-Kind: public sealed class.
-
-Properties:
-
-BaseAddress
-Default: http://localhost:8080/
-
-EvaluatePath
-Default: v1/build/evaluate
-
-RequestTimeout
-Default: two minutes.
-
-MaxResponseBytes
-Default: 256 MiB.
-
-## Registration validation
-
-BaseAddress:
-
-- must be absolute;
-- scheme must be HTTP or HTTPS.
-
-EvaluatePath:
-
-- cannot be empty;
-- must be relative.
-
-RequestTimeout:
-
-- must be greater than zero;
-- must be at most one hour.
-
-MaxResponseBytes:
-
-- must be greater than zero;
-- must be at most 2 GiB.
-
----
-
-# 35. IRustKernelService
-
-Public interface.
-
-EvaluateAsync(package, cancellationToken)
-
-is the only required operation.
-
-It deliberately does not expose:
-
-- HttpClient;
-- sockets;
-- process handles;
-- JSON stream implementation;
-- retry implementation.
-
----
-
-# 36. KernelEvaluationResult
-
-Fields:
-
-- Succeeded
-- CompiledModel
-- Diagnostics
-
-The result distinguishes successful execution from the presence/absence of a compiled model and diagnostic evidence.
-
----
-
-# 37. KernelDiagnostic
-
-Fields:
-
-- Code
-- Severity
-- Message
-- TargetId
-
-The code is the stable machine-readable category.
-
----
-
-# 38. RustKernelService
-
-Public sealed implementation of IRustKernelService.
-
-## 38.1 Request sequence
-
-1. Reject null package.
-2. Create a linked cancellation token source.
-3. Apply configured timeout.
-4. POST BuildPackage JSON.
-5. Check advertised Content-Length.
-6. Stream response into a bounded buffer.
-7. Handle non-success HTTP status.
-8. Reject empty body.
-9. Deserialize KernelEvaluationResult.
-10. Validate CompiledModelPackage when present.
-11. Return structured result.
-
-## 38.2 Caller cancellation versus timeout
-
-Caller cancellation is preserved and re-thrown.
-
-A service timeout becomes KERNEL_TIMEOUT.
-
-This distinction is deliberate: cancellation is not equivalent to a failed kernel evaluation.
-
-## 38.3 Resource-limit behavior
-
-Response size is guarded twice:
-
-- declared Content-Length;
-- actual streamed body size.
-
-This prevents an oversized response from passing merely because its final byte count was checked late.
-
-## 38.4 Stable diagnostic mapping
-
-KERNEL_RESPONSE_TOO_LARGE:
-response exceeds configured limit.
-
-KERNEL_HTTP:
-kernel returned non-success HTTP status.
-
-KERNEL_EMPTY_RESPONSE:
-response body was empty/unusable.
-
-KERNEL_TRANSPORT:
-HTTP transport failure.
-
-KERNEL_TIMEOUT:
-configured timeout expired.
-
-KERNEL_INVALID_JSON:
-response is not valid JSON.
-
-KERNEL_CLIENT:
-unexpected client-side exception.
-
-KERNEL_INVALID_RESULT:
-returned compiled model violates integrity validation.
-
----
-
-# 39. CompiledModelValidator
-
-Internal static class.
-
-This is the result-integrity firewall.
-
-## Identity checks
-
-Requires:
-
-package BuildIdentity == expected BuildIdentity
-
-Manifest BuildIdentity == expected BuildIdentity
-
-Manifest ApplicationId == package ApplicationId
-
-Manifest ApplicationVersion == package ApplicationVersion
-
-## Graph checks
-
-Rejects:
-
-- duplicate node IDs;
-- unresolved root IDs;
-- unresolved relationship source IDs;
-- unresolved relationship target IDs.
-
-## Representation check
-
-If a render artifact exists:
-
-RenderArtifact.BuildIdentity must equal the submitted BuildIdentity.
-
-## Why this matters
-
-Valid JSON is not equivalent to a valid CAD result.
-
-A server can return well-formed JSON containing:
-
-- stale geometry;
-- another application's graph;
-- another build;
-- wrong roots;
-- broken relationship references.
-
-CompiledModelValidator prevents those values from being silently accepted as the current build.
-
----
-
-# 40. RustKernelServiceCollectionExtensions
-
-Public static extension class.
-
-Main method:
-
-AddRustKernel(services, configure)
-
-Responsibilities:
-
-1. create default options;
-2. apply optional configuration;
-3. validate options;
-4. register RustKernelOptions;
-5. configure HttpClient;
-6. register IRustKernelService -> RustKernelService.
-
-This is the composition-root adapter.
-
-The application layer depends on the interface, while DI selects the concrete HTTP implementation.
-
----
-
-# 41. Dependency graph
-
-Current production dependency graph:
-
-UMLCAD.Kernel.Client
-    -> UMLCAD.Framework
-
-UMLCAD.Framework
-    -> Microsoft.Extensions.Configuration
-    -> Microsoft.Extensions.DependencyInjection
-    -> Microsoft.Extensions.Hosting.Abstractions
-    -> Microsoft.Extensions.Options
-
-UMLCAD.Kernel.Client
-    -> Microsoft.Extensions.Http
-    -> Microsoft.Extensions.Options
-
-UMLCAD.Kernel.Client
-    -> HTTP
-    -> Rust kernel host
-
-There is no direct Framework dependency on Rust implementation assemblies.
-
----
-
-# 42. Semantic data-flow
-
-The complete current .NET path is:
-
-Authoring
-    -> CadApplicationBuilder
-    -> PartBuilder / AssemblyBuilder / DrawingBuilder
-    -> internal Definition records
-    -> SemanticRegistry
-    -> SemanticApplication
-
-Identity
-    -> canonical ordered content
-    -> compact camel-case JSON
-    -> SHA-256
-    -> BuildIdentity
-
-Transport
-    -> SemanticApplication
-    -> BuildPackage
-    -> IRustKernelService
-    -> RustKernelService
-    -> HTTP
-    -> Rust kernel
-    -> KernelEvaluationResult
-    -> CompiledModelValidator
-    -> caller
-
-Compiled graph
-    -> SemanticApplication
-    -> CompiledModelService
-    -> nodes + relationships
-    -> graph validation
-    -> CompiledModelManifest
-
----
-
-# 43. Validation assemblies
-
-## 43.1 UMLCAD.Framework.Tests
-
-This assembly validates Framework and client components.
-
-### SemanticBuildTests
-
-Verifies:
-
-- application construction;
-- application ID/version;
-- configuration transfer;
-- part semantics;
-- parameter storage;
-- geometry descriptors;
-- constraints;
-- drawing definitions;
-- sheet definitions;
-- service registration.
-
-### CompiledModelTests
-
-Verifies:
-
-- nested assemblies;
-- part occurrences;
-- metadata;
-- BOM-related occurrence metadata;
-- compiled nodes;
-- compiled relationships;
-- product structure survival.
-
-### IdentityCollisionTests
-
-Specifically attacks:
-
-- path-like user IDs;
-- colon-containing IDs;
-- slash-containing IDs;
-- compiled definition collisions;
-- duplicate geometry identity.
-
-This validates URI-encoded structural identity.
-
-### AdversarialEdgeCaseTests
-
-Attacks:
-
-- empty application;
-- whitespace identifiers;
-- global definition collisions;
-- duplicate occurrence identity;
-- other semantic edge conditions.
-
-### RustKernelClientTests
-
-Tests:
-
-- successful response;
-- HTTP errors;
-- empty response;
-- invalid JSON;
-- transport errors;
-- timeout;
-- response-size limits;
-- invalid compiled result.
-
-### RustKernelEndToEndTests
-
-Uses a real running Rust kernel.
-
-It verifies:
-
-- Framework package creation;
-- real process boundary;
-- compiled model schema;
-- BuildIdentity preservation;
-- application identity;
-- expected semantic nodes.
-
-### Test philosophy
-
-This assembly is the component-level and client-level authority. It must not be treated as a substitute for the black-box system tests.
-
----
-
-# 44. UMLCAD.Kernel.Integration.Tests
-
-This assembly validates the production process boundary.
-
-## 44.1 KernelBlackBoxE2ETests
-
-Verifies:
-
-- production client round-trip;
-- rectangle semantic graph;
-- build identity preservation;
-- compiled node identity;
-- invalid geometry rejection;
-- stale reference rejection;
-- concurrent request isolation;
-- schema rejection;
-- unsupported geometry rejection.
-
-### Concurrency test meaning
-
-Twelve distinct applications are evaluated concurrently.
-
-The test requires:
-
-- each result remains associated with the correct application;
-- no BuildIdentity crossover;
-- no result contamination between requests.
-
-This is essential for a process-level kernel service.
-
-## 44.2 AssemblyGraphE2ETests
-
-Verifies that nested product structure survives the real HTTP boundary.
-
-The scenario contains:
-
-- a part;
-- a subassembly;
-- a top-level assembly;
-- a nested assembly occurrence;
-- a direct part occurrence.
-
-The expected compiled graph is checked after crossing the real kernel boundary.
-
-This test is important because it proves assembly meaning is not merely an in-memory Framework artifact.
-
----
-
-# 45. Class segmentation by ownership
-
-## Public authoring classes
-
-- CadApplicationBuilder
+- Configuration.Abstractions
+- DependencyInjection
+- DependencyInjection.Abstractions
+- Hosting.Abstractions
+- Options
+
+Source files currently on main:
+
+~~~
+CadApplication.cs
+Configuration/CadConfiguration.cs
+Semantics/BuildHistory.cs
+Semantics/BuildPackage.cs
+Semantics/CompiledModel.cs
+Semantics/ISemanticRegistry.cs
+Semantics/SemanticEntity.cs
+Semantics/SemanticModels.cs
+Semantics/SemanticServices.cs
+UMLCAD.Framework.csproj
+~~~
+
+Principal responsibilities:
+
+- CadApplication and CadApplicationBuilder
 - PartBuilder
 - DrawingBuilder
 - AssemblyBuilder
 - AssemblyOccurrenceBuilder
+- semantic snapshot publication
+- semantic lookup services
+- deterministic build identity
+- build history
+- BuildPackage creation
+- compiled semantic graph generation
+- configuration abstraction
 
-## Public application façade
-
-- CadApplication
-
-## Public semantic records
+Core semantic types include:
 
 - SemanticEntity
 - ParameterSemantic
@@ -1839,7 +540,7 @@ This test is important because it proves assembly meaning is not merely an in-me
 - AssemblySemantic
 - SemanticApplication
 
-## Public semantic service contracts
+Core application services include:
 
 - ISemanticApplication
 - IPartSemanticService
@@ -1852,251 +553,410 @@ This test is important because it proves assembly meaning is not merely an in-me
 - ICompiledModelService
 - ICadConfiguration
 
-## Public package/result contracts
+BuildPackage currently uses the uml-cad-build-package/1.0.0 bridge contract.
 
-- BuildSnapshot
-- BuildPackage
-- CompiledModelPackage
-- CompiledModelManifest
-- CompiledNode
-- CompiledRelationship
-- CompiledRepresentation
-- CompiledTopologyBinding
-- CompiledSourceBinding
-- CompiledCapabilities
-- CompiledRenderArtifact
-- CompiledDiagnostic
+CompiledModelPackage and CompiledModelManifest represent a compiled semantic graph plus derived representation metadata.
 
-## Public kernel-client contracts
+Framework remains application/build infrastructure. It is not the newer mathematical evaluation kernel.
+
+---
+
+# 14. UMLCAD.Kernel.Client
+
+Project: dotnet/src/UMLCAD.Kernel.Client/UMLCAD.Kernel.Client.csproj
+
+Current project dependency on main:
+
+- UMLCAD.Framework
+
+Source files currently on main:
+
+~~~
+RustKernelService.cs
+UMLCAD.Kernel.Client.csproj
+~~~
+
+This is intentionally the existing pre-S1 transport library. The S1-only Rust geometry adapter files were not imported by the engineering-library merge.
+
+Principal types:
 
 - RustKernelOptions
 - IRustKernelService
 - KernelEvaluationResult
 - KernelDiagnostic
-
-## Internal orchestration
-
-- PartDefinition
-- DrawingDefinition
-- AssemblyDefinition
-- SemanticApplicationState
-- PartSemanticService
-- DrawingSemanticService
-- SheetSemanticService
-- AssemblySemanticService
-- SemanticRegistry
-- BuildHistory
-- BuildPackageService
-- CompiledModelService
-- CadConfiguration
+- RustKernelService
 - CompiledModelValidator
-
-## Public extension/composition infrastructure
-
 - RustKernelServiceCollectionExtensions
 
-## Transport implementation
+Current endpoint configuration:
 
-- RustKernelService
+- BaseAddress defaults to http://localhost:8080/
+- EvaluatePath defaults to v1/build/evaluate
+- RequestTimeout defaults to two minutes
+- MaxResponseBytes defaults to 256 MiB
 
----
+RustKernelService responsibilities:
 
-# 46. What belongs where
+1. submit BuildPackage;
+2. enforce timeout/cancellation policy;
+3. bound response size;
+4. handle transport/HTTP failure;
+5. reject empty or invalid JSON;
+6. validate returned compiled-model identity and graph consistency;
+7. return structured diagnostics.
 
-The intended ownership boundary can be stated precisely.
-
-### Framework owns
-
-- CAD semantic meaning;
-- application identity;
-- product definitions currently represented by parts/assemblies/drawings;
-- authoring structures;
-- semantic metadata;
-- configuration;
-- deterministic BuildIdentity;
-- semantic snapshot;
-- build history;
-- bridge package;
-- compiled graph.
-
-### Kernel Client owns
-
-- transport;
-- HTTP policy;
-- response limits;
-- cancellation;
-- diagnostics;
-- returned-result validation;
-- DI registration.
-
-### Rust mathematics owns
-
-- exact supported geometry mathematics;
-- numerical linear algebra;
-- solver;
-- topology mathematics;
-- tessellation;
-- GPU conformance;
-- mathematical diagnostics.
-
-A future System-CAD feature must be added at the layer that owns its meaning rather than inserted into Kernel Client because that library is convenient.
+The client does not own CAD semantics, feature evaluation, B-Rep algorithms, solver mathematics, drawing, CAM or simulation.
 
 ---
 
-# 47. Current library limitations
+# 15. Current project dependency map
 
-The production .NET libraries currently do not implement:
+~~~
+UMLCAD.Cad.Expressions
+    -> none
 
-- full feature trees;
-- generalized sketch authoring;
-- generalized CAD evaluation graphs;
-- semantic topology evolution;
-- generalized reference migration;
-- full B-Rep semantic ownership;
-- production CAM;
-- production Sheet Metal;
-- production Drawing/PMI engine;
-- production Science provider service;
-- Engineering Resource catalog;
-- generalized Phenomena Simulation orchestration;
-- PLM/PDM lifecycle storage.
+UMLCAD.Cad.Contracts
+    -> none
 
-These are target System-CAD domains.
+UMLCAD.Cad.Semantics
+    -> UMLCAD.Cad.Expressions
 
-The current Framework is therefore a semantic/build foundation rather than the completed System-CAD application.
-
----
-
-# 48. Rules for extending the libraries
-
-Every new type must answer four questions before implementation:
-
-1. What semantic truth does it own?
-2. Which existing contract does it consume?
-3. Which result does it produce?
-4. Which test proves its boundary?
-
-Then answer:
-
-- What is its deterministic identity?
-- What references can point into it?
-- What frame does it use?
-- What happens when input is invalid?
-- What happens when evidence is ambiguous?
-- What happens when a provider fails?
-- What part can be cached?
-- What exact input changes invalidate the result?
-- Which representation is derived?
-- Which E2E test proves the real boundary?
-
-## No catch-all rule
-
-Do not add a feature to UMLCAD.Framework merely because Framework already exists.
-
-Framework should remain infrastructure.
-
-A large domain belongs in a dedicated library when it has independent semantic ownership, lifecycle, testing, and dependency boundaries.
-
----
-
-# 49. Target future .NET library segmentation
-
-The following is the architectural target, not current implementation.
-
-UMLCAD.Framework
-    application and common semantic infrastructure
-
-UMLCAD.Cad.Core
-    Product, Part, Body, Sketch, Feature, references, publications, frames
-
-UMLCAD.Cad.Evaluation
-    dependency graph, evaluator, invalidation, cache, authoritative-result integration
-
-UMLCAD.Cad.Representation
-    derived representation contracts and artifact management
-
-UMLCAD.Cad.ProductStructure
-    product, assembly, occurrence, configuration, BOM
-
-UMLCAD.Cad.Drawing
-    drawing, sheet, views, PMI and documentation semantics
+UMLCAD.Cad.Engine
+    -> UMLCAD.Cad.Expressions
+    -> UMLCAD.Cad.Semantics
+    -> UMLCAD.Cad.Contracts
 
 UMLCAD.Science
-    material/physical facts and Phenomena Simulation Service
+    -> UMLCAD.Cad.Expressions
 
 UMLCAD.Engineering.Resources
-    Machine, Tool, Fixture, Process, Capability
+    -> UMLCAD.Cad.Expressions
+    -> UMLCAD.Science
 
 UMLCAD.Engineering.SheetMetal
-    sheet-metal design and flat-pattern semantics
+    -> UMLCAD.Cad.Expressions
+    -> UMLCAD.Cad.Semantics
+    -> UMLCAD.Science
+    -> UMLCAD.Engineering.Resources
 
 UMLCAD.Engineering.Cam
-    manufacturing definition, toolpath, postprocessor, G-code/NC
+    -> UMLCAD.Cad.Expressions
+    -> UMLCAD.Cad.Semantics
+    -> UMLCAD.Science
+    -> UMLCAD.Engineering.Resources
 
-UMLCAD.Lifecycle
-    revision, release, lifecycle, PDM/PLM integration
+UMLCAD.Engineering.Drawing
+    -> UMLCAD.Cad.Expressions
+    -> UMLCAD.Cad.Semantics
+    -> UMLCAD.Science
 
-UMLCAD.Kernel.Client
-    Rust-kernel transport only
-
-The exact project split may evolve, but ownership boundaries should remain stable.
-
----
-
-# 50. Definition of Done for a new .NET library
-
-A library is not complete because it compiles.
-
-Minimum completion requires:
-
-- explicit ownership;
-- stable public contract;
-- correct dependency direction;
-- deterministic identity where needed;
-- reference semantics;
-- frame semantics;
-- failure semantics;
-- provider boundary where applicable;
-- component tests;
-- red-team tests;
-- integration/E2E tests;
-- exact-head validation;
-- documentation of limitations.
-
-For authoritative CAD behavior, add:
-
-- full-vs-incremental equivalence;
-- cache-vs-fresh equivalence;
-- topology/reference provenance;
-- appropriate mathematical authority tests;
-- representation regeneration rules.
-
----
-
-# 51. Final architectural statement
-
-The current .NET kernel is correctly understood as:
+UMLCAD.Integration.Simulation
+    -> UMLCAD.Science
 
 UMLCAD.Framework
-    = semantic application foundation
-    + deterministic build identity
-    + product/drawing/assembly semantic construction
-    + semantic registry
-    + history
-    + package generation
-    + compiled graph generation
+    -> Microsoft.Extensions.*
 
 UMLCAD.Kernel.Client
-    = transport boundary
-    + timeout/cancellation policy
-    + response-size defense
-    + stable diagnostics
-    + compiled-result integrity firewall
+    -> UMLCAD.Framework
+~~~
+
+This table reflects the current project references in the source projects on main.
+
+---
+
+# 16. Current data flow
+
+~~~
+Authoring
+    ↓
+UMLCAD.Framework
+    ↓
+SemanticApplication
+    ↓
+BuildPackage
+    ↓
+UMLCAD.Kernel.Client
+    ↓
+existing Rust process boundary
+    ↓
+Rust mathematical authority
+    ↓
+validated result
+~~~
+
+Engineering-domain flow:
+
+~~~
+CAD semantics
+    ↓
+UMLCAD.Cad.Engine
+    ↓
+authoritative CAD result
+    ├── UMLCAD.Engineering.Drawing
+    ├── UMLCAD.Engineering.Cam
+    ├── UMLCAD.Engineering.SheetMetal
+    ├── UMLCAD.Engineering.Resources
+    └── UMLCAD.Science / UMLCAD.Integration.Simulation
+~~~
+
+The engineering layer composes around mathematical authority; it does not replace it.
+
+---
+
+# 17. Identity and determinism
+
+Identity levels are intentionally distinct:
+
+1. Semantic identity — identifies an engineering object or definition.
+2. Evaluation identity — identifies exact semantic evaluation inputs.
+3. Authoritative result identity — identifies a mathematically certified result.
+4. Topology identity — identifies topology within a result.
+5. Representation identity — identifies a derived representation.
+6. Manufacturing program identity — identifies deterministic NC content where applicable.
+
+Identity-bearing operations should use canonical serialization, stable ordering, ordinal comparison, explicit contracts and SHA-256 where hashing is required.
+
+Forbidden identity inputs include timestamps, object addresses, viewer state and incidental execution ordering.
+
+---
+
+# 18. Failure-closed behavior
+
+Current libraries preserve explicit failure/uncertainty states such as:
+
+- invalid specification;
+- missing reference;
+- ambiguous reference;
+- indeterminate result;
+- unsupported capability;
+- kernel/backend failure;
+- incompatible machine/tool/process;
+- stale drawing association;
+- invalid external simulation response.
+
+The rule is:
+
+DO NOT silently fabricate authoritative engineering meaning when the responsible provider cannot prove it.
+
+---
+
+# 19. Current implementation status
+
+Implemented foundations on main now include:
+
+- versioned CAD contracts;
+- deterministic expressions;
+- CAD semantics and references;
+- product structure/BOM foundation;
+- evaluation planning/cache/invalidation primitives;
+- authoritative-result integration structures;
+- science/material/phenomena foundation;
+- engineering resource semantics;
+- sheet-metal engineering semantics;
+- CAM operation and deterministic NC/G-code foundation;
+- drawing semantics and associativity;
+- external simulation adapter boundary.
+
+This does not claim that all final product capabilities are complete.
+
+Examples of broader work that remain separate include:
+
+- general exact Boolean feature evolution;
+- complete feature-tree families;
+- complete topology/reference migration;
+- full generative drawing projection;
+- full sheet-metal unfolding/B-Rep behavior;
+- full B-Rep-driven CAM planning;
+- complete PMI/GD&T execution;
+- PLM/PDM lifecycle storage;
+- broader simulation-provider implementations.
+
+---
+
+# 20. Exact current source inventory
+
+## UMLCAD.Cad.Contracts
+
+~~~
+AxisAlignedBoxSolidContracts.cs
+CadEvaluationContracts.cs
+CircularPrismSolidContracts.cs
+ExtrusionContracts.cs
+GeometryKernelStatus.cs
+KernelContracts.cs
+RepresentationContracts.cs
+SketchSolveContracts.cs
+UMLCAD.Cad.Contracts.csproj
+~~~
+
+## UMLCAD.Cad.Expressions
+
+~~~
+ArithmeticExpression.cs
+ExpressionIdentity.cs
+UMLCAD.Cad.Expressions.csproj
+~~~
+
+## UMLCAD.Cad.Semantics
+
+~~~
+AuthoritativeResults.cs
+FeatureSpecifications.cs
+ProductStructure.cs
+References.cs
+UMLCAD.Cad.Semantics.csproj
+~~~
+
+## UMLCAD.Cad.Engine
+
+~~~
+AsyncEvaluationEngine.cs
+AuthoritativeCadReferenceResolver.cs
+AxisAlignedBoxSolidEvaluator.cs
+CadEvaluationEngine.cs
+CadModelEvaluator.cs
+ChangeSets.cs
+ConvexProfileExtrusionEvaluator.cs
+EvaluationCache.cs
+EvaluationEngine.cs
+EvaluationGraph.cs
+EvaluationIdentityBuilder.cs
+EvaluationStepFactory.cs
+FeatureEvaluation.cs
+IncrementalEvaluation.cs
+ReferenceResolver.cs
+ResultIntegration.cs
+UMLCAD.Cad.Engine.csproj
+~~~
+
+## UMLCAD.Science
+
+~~~
+PhenomenaSimulationService.cs
+ScienceFoundation.cs
+UMLCAD.Science.csproj
+~~~
+
+## UMLCAD.Engineering.Resources
+
+~~~
+EngineeringResources.cs
+UMLCAD.Engineering.Resources.csproj
+~~~
+
+## UMLCAD.Engineering.SheetMetal
+
+~~~
+SheetMetalExpressions.cs
+SheetMetalSemantics.cs
+UMLCAD.Engineering.SheetMetal.csproj
+~~~
+
+## UMLCAD.Engineering.Cam
+
+~~~
+CamAndGCode.cs
+UMLCAD.Engineering.Cam.csproj
+~~~
+
+## UMLCAD.Engineering.Drawing
+
+~~~
+DrawingAdvancedSemantics.cs
+DrawingSemantics.cs
+UMLCAD.Engineering.Drawing.csproj
+~~~
+
+## UMLCAD.Integration.Simulation
+
+~~~
+SimulationApplicationAdapter.cs
+UMLCAD.Integration.Simulation.csproj
+~~~
+
+## UMLCAD.Framework
+
+~~~
+CadApplication.cs
+Configuration/CadConfiguration.cs
+Semantics/BuildHistory.cs
+Semantics/BuildPackage.cs
+Semantics/CompiledModel.cs
+Semantics/ISemanticRegistry.cs
+Semantics/SemanticEntity.cs
+Semantics/SemanticModels.cs
+Semantics/SemanticServices.cs
+UMLCAD.Framework.csproj
+~~~
+
+## UMLCAD.Kernel.Client
+
+~~~
+RustKernelService.cs
+UMLCAD.Kernel.Client.csproj
+~~~
+
+---
+
+# 21. Maintenance rule
+
+When dotnet/src changes, this reference must be updated with the same architectural intent:
+
+- library inventory;
+- project references;
+- source-file inventory;
+- public semantic contracts;
+- responsibility/ownership;
+- implementation status;
+- authority boundaries.
+
+This file documents current implementation. Future library names or target architecture must not be presented here as current production code.
+
+---
+
+# 22. Final authority statement
+
+The current production .NET stack is:
+
+~~~
+UMLCAD.Framework
+    = application/build foundation
+
+UMLCAD.Cad.Contracts
+    = versioned CAD/kernel/representation boundaries
+
+UMLCAD.Cad.Expressions
+    = deterministic expression semantics
+
+UMLCAD.Cad.Semantics
+    = CAD meaning, references, authoritative-result semantics and product structure
+
+UMLCAD.Cad.Engine
+    = evaluation orchestration
+
+UMLCAD.Science
+    = scientific/material/phenomena foundation
+
+UMLCAD.Engineering.Resources
+    = engineering resource semantics
+
+UMLCAD.Engineering.SheetMetal
+    = sheet-metal engineering semantics
+
+UMLCAD.Engineering.Cam
+    = CAM semantics and deterministic NC/G-code foundation
+
+UMLCAD.Engineering.Drawing
+    = drawing semantics
+
+UMLCAD.Integration.Simulation
+    = external simulation adapter boundary
+
+UMLCAD.Kernel.Client
+    = existing transport boundary
 
 Rust
     = mathematical authority
+~~~
 
-Future System-CAD libraries
-    = higher-level semantic ownership built above this foundation
-
-The critical architectural rule is that these layers must not collapse into one catch-all library. Mathematical authority, CAD meaning, transport, derived representation, and specialized engineering domains must remain separately owned and testable.
+The .NET engineering libraries are therefore documented as the current systems-engineering layer represented by dotnet/src on main, while preserving the existing mathematical-kernel authority.

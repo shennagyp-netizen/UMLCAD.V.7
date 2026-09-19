@@ -11,3 +11,5 @@ There is no traditional CAD Feature Tree as semantic authority.
 Earlier results remain immutable lineage for provenance, references, invalidation and recomputation.
 
 The former implementation is preserved under app_old/.
+
+Kernel access is centralized in the dedicated `UMLCAD.Kernel.Client` library. Semantic libraries consume `IKernelGateway`; only the client owns HTTP/process/native transport knowledge.

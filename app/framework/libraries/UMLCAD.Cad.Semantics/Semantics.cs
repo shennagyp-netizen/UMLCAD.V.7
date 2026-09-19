@@ -316,23 +316,6 @@ public sealed record CadPartProgram(CadPartDefinition Definition)
         };
     }
 
-    public CadPartProgram AddPublication(Publication publication)
-    {
-        ArgumentNullException.ThrowIfNull(publication);
-
-        if (Definition.Publications.Any(x => x.Id == publication.Id))
-            throw new InvalidOperationException(
-                $"Publication '{publication.Id}' already exists.");
-
-        return this with
-        {
-            Definition = Definition with
-            {
-                Publications = Definition.Publications.Append(publication).ToArray()
-            }
-        };
-    }
-
     public CadPartProgram AddSketch(SketchOperation operation) => AddOperation(operation);
     public CadPartProgram Extrude(ExtrusionOperation operation) => AddOperation(operation);
     public CadPartProgram Hole(HoleOperation operation) => AddOperation(operation);

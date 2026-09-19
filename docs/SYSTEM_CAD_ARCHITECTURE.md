@@ -702,7 +702,7 @@ The viewer may not:
 
 The repository enforces the following executable architectural rules:
 
-- every production .NET project must live under `dotnet/src/` and is classified as Application Layer;
+- every new production .NET framework project must live under `app/framework/libraries/` and is classified as Application Layer;
 - production ProjectReferences must resolve only to other Application Layer production projects;
 - the complete production .NET ProjectReference graph must be acyclic;
 - exactly one production .NET library is designated as the kernel-access gateway;

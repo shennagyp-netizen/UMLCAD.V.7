@@ -53,6 +53,12 @@ BOM is derived from authoritative Product Structure. CAM consumes authoritative 
 
 CPU mathematical behavior is normative for the repository's certified mathematical contracts. GPU execution is acceleration only. Do not duplicate mathematical authority in .NET or introduce alternative numerical semantics without an explicit contract and verification plan.
 
+## Application Layer and kernel boundary
+
+All production .NET libraries under `dotnet/src/` are the UMLCAD Application Layer. The mathematical authority remains outside that layer under `kernel/`. Exactly one dedicated .NET library owns the kernel-access implementation; the other Application Layer libraries consume its stable API rather than knowing Rust, HTTP, or kernel-host details.
+
+The executable architecture gate is the Python project [`app_e2e`](app_e2e/README.md). It checks the real `.csproj` graph, rejects circular dependencies, and rejects kernel transport/native implementation leakage outside the dedicated gateway.
+
 ## Validation
 
 Substantial changes follow:

@@ -57,6 +57,20 @@ public sealed record GeometrySemantic(
     string Kind,
     IReadOnlyDictionary<string, string> Properties) : SemanticEntity(Id, Kind);
 
+public sealed record ShapePublicationSemantic(
+    string Id,
+    string TargetKind,
+    string TargetId,
+    string ResultIdentity,
+    string TopologyBindingId);
+
+public sealed record TopologyBindingSemantic(
+    string Id,
+    string TopologyKind,
+    string SemanticTargetId,
+    string ResultIdentity,
+    string AuthoritativeTopologyId);
+
 public sealed record ConstraintSemantic(
     string Id,
     string Kind,
@@ -116,6 +130,10 @@ public sealed record PartSemantic(
 {
     public string Name { get; init; } = Id;
     public CadMetadata StructuredMetadata { get; init; } = CadMetadata.Empty;
+    public IReadOnlyList<ShapePublicationSemantic> Publications { get; init; } =
+        Array.Empty<ShapePublicationSemantic>();
+    public IReadOnlyList<TopologyBindingSemantic> TopologyBindings { get; init; } =
+        Array.Empty<TopologyBindingSemantic>();
 }
 
 public sealed record SheetSemantic(

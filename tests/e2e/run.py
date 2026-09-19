@@ -149,6 +149,7 @@ class Runner:
             "UMLCAD.Framework.Tests.SystemCadAcceptanceTests.",
             "UMLCAD.Framework.Tests.SystemCadRedTeamTests.",
             "UMLCAD.Framework.Tests.SystemCadVerticalSliceGateTests.",
+            "UMLCAD.Framework.Tests.SemanticFrameTests.",
         }
         missing_suites = [
             suite for suite in sorted(required_suites)

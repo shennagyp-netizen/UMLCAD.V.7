@@ -1,8 +1,4 @@
 using UMLCAD.Engineering.Runtime;
-using UMLCAD.Cad.Contracts;
-using UMLCAD.Cad.Engine;
-using UMLCAD.Cad.Semantics;
-using UMLCAD.Science;
 
 namespace UMLCAD.ApplicationLayer.Tests;
 
@@ -82,7 +78,7 @@ public sealed class RuleRegistryTests
     {
         var registry = new EngineeringRuleRegistry();
 
-        registry.Register(new MarkerRuleRegistration(
+        registry.Register(new EngineeringRuleRegistration(
             new MarkerRule("rule.b", "2"),
             EngineeringRuleScope.Default,
             null));
@@ -125,14 +121,4 @@ public sealed class RuleRegistryTests
                     []));
     }
 
-    private sealed class MarkerRuleRegistration : EngineeringRuleRegistration
-    {
-        public MarkerRuleRegistration(
-            IEngineeringRule rule,
-            EngineeringRuleScope scope,
-            string? scopeKey)
-            : base(rule, scope, scopeKey)
-        {
-        }
-    }
 }

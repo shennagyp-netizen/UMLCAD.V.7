@@ -86,6 +86,7 @@ public sealed record KernelOperationRequest(
     KernelEvaluationMode Mode,
     CadResultId? IncrementalBaseResultId,
     IReadOnlyList<CadResultId> InputResults,
+    string SemanticPayloadJson,
     IReadOnlyDictionary<string, string> Inputs);
 
 public sealed record KernelOperationResponse(

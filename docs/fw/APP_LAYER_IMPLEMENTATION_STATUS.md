@@ -110,3 +110,22 @@ The project graph was statically inspected:
 The existing Rust host currently exposes the older build-package endpoint. The new Application Layer defines an operation-level kernel contract so semantic operations and incremental realization are not forced into the old package model.
 
 A real Rust operation-level endpoint/adaptor is the next kernel-integration increment. The application code does not falsely claim that the existing legacy endpoint already implements this new contract.
+
+
+## Final implementation closure for the current application-layer increment
+
+The active kernel boundary is now the dedicated:
+
+    app/framework/libraries/UMLCAD.Kernel.Client/
+
+UMLCAD.Cad.Engine consumes only IKernelGateway and contains no transport implementation. The former duplicate UMLCAD.Kernel gateway was removed from the active tree.
+
+Kernel operation responses now carry and validate the contract version, evaluation identity and operation identity. The engine performs an independent identity check and fails closed on a mismatch.
+
+The evaluation engine records dependent failures explicitly instead of aborting unrelated branches. Incremental requests use the previous result of the same operation as the incremental base result.
+
+Application Layer framework and application-host solution files are present, and CI is configured to run the architecture gate plus the complete framework test solution.
+
+Additional kernel-client black-box tests and Application Layer red-team pipeline tests are present.
+
+The exact operation-level Rust endpoint remains a separate mathematical-kernel implementation boundary; the active Application Layer does not impersonate the legacy v1/build/evaluate endpoint.

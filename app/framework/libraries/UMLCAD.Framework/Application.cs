@@ -18,6 +18,9 @@ public sealed class UmlcadApplication : IDisposable
         _cad = new CadEvaluationEngine(_kernel);
     }
 
+    public static UmlcadApplication CreateDeterministicDemo() =>
+        new DeterministicDemoKernelGateway();
+
     public Task<CadEvaluationSnapshot> BuildAsync(
         CadPartDefinition part,
         CadEvaluationOptions? options = null,
@@ -71,5 +74,29 @@ public sealed class UmlcadApplication : IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(UmlcadApplication));
+    }
+}
+
+
+internal sealed class DeterministicDemoKernelGateway : UMLCAD.Cad.Contracts.IKernelGateway
+{
+    public Task<UMLCAD.Cad.Contracts.KernelOperationResponse> EvaluateAsync(
+        UMLCAD.Cad.Contracts.KernelOperationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return Task.FromResult(
+            new UMLCAD.Cad.Contracts.KernelOperationResponse(
+                UMLCAD.Cad.Contracts.CadEvaluationStatus.Succeeded,
+                new UMLCAD.Cad.Contracts.CadResultId("demo:" + request.OperationId.Value),
+                "demo:" + request.EvaluationIdentity.Value,
+                new[]
+                {
+                    new UMLCAD.Cad.Contracts.KernelTopologyBinding(
+                        "operation",
+                        request.OperationId.Value)
+                },
+                Array.Empty<UMLCAD.Cad.Contracts.CadDiagnostic>()));
     }
 }

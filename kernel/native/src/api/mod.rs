@@ -13,8 +13,6 @@ use crate::functions::{
     engineering::EngineeringEvidence,
     snapshot::SemanticSnapshot,
     solver::{ConstraintAnalysis, ConstraintSolveResult, SolveOptions},
-    tolerance::Tolerance,
-    vec::Vec3,
 };
 
 #[derive(Clone, Debug)]
@@ -55,7 +53,6 @@ pub enum KernelRequest {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-#[derive(Clone, Debug, PartialEq)]
 pub struct AxisAlignedBoxEvaluationResult {
     pub evaluation_identity: String,
     pub result_identity: String,
@@ -66,6 +63,7 @@ pub struct AxisAlignedBoxEvaluationResult {
     pub centroid: [f64; 3],
 }
 
+#[derive(Clone, Debug, PartialEq)]
 pub enum KernelResponse {
     AxisAlignedBox(AxisAlignedBoxEvaluationResult),
     Diagnostics(Vec<crate::functions::validation::Diagnostic>),

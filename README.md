@@ -55,9 +55,9 @@ CPU mathematical behavior is normative for the repository's certified mathematic
 
 ## Application Layer and kernel boundary
 
-All production .NET libraries under `dotnet/src/` are the UMLCAD Application Layer. The mathematical authority remains outside that layer under `kernel/`. Exactly one dedicated .NET library owns the kernel-access implementation; the other Application Layer libraries consume its stable API rather than knowing Rust, HTTP, or kernel-host details.
+All new production .NET framework libraries under `app/framework/libraries/` are the UMLCAD Application Layer. The previous `dotnet/` implementation is legacy and remains untouched. The mathematical authority remains outside that layer under `kernel/`. Exactly one dedicated .NET library, `app/framework/libraries/UMLCAD.Kernel`, owns kernel-access implementation details. Other Application Layer libraries consume its concrete API and must not know Rust, native transport, or kernel-host details.
 
-The executable architecture gate is the Python project [`app_e2e`](app_e2e/README.md). It checks the real `.csproj` graph, rejects circular dependencies, and rejects kernel transport/native implementation leakage outside the dedicated gateway.
+The executable architecture gate is the Python project [`app_e2e`](app_e2e/README.md). It checks the real new `app/` project graph, rejects circular dependencies, verifies framework/test/application placement, and rejects kernel transport/native implementation leakage outside the dedicated gateway.
 
 ## Validation
 

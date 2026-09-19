@@ -1,6 +1,7 @@
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Engine;
 using UMLCAD.Cad.Semantics;
+using UMLCAD.Science;
 
 namespace UMLCAD.Engineering.Runtime;
 
@@ -84,12 +85,18 @@ public interface IEngineeringRule
 public interface IEngineeringServices
 {
     ICadControlService Cad { get; }
+    IPhenomenaSimulationService Simulation { get; }
 }
 
-public sealed class EngineeringServices(ICadControlService cad) : IEngineeringServices
+public sealed class EngineeringServices(
+    ICadControlService cad,
+    IPhenomenaSimulationService simulation) : IEngineeringServices
 {
     public ICadControlService Cad { get; } =
         cad ?? throw new ArgumentNullException(nameof(cad));
+
+    public IPhenomenaSimulationService Simulation { get; } =
+        simulation ?? throw new ArgumentNullException(nameof(simulation));
 }
 
 public sealed class EngineeringContext

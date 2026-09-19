@@ -1,0 +1,42 @@
+name: Application Layer CI
+
+on:
+  push:
+    branches:
+      - main
+      - "milestone/**"
+  pull_request:
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.x"
+
+      - name: Restore every Application Layer project
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' project; do
+            dotnet restore "$project"
+          done < <(find app -name '*.csproj' -print0)
+
+      - name: Build every Application Layer project
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' project; do
+            dotnet build "$project" --configuration Release --no-restore
+          done < <(find app -name '*.csproj' -print0)
+
+      - name: Run Application Layer tests
+        run: dotnet test app/framework/tests/UMLCAD.ApplicationLayer.Tests/UMLCAD.ApplicationLayer.Tests.csproj --configuration Release --no-restore --logger "console;verbosity=normal"
+
+      - name: Run semantic application demo
+        run: dotnet run --project app/application/UMLCAD.Application/UMLCAD.Application.csproj --configuration Release --no-restore

@@ -81,6 +81,39 @@ public sealed class EngineeringRuntimeTests
             methods);
     }
 
+
+    [Fact]
+    public async Task Rule_Can_Query_Context_Call_Simulation_And_Change_Cad()
+    {
+        var store = NewStore();
+        var control = new InMemoryCadControlService(store);
+        var simulation = new RecordingSimulationService();
+        var context = Context(store);
+
+        var result = await new EngineeringRuleRuntime().ExecuteAsync(
+            new SimulationDrivenRule(),
+            context,
+            new EngineeringServices(control, simulation));
+
+        Assert.Equal(EngineeringRuleOutcomeKind.ApplyChange, result.Outcome);
+        Assert.Equal(1, simulation.ExecutionCount);
+        Assert.Equal("created-after-simulation", Assert.Single(store.Snapshot().Features).Id.Value);
+    }
+
+    [Fact]
+    public void EngineeringContext_Copies_FeatureIndex()
+    {
+        var store = NewStore();
+        var snapshot = store.Snapshot();
+        var source = snapshot.Features.ToDictionary(feature => feature.Id);
+
+        var context = new EngineeringContext(snapshot, source);
+        source.Clear();
+
+        Assert.True(context.TryGetFeature(new CadId("created-after-simulation"), out _ ) is false);
+        Assert.Empty(context.FeatureIndex);
+    }
+
     private static CadDocumentStore NewStore() =>
         new(
             new CadDocumentDefinition(
@@ -154,6 +187,82 @@ public sealed class EngineeringRuntimeTests
                 SimulationResultStatus.Completed,
                 [],
                 []));
+    }
+
+
+    private sealed class SimulationDrivenRule : IEngineeringRule
+    {
+        public EngineeringRuleIdentity Identity { get; } =
+            new("rule.simulation-driven", "1.0.0");
+
+        public async ValueTask<EngineeringRuleResult> ExecuteAsync(
+            EngineeringContext context,
+            IEngineeringServices services,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await services.Simulation.GetOrRunAsync(
+                new SimulationRequest(
+                    PhenomenonKind.Thermal,
+                    "thermal-model-1",
+                    "geometry-1",
+                    "material-1",
+                    "process-1",
+                    "bc-1",
+                    "environment-1",
+                    "config-1",
+                    "numerical-1",
+                    "uncertainty-1"),
+                cancellationToken);
+
+            if (!result.IsReusable(
+                    new SimulationRequest(
+                        PhenomenonKind.Thermal,
+                        "thermal-model-1",
+                        "geometry-1",
+                        "material-1",
+                        "process-1",
+                        "bc-1",
+                        "environment-1",
+                        "config-1",
+                        "numerical-1",
+                        "uncertainty-1")))
+            {
+                return new EngineeringRuleResult(
+                    EngineeringRuleOutcomeKind.Indeterminate,
+                    [new EngineeringDiagnostic(
+                        "SIMULATION_NOT_REUSABLE",
+                        "Simulation result was not valid for the requested identity.",
+                        [])]);
+            }
+
+            services.Cad.AddFeature(
+                new CadFeatureDefinition(
+                    new CadId("created-after-simulation"),
+                    CadFeatureKind.Feature,
+                    "Created after simulation"));
+
+            return new EngineeringRuleResult(
+                EngineeringRuleOutcomeKind.ApplyChange,
+                []);
+        }
+    }
+
+    private sealed class RecordingSimulationService : IPhenomenaSimulationService
+    {
+        public int ExecutionCount { get; private set; }
+
+        public Task<SimulationResult> GetOrRunAsync(
+            SimulationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ExecutionCount++;
+            return Task.FromResult(
+                new SimulationResult(
+                    request,
+                    SimulationResultStatus.Completed,
+                    [],
+                    []));
+        }
     }
 
 }

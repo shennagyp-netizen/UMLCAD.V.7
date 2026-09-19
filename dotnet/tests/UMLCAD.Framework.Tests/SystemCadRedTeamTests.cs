@@ -221,9 +221,20 @@ public sealed class SystemCadRedTeamTests
             assembly.Part("instance", "part"));
 
         using var app = builder.Build();
+        var integrated = app.GetRequiredService<IAuthoritativeResultIntegrationService>()
+            .Integrate(
+                app.Semantic,
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative));
+
         var result = app.GetRequiredService<ISemanticReferenceService>()
             .Resolve(
-                app.Semantic,
+                integrated,
                 new SemanticReference("occurrence:assembly/instance", "front-face", "face", "result-r1"));
 
         Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);

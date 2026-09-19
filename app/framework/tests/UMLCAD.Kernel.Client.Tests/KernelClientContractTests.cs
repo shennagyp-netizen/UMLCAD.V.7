@@ -18,6 +18,7 @@ public sealed class KernelClientContractTests
                 request,
                 new CadResultId("result:1"),
                 "evidence:1",
+                new KernelHistoryIdentity("history:1"),
                 new[] { new KernelTopologyBinding("body", "face:1") });
 
             return JsonResponse(response);

@@ -424,7 +424,7 @@ class ApplicationArchitectureTests(unittest.TestCase):
         violations: list[str] = []
 
         for source_file in self._production_app_sources():
-            if not is_under(source_file.resolve(), gateway.path):
+            if is_under(source_file.resolve(), gateway.path.parent):
                 continue
 
             source = source_file.read_text(encoding="utf-8")

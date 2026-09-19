@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>UMLCAD.Framework</RootNamespace>
+    <AssemblyName>UMLCAD.Framework</AssemblyName>
+    <Description>Application composition, workflow, and cross-domain orchestration.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UMLCAD.Kernel/UMLCAD.Kernel.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
+    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
+    <ProjectReference Include="../UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj" />
+    <ProjectReference Include="../UMLCAD.Engineering.SheetMetal/UMLCAD.Engineering.SheetMetal.csproj" />
+    <ProjectReference Include="../UMLCAD.Engineering.Cam/UMLCAD.Engineering.Cam.csproj" />
+    <ProjectReference Include="../UMLCAD.Engineering.Drawing/UMLCAD.Engineering.Drawing.csproj" />
+    <ProjectReference Include="../UMLCAD.Integration.Simulation/UMLCAD.Integration.Simulation.csproj" />
+  </ItemGroup>
+</Project>

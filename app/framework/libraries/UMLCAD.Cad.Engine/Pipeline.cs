@@ -96,7 +96,7 @@ public static class CadOperationPayloadSerializer
         {
             id = reference.Id.Value,
             targetKind = reference.TargetKind.ToString(),
-            resultId = reference.ResultId?.Value,
+            targetOperationId = reference.TargetOperationId?.Value,
             topologyKind = reference.TopologyKind,
             topologyKey = reference.TopologyKey,
             publicationId = reference.PublicationId?.Value
@@ -156,8 +156,34 @@ public sealed class CadDependencyGraph
 
         foreach (var operation in operations.Values)
         {
-            var dependenciesOfOperation = operation.InputOperationIds
-                .Distinct()
+            var dependencyIds = new HashSet<CadId>(
+                operation.InputOperationIds);
+
+            foreach (var reference in operation.References)
+            {
+                switch (reference.TargetKind)
+                {
+                    case ReferenceTargetKind.Result:
+                    case ReferenceTargetKind.Topology:
+                        if (reference.TargetOperationId is CadId target)
+                            dependencyIds.Add(target);
+                        break;
+
+                    case ReferenceTargetKind.Publication:
+                    {
+                        var publication = part.Publications
+                            .SingleOrDefault(
+                                x => x.Id == reference.PublicationId);
+
+                        if (publication is not null)
+                            dependencyIds.Add(publication.SourceOperationId);
+
+                        break;
+                    }
+                }
+            }
+
+            var dependenciesOfOperation = dependencyIds
                 .OrderBy(x => x.Value, StringComparer.Ordinal)
                 .ToArray();
 
@@ -729,18 +755,17 @@ public sealed class CadEvaluationEngine
             {
                 case ReferenceTargetKind.Result:
                 {
-                    var result = outcomes.Values
-                        .Select(x => x.Result)
-                        .FirstOrDefault(x =>
-                            x is not null &&
-                            x.Id == reference.ResultId);
+                    var result = reference.TargetOperationId is CadId target &&
+                        outcomes.TryGetValue(target, out var targetOutcome)
+                            ? targetOutcome.Result
+                            : null;
 
                     resolutions.Add(result is null
                         ? new CadReferenceResolution(
                             reference,
                             CadEvaluationStatus.Failed,
                             null,
-                            "Referenced authoritative result is unavailable.")
+                            "Referenced semantic operation result is unavailable.")
                         : new CadReferenceResolution(
                             reference,
                             CadEvaluationStatus.Succeeded,
@@ -751,11 +776,10 @@ public sealed class CadEvaluationEngine
 
                 case ReferenceTargetKind.Topology:
                 {
-                    var result = outcomes.Values
-                        .Select(x => x.Result)
-                        .FirstOrDefault(x =>
-                            x is not null &&
-                            x.Id == reference.ResultId);
+                    var result = reference.TargetOperationId is CadId target &&
+                        outcomes.TryGetValue(target, out var targetOutcome)
+                            ? targetOutcome.Result
+                            : null;
 
                     if (result is null)
                     {
@@ -819,11 +843,11 @@ public sealed class CadEvaluationEngine
                         break;
                     }
 
-                    var source = outcomes.Values
-                        .Select(x => x.Result)
-                        .FirstOrDefault(x =>
-                            x is not null &&
-                            x.Id == publication[0].SourceResult);
+                    var source = outcomes.TryGetValue(
+                        publication[0].SourceOperationId,
+                        out var sourceOutcome)
+                        ? sourceOutcome.Result
+                        : null;
 
                     resolutions.Add(source is null
                         ? new CadReferenceResolution(

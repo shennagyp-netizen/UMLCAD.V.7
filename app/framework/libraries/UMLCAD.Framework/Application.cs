@@ -19,6 +19,9 @@ public sealed class UmlcadApplication : IDisposable
     public static UmlcadApplication ConnectDefault(UmlcadKernelOptions? options = null) =>
         new(UmlcadKernel.Connect(options));
 
+    internal static UmlcadApplication ForTest(UmlcadKernel kernel) =>
+        new(kernel);
+
     public Task<KernelEvaluationOutcome> BuildAsync(
         CadBuildDefinition definition,
         CancellationToken cancellationToken = default)

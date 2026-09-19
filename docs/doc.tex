@@ -70,7 +70,7 @@
 \vspace{6mm}
 {\large Audited against the exact repository state immediately before this document revision:\par}
 \vspace{2mm}
-{\ttfamily acb125ca3ad4ca01f5b87033ce63739f6a271163\par}
+{\ttfamily 8b883f8f5c8b2583dea8178ccc8e694dd18227bd\par}
 \vfill
 {\large The repository is the source of truth.\par}
 {\large This document distinguishes implemented code from target architecture.\par}
@@ -219,21 +219,95 @@ The components have distinct responsibility:
 
 \chapter{C4 Level 4 - Critical Runtime Paths}
 
-\section{Feature evaluation}
+\section{Semantic-object evaluation: no traditional CAD feature model}
+
+The new Application Layer does \textbf{not} use the traditional CAD "Feature" hierarchy as its semantic foundation. Terms such as sketch, extrusion, hole, fillet, pattern, cut, and similar user actions describe typed semantic operations and their results, not a permanent Feature class hierarchy.
+
+The normative abstraction is a directed acyclic graph of typed objects and typed results composed through a functional pipeline:
 
 \begin{lstlisting}
-Feature Specification
- -> resolve references
- -> resolve frames/configuration
- -> close dependency graph
- -> construct deterministic evaluation identity
- -> select evaluator
- -> create mathematical contract
- -> invoke kernel authority
- -> validate authoritative result
- -> integrate topology/provenance
- -> update cache/invalidation
- -> derive representation
+Part
+  -> Sketch
+      -> SketchResult
+  -> Extrusion(SketchResult)
+      -> BodyResult_1
+  -> Hole(BodyResult_1)
+      -> BodyResult_2 = Current/Final Body
+\end{lstlisting}
+
+A Sketch produces a sketch/profile result. An Extrusion consumes that result and produces a Body result. A Hole consumes the preceding Body result and produces the next Body result. The newest Body result is the current body.
+
+The previous sketch and previous body result do not remain as separate solids inside the final body. Their semantic lineage may remain available for provenance, references, cache reuse, dependency invalidation, revision history, and recomputation.
+
+\section{Functional pipeline}
+
+For semantic operation $o_i$:
+\[
+R_i=o_i(R_{i-1},I_i)
+\]
+where $I_i$ contains the explicit parameters, expressions, references, configuration and policy inputs relevant to the operation.
+
+For the example:
+\[
+S=\mathrm{Sketch}(P),\qquad
+B_1=\mathrm{Extrusion}(S,E),\qquad
+B_2=\mathrm{Hole}(B_1,H)
+\]
+
+The authoritative current body is $B_2$.
+
+\begin{enumerate}
+\item operations consume explicit typed inputs;
+\item operations produce explicit typed results;
+\item earlier results are immutable semantic values rather than secretly mutated geometry;
+\item evaluation order is determined by dependencies;
+\item result identity is deterministic for deterministic semantic inputs;
+\item intermediate results may be cached, invalidated, recomputed or discarded without changing meaning;
+\item side effects are confined to controlled boundaries such as kernel calls, persistence and simulation.
+\end{enumerate}
+
+\section{Body and incremental render semantics}
+
+A Body is the current solid/result state, not a container holding a traditional feature tree.
+
+\begin{lstlisting}
+BodyResult_0
+   -> Extrusion(...) -> BodyResult_1
+   -> Hole(...)      -> BodyResult_2
+   -> Fillet(...)    -> BodyResult_3
+\end{lstlisting}
+
+At each stage the newly produced result becomes the current body. Earlier results remain addressable only when their identities are required for semantic purposes.
+
+The kernel may realize the transition incrementally:
+
+\begin{lstlisting}
+previous authoritative result + semantic delta
+        -> kernel incremental render
+\end{lstlisting}
+
+Incremental render is a kernel execution/optimization mechanism. It is not the semantic model and must not replace the Application Layer pipeline.
+
+The required equivalence is:
+\[
+CurrentResult_{full}=CurrentResult_{incremental}
+\]
+
+\section{References, publications and provenance}
+
+References and publications are first-class semantic inputs. A Sketch may consume a face publication, datum, frame, or another authoritative result. An operation records what it consumed rather than copying hidden geometry into a mutable Feature object.
+
+The minimum lineage is:
+
+\begin{lstlisting}
+input identity
+reference/publication identity
+operation identity
+parameter/expression identity
+result identity
+parent-result lineage
+kernel evidence
+derived representation identity
 \end{lstlisting}
 
 \section{Sketch attached to a face}
@@ -306,26 +380,26 @@ The adaptor is a phenomena-service boundary, not an application-semantic boundar
 
 \chapter{Mandatory Early System-CAD Vertical Slice}
 
-The first system-level CAD proof is intentionally narrow and architectural:
+The first meaningful CAD proof is a complete semantic object pipeline that produces a final Body and then realizes that result through the kernel boundary.
 
 \begin{lstlisting}
-Create Cube
- -> select Face semantically
- -> Sketch on Face
- -> Circle A + Circle B
- -> solve/validate supported constraints
- -> Feature A along +FaceNormal
- -> Feature B along -FaceNormal
- -> recompute
- -> authoritative B-Rep / result
- -> topology + reference provenance
- -> derived representation
- -> viewer semantic selection
+Part
+  -> Sketch
+      -> constrained profile
+      -> SketchResult
+  -> Extrusion
+      -> BodyResult_1
+  -> Hole
+      -> BodyResult_2 = Final/Current Body
+  -> topology + provenance
+  -> kernel incremental-render request
+  -> authoritative kernel result
+  -> derived representation
 \end{lstlisting}
 
-The slice proves the semantic path rather than merely a visual result. It must establish semantic intent, reference resolution, frame correctness, dependency planning, explicit kernel contract use, authoritative result integration, topology provenance and representation derivation.
+The acceptance test must prove that changing a Sketch input invalidates the Extrusion and all downstream Body results, while changing the Hole input invalidates the Hole and its downstream closure.
 
-Exact circular geometry must not be replaced by a polygon solely to make the workflow executable. When a required exact circular-profile solid or Boolean topology operation is not certified by the mathematical authority, that boundary remains explicitly unsupported until a new mathematical contract is established.
+A full recomputation and an incremental realization must converge to the same authoritative result identity and semantic meaning. Missing, ambiguous, cyclic, unsupported or frame-inconsistent references fail closed.
 
 \chapter{C4 Domain Boundaries and Dependency Direction}
 
@@ -600,6 +674,134 @@ A drawing contains stable sheets, part references, and settings. Sheets contain 
 
 \section{Build history}
 \pathref{dotnet/src/UMLCAD.Framework/Semantics/BuildHistory.cs} stores build snapshots in a synchronized in-memory history. Sequence numbers identify history entries and are deliberately not used as semantic build identity.
+
+\chapter{New Application Layer: \texttt{app/}}
+
+The \texttt{app/} tree is the new Application Layer. It is separate from the legacy \texttt{dotnet/} implementation and must not simply reproduce the legacy class model under new namespaces.
+
+The purpose of this layer is to provide a programmable System-CAD environment in which typed semantic objects, engineering rules, scientific services and domain operations are composed through deterministic execution pipelines.
+
+\section{Library map and current state}
+
+\begin{longtable}{@{}p{0.29\textwidth}p{0.38\textwidth}p{0.25\textwidth}@{}}
+\toprule
+Library & Intended responsibility & Current state \\
+\midrule
+\texttt{UMLCAD.Kernel} & Single concrete gateway to the UMLCAD kernel; bounded transport, cancellation and result validation. & Foundation implemented. \\
+\texttt{UMLCAD.Cad.Contracts} & Shared immutable CAD build/package/result contracts. & Foundation implemented. \\
+\texttt{UMLCAD.Cad.Expressions} & Deterministic typed expression values and identities. & Initial implementation. \\
+\texttt{UMLCAD.Cad.Semantics} & Part, Body, Sketch, References/Publications, Parameters/Expressions, Operations, Results and topology provenance. & \textbf{Incomplete}; current feature model is scaffold only. \\
+\texttt{UMLCAD.Cad.Engine} & Functional pipeline evaluation, dependency planning, invalidation, caching and result integration. & Foundation exists; semantic model must be rebuilt around operations/results. \\
+\texttt{UMLCAD.Science} & Phenomena, simulation requests/results, spatial regions and fields. & Initial contracts implemented. \\
+\texttt{UMLCAD.Engineering.Resources} & Machines, tools, fixtures, processes and capabilities. & Project shell; domain not implemented. \\
+\texttt{UMLCAD.Engineering.SheetMetal} & Sheet-metal operations and manufacturing semantics. & Project shell; domain not implemented. \\
+\texttt{UMLCAD.Engineering.Cam} & CAM semantics, toolpaths, postprocessing and deterministic NC/G-code. & Project shell; domain not implemented. \\
+\texttt{UMLCAD.Engineering.Drawing} & Drawing/PMI semantics and associative derivation. & Project shell; domain not implemented. \\
+\texttt{UMLCAD.Integration.Simulation} & Provider-neutral boundary to simulation implementations. & Project shell; domain not implemented. \\
+\texttt{UMLCAD.Engineering.Runtime} & Rules, transactions, rule precedence, build validation and engineering control. & Foundation implemented. \\
+\texttt{UMLCAD.Framework} & Application composition and public Application Layer facade. & Initial facade implemented. \\
+\bottomrule
+\end{longtable}
+
+The existence of a project or namespace is not evidence of completed functionality. Empty or contract-only domain projects are recorded as incomplete.
+
+\section{Normative Part/Body model}
+
+\begin{lstlisting}
+Part
+  |
+  +-- Body context
+  |
+  +-- Sketch
+  |     |
+  |     +-- SketchResult
+  |
+  +-- References / Publications
+  |
+  +-- Parameters / Expressions
+  |
+  +-- Operations
+        |
+        +-- consume typed results
+        +-- produce typed results
+\end{lstlisting}
+
+The operation-result relationship is the central composition mechanism. There is no requirement for a persistent Feature Tree.
+
+A Body represents the current result state. When a later operation is evaluated, its result supersedes the prior Body result as the current state. Provenance may retain the full lineage without making all intermediate results current simultaneously.
+
+\section{Operation/result examples}
+
+\begin{tabularx}{\textwidth}{@{}lX@{}}
+\toprule
+Operation & Result \\
+\midrule
+\texttt{Sketch} & Sketch/profile result with explicit frame, constraints, references and provenance. \\
+\texttt{Extrusion} & New BodyResult derived from a SketchResult and explicit extrusion inputs. \\
+\texttt{Hole} & New BodyResult derived from the previous BodyResult and explicit hole inputs. \\
+\texttt{Fillet} & New BodyResult derived from a BodyResult and topology/radius inputs. \\
+\texttt{Boolean} & New result derived from explicit operand results. \\
+\texttt{Pattern} & New result derived from an input operation/result plus an explicit pattern specification. \\
+\bottomrule
+\end{tabularx}
+
+These are semantic transformations, not prescribed inheritance classes.
+
+\section{Corrective statement about the current scaffold}
+
+The current file \texttt{app/framework/libraries/UMLCAD.Cad.Semantics/CadDocument.cs} still contains \texttt{CadFeatureDefinition}, \texttt{CadFeatureKind}, and the command names \texttt{AddFeature}, \texttt{RemoveFeature}, and \texttt{RenameFeature}. These are transitional scaffolding.
+
+They must \textbf{not} be expanded into a larger traditional CAD feature hierarchy. The next semantic implementation must replace that abstraction with typed Part/Body/Sketch/Reference/Publication/Parameter/Operation/Result objects and the functional evaluation pipeline defined here.
+
+\section{Application Layer to kernel}
+
+\begin{lstlisting}
+Part / semantic objects
+        |
+        v
+functional operation pipeline
+        |
+        v
+typed result / topology provenance
+        |
+        v
+kernel contract
+        |
+        v
+UMLCAD.Kernel gateway
+        |
+        v
+Rust mathematical/native kernel
+        |
+        v
+incremental render / authoritative realization
+\end{lstlisting}
+
+The Application Layer owns meaning and composition. The kernel owns mathematical authority and realization. No domain library may introduce a second competing Body/geometry authority.
+
+\section{Minimum useful vertical acceptance test}
+
+\begin{lstlisting}
+Create Part
+ -> Create Sketch
+ -> define references/publications
+ -> define expressions/parameters
+ -> evaluate SketchResult
+ -> Extrusion(SketchResult)
+ -> obtain BodyResult_1
+ -> Hole(BodyResult_1)
+ -> obtain BodyResult_2
+ -> assert BodyResult_2 is current/final Body
+ -> assert complete provenance
+ -> incremental kernel realization
+ -> change Sketch input
+ -> assert downstream invalidation
+ -> recompute
+ -> assert deterministic new final-body identity
+\end{lstlisting}
+
+Until this path exists as real production code plus tests, the new Application Layer is a foundation/scaffold rather than a complete System-CAD implementation.
+
 
 \chapter{Compiled Model Contract}
 
@@ -1129,6 +1331,28 @@ The following paths are verified current or are explicit target-contract referen
 \item \pathref{kernel/native/src/gpu/metal.rs}
 \item \pathref{kernel/native/src/gpu/cuda.rs}
 \end{itemize}
+
+\section{New \texttt{app/} source reference}
+
+The principal current Application Layer sources include:
+
+\begin{itemize}
+\item \pathref{app/README.md}
+\item \pathref{app/framework/libraries/UMLCAD.Kernel/KernelApi.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Cad.Contracts/CadContracts.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Cad.Expressions/ExpressionValue.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Cad.Semantics/CadDocument.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Cad.Semantics/PlanarCad.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Cad.Engine/CadEvaluationEngine.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Cad.Engine/CadControl.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Cad.Engine/CadKernelPackageFactory.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Cad.Engine/DependencyPlanning.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Science/PhenomenaContracts.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Engineering.Runtime/EngineeringRuntime.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Framework/Application.cs}
+\end{itemize}
+
+The repository also contains project shells for Resources, SheetMetal, CAM, Drawing and Simulation integration; these are structural placeholders until their domain behavior is implemented.
 
 \section{Current .NET}
 \begin{itemize}

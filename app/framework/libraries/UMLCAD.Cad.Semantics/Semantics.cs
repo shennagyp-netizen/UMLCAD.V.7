@@ -180,14 +180,6 @@ public sealed record CadReference
         if (!id.IsValid)
             throw new ArgumentException("Reference identity is required.", nameof(id));
 
-        if (targetKind == ReferenceTargetKind.OperationResult &&
-            operationId is not { } operationReferenceId || 
-            targetKind == ReferenceTargetKind.Topology &&
-            operationId is not { } topologyOperationId)
-        {
-            // Validation is completed by the operation/part graph where context exists.
-        }
-
         Id = id;
         TargetKind = targetKind;
         OperationId = operationId;

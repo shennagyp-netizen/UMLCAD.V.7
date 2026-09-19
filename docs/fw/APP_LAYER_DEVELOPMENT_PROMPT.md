@@ -7,7 +7,7 @@ This document is the governing development prompt for all production .NET Applic
 It applies to every new feature, refactor, library, service, semantic contract, engineering domain, kernel-facing integration, application workflow, and supporting implementation under:
 
 ~~~
-dotnet/src/
+app/framework/libraries/
 ~~~
 
 It is subordinate to:
@@ -28,7 +28,7 @@ The objective is not merely to produce working code. The objective is to preserv
 All production .NET libraries under:
 
 ~~~
-dotnet/src/
+app/framework/libraries/
 ~~~
 
 are part of the UMLCAD Application Layer.
@@ -69,7 +69,7 @@ There shall be exactly one dedicated production .NET kernel-access library.
 The current transitional implementation is:
 
 ~~~
-UMLCAD.Kernel.Client
+UMLCAD.Kernel
 ~~~
 
 The long-term architectural concept is:
@@ -203,7 +203,7 @@ At minimum it shall enforce:
 Every production .NET project is under:
 
 ~~~
-dotnet/src/
+app/framework/libraries/
 ~~~
 
 ## 5.2 Dependency resolution

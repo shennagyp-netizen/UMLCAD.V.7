@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Text;
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Expressions;
@@ -31,7 +32,7 @@ public abstract record CadOperation(CadId Id,CadId BodyId,string OperationKind,I
 {
     public IReadOnlyList<CadReference> References{get;init;}=Array.Empty<CadReference>();
     public IReadOnlyDictionary<string,string> SemanticInputs{get;init;}=new ReadOnlyDictionary<string,string>(new Dictionary<string,string>());
-    public string CanonicalDefinition()
+    public virtual string CanonicalDefinition()
     {
         var b=new StringBuilder(OperationKind).Append('|').Append(Id.Value).Append('|').Append(BodyId.Value);
         foreach(var input in InputOperationIds.OrderBy(x=>x.Value,StringComparer.Ordinal))b.Append("|input-op=").Append(input.Value);
@@ -40,7 +41,72 @@ public abstract record CadOperation(CadId Id,CadId BodyId,string OperationKind,I
         return b.ToString();
     }
 }
-public sealed record SketchOperation(CadId Id,CadId BodyId,Sketch Sketch):CadOperation(Id,BodyId,"Cad.Sketch",Array.Empty<CadId>);
+public sealed record SketchOperation(CadId Id,CadId BodyId,Sketch Sketch):CadOperation(Id,BodyId,"Cad.Sketch",Array.Empty<CadId>)
+{
+    public override string CanonicalDefinition()
+    {
+        ArgumentNullException.ThrowIfNull(Sketch);
+
+        var b = new StringBuilder(base.CanonicalDefinition())
+            .Append("|sketch.id=").Append(Sketch.Id.Value)
+            .Append("|sketch.name=").Append(Sketch.Name);
+
+        foreach (var geometry in Sketch.Geometry.OrderBy(x => x.Id.Value, StringComparer.Ordinal))
+        {
+            b.Append("|geometry=").Append(geometry.Id.Value).Append(':').Append(geometry.Kind);
+
+            switch (geometry)
+            {
+                case LineGeometry line:
+                    b.Append(':').Append(Number(line.X1))
+                        .Append(':').Append(Number(line.Y1))
+                        .Append(':').Append(Number(line.X2))
+                        .Append(':').Append(Number(line.Y2));
+                    break;
+                case CircleGeometry circle:
+                    b.Append(':').Append(Number(circle.X))
+                        .Append(':').Append(Number(circle.Y))
+                        .Append(':').Append(Number(circle.Radius));
+                    break;
+                case ArcGeometry arc:
+                    b.Append(':').Append(Number(arc.CenterX))
+                        .Append(':').Append(Number(arc.CenterY))
+                        .Append(':').Append(Number(arc.Radius))
+                        .Append(':').Append(Number(arc.StartAngle))
+                        .Append(':').Append(Number(arc.EndAngle));
+                    break;
+            }
+        }
+
+        foreach (var constraint in Sketch.Constraints.OrderBy(x => x.Id.Value, StringComparer.Ordinal))
+        {
+            b.Append("|constraint=").Append(constraint.Id.Value)
+                .Append(':').Append(constraint.Kind)
+                .Append(':').Append(Number(constraint.Value));
+
+            foreach (var geometryId in constraint.GeometryIds.OrderBy(x => x.Value, StringComparer.Ordinal))
+                b.Append(':').Append(geometryId.Value);
+        }
+
+        foreach (var support in Sketch.Supports.OrderBy(x => x.Id.Value, StringComparer.Ordinal))
+        {
+            b.Append("|support=").Append(support.Id.Value)
+                .Append(':').Append(support.TargetKind)
+                .Append(':').Append(support.OperationId?.Value ?? "-")
+                .Append(':').Append(support.TopologyKind ?? "-")
+                .Append(':').Append(support.TopologyKey ?? "-")
+                .Append(':').Append(support.PublicationId?.Value ?? "-");
+        }
+
+        return b.ToString();
+    }
+
+    private static string Number(double? value) =>
+        value?.ToString("R", CultureInfo.InvariantCulture) ?? "-";
+
+    private static string Number(double value) =>
+        value.ToString("R", CultureInfo.InvariantCulture);
+}
 public sealed record ExtrusionOperation(CadId Id,CadId BodyId,CadId SketchOperationId,CadExpression Distance,string Direction):CadOperation(Id,BodyId,"Cad.Extrusion",new[]{SketchOperationId})
 {
     public ExtrusionOperation

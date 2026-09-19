@@ -208,6 +208,47 @@ public sealed class SystemCadRedTeamTests
     }
 
     [Fact]
+    public void Nested_occurrence_face_reference_keeps_full_occurrence_path_identity()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "binding");
+        });
+        builder.AddAssembly("child", "Child", assembly =>
+            assembly.Part("part-instance", "part"));
+        builder.AddAssembly("root", "Root", assembly =>
+            assembly.Assembly("child-instance", "child"));
+
+        using var app = builder.Build();
+        var integrated = app.GetRequiredService<IAuthoritativeResultIntegrationService>()
+            .Integrate(
+                app.Semantic,
+                new AuthoritativeResultSemantic(
+                    "result-r1",
+                    "part",
+                    "operation-1",
+                    "contract-v1",
+                    "evidence-1",
+                    AuthoritativeResultStatus.Authoritative));
+
+        var result = app.GetRequiredService<ISemanticReferenceService>()
+            .Resolve(
+                integrated,
+                new SemanticReference(
+                    "occurrence:root/child-instance/occurrence:part-instance",
+                    "front-face",
+                    "face",
+                    "result-r1"));
+
+        Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
+        Assert.Equal(
+            "occurrence:root/child-instance/occurrence:part-instance",
+            result.Target!.ProducerId);
+    }
+
+    [Fact]
     [Trait("Gate", "RED")]
     public void Red_gate_face_reference_in_occurrence_context_must_preserve_occurrence_producer_identity()
     {

@@ -234,7 +234,6 @@ class ApplicationArchitectureTests(unittest.TestCase):
                 include = element.attrib.get("Include", "")
                 references.append((project.parent / include).resolve())
 
-            relative = project.relative_to(APPLICATION_ROOT)
             if project.name == "UMLCAD.Application.csproj":
                 allowed_names = {"UMLCAD.Framework.csproj"}
             else:

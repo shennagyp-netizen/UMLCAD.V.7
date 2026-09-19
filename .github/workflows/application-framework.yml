@@ -27,3 +27,5 @@ jobs:
         run: dotnet build app/framework/UMLCAD.ApplicationLayer.sln --configuration Release
       - name: Run application framework tests
         run: dotnet test app/framework/UMLCAD.ApplicationLayer.sln --configuration Release --no-build
+      - name: Build application hosts and demos
+        run: dotnet build app/application/UMLCAD.Application.sln --configuration Release

@@ -303,33 +303,40 @@ A representation is never allowed to become an alternative geometry or semantic 
 
 # 7. SYSTEM RELATIONSHIP MODEL
 
-The following relationships are architectural invariants.
+The following are the authoritative consumption relationships.
 
-```text
-Science
-├── Material / physical properties
-└── Phenomena Simulation Service
-↑
-│
-multiple providers
-│
-Engineering Resources
-├── Machine
-├── Tool
-├── Fixture
-├── Process
-└── Capabilities
-↑
-┌───────┴────────┐
-│                │
-Sheet Metal          CAM
-│                │
-│                ├── Toolpath
-│                ├── Postprocessor
-│                └── deterministic G-code / NC
-│
-└── material/machine/process validation
+For the dependency graph, **A → B means A consumes an explicit contract/authority supplied by B**.
 
+```
+CAD Core → Mathematical Contracts
+CAD Core → Science Contracts (where required)
+CAD Core → Configuration / Knowledge
+
+Sheet Metal → CAD Core
+Sheet Metal → Science
+Sheet Metal → Engineering Resources
+Sheet Metal → Phenomena Simulation Service (where required)
+
+CAM → CAD Core / Product Structure / BOM
+CAM → Engineering Resources
+CAM → Sheet Metal (where applicable)
+CAM → Science / Material / Process semantics
+CAM → Phenomena Simulation Service (where required)
+
+Drawing / PMI → CAD Core / Product Structure
+Kinematics → Product / Assembly Structure
+Kinematics → Mathematical Contracts
+Lifecycle / PLM → CAD / Product / Configuration state
+Application / Workflow → CAD Core and domain contracts
+Presentation → Derived Result / Representation contracts
+
+Simulation Provider → Phenomena Simulation Service
+Integration Adapter → external provider/system
+```
+
+Product Structure remains the composition authority:
+
+```
 CAD Product Structure
         ↓
        BOM
@@ -337,81 +344,33 @@ CAD Product Structure
 Drawing / CAM / PLM
 ```
 
-Interpret these relationships precisely:
-
 ### Science
 
 Science owns reusable scientific concepts, including material/physical properties and the abstract **Phenomena Simulation Service**.
 
 ### Phenomena Simulation Service
 
-The service is provider-neutral.
-
-It defines the stable semantic service boundary used by engineering domains.
-
-Multiple simulation providers may implement that boundary.
-
-A caller must not depend on a specific simulation implementation when the contract does not require one.
+The service is provider-neutral. It defines the stable service contract used by engineering domains. Multiple simulation providers may implement that contract, including internal, external, CPU, GPU, specialized, or remote implementations.
 
 ### Engineering Resources
 
-Engineering Resources describe manufacturing and engineering resources and their declared capabilities, including:
-
-- machines;
-- tools;
-- fixtures;
-- processes;
-- capabilities.
-
-These are reusable engineering facts and constraints, not CAM-owned private state.
+Engineering Resources owns reusable manufacturing and engineering facts and declared capabilities: machines, tools, fixtures, processes, and capabilities. These are not CAM-owned private state.
 
 ### Sheet Metal
 
-Sheet Metal consumes relevant engineering-resource information and participates in material/machine/process feasibility validation where its semantics require it.
-
-Sheet Metal owns sheet-metal design semantics and must expose authoritative results to downstream consumers.
+Sheet Metal owns sheet-metal design semantics and consumes relevant CAD, Science, and Engineering Resource contracts.
 
 ### CAM
 
-CAM consumes authoritative CAD semantics and may consume:
-
-- product structure/BOM;
-- engineering resources;
-- material/process information;
-- Sheet Metal outputs where applicable;
-- Phenomena Simulation Service through its provider-neutral contract.
-
-CAM owns manufacturing-process semantics such as setups, manufacturing features/operations, strategies, toolpaths, and postprocessing.
-
-CAM must ultimately produce **deterministic G-code / NC** through a defined postprocessor boundary.
-
-A visual toolpath is not equivalent to postprocessed machine output.
-
-### CAD Product Structure
-
-CAD Product Structure owns Product/Part/Assembly/Occurrence and related structure semantics.
-
-### BOM
-
-BOM is derived from authoritative product structure.
-
-BOM is not an independent competing source of product truth.
-
-Downstream domains such as Drawing, CAM, and PLM consume the authoritative product/BOM semantics through explicit contracts.
+CAM consumes authoritative CAD/product structure/BOM, Engineering Resources, applicable Sheet Metal results, material/process semantics, and the Phenomena Simulation Service where required. CAM owns manufacturing-process semantics and ultimately deterministic G-code/NC through its postprocessor boundary.
 
 ### Drawing
 
-Drawing consumes authoritative CAD semantics and product-structure information.
-
-Drawing must not reconstruct geometry from presentation meshes merely because that is visually convenient.
+Drawing consumes authoritative CAD/product semantics and does not reconstruct engineering truth from presentation meshes.
 
 ### PLM
 
-PLM consumes authoritative product/lifecycle information.
-
-It must not become a replacement geometry authority.
-
----
+PLM consumes authoritative product/lifecycle/configuration state and integrates with external lifecycle/product systems through adapters.
 
 # 8. DOMAIN OWNERSHIP AND DEPENDENCY RULES
 

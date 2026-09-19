@@ -63,8 +63,9 @@ public sealed class SemanticReferenceServiceTests
         });
 
         using var app = builder.Build();
+        var semantic = WithAuthoritativeResult(app.Semantic, "result-r1", "part");
         var result = app.GetRequiredService<ISemanticReferenceService>()
-            .Resolve(app.Semantic, new SemanticReference("part", "front-face", "face", "result-r1"));
+            .Resolve(semantic, new SemanticReference("part", "front-face", "face", "result-r1"));
 
         Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
         Assert.Equal("result-r1", result.Target!.ResultIdentity);
@@ -133,7 +134,9 @@ public sealed class SemanticReferenceServiceTests
             [],
             "semantic-build");
 
-        using var app = CadApplication.CreateBuilder().AddPart("anchor", "part").Build();
+        var anchorBuilder = CadApplication.CreateBuilder();
+        anchorBuilder.AddPart("anchor", "part");
+        using var app = anchorBuilder.Build();
         var service = app.GetRequiredService<ISemanticReferenceService>();
 
         var missing = service.Resolve(

@@ -108,7 +108,7 @@ public sealed class CadDependencyGraph
             var cycle = Visit(node, state, stack, order);
             if (cycle.Count > 0)
             {
-                    return new CadEvaluationPlan(
+                return new CadEvaluationPlan(
                     CadEvaluationPlanStatus.CycleDetected,
                     [],
                     cycle);

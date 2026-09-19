@@ -194,25 +194,19 @@ A gate that could not execute is **Not validated**, not PASS and not a product f
 
 # 4. ARCHITECTURAL AUTHORITY
 
-The system is layered conceptually as:
+The system is organized conceptually into authority strata:
 
-```text
+```
 Platform Foundation
-        ↓
-Mathematics
-        ↓
-Science
-        ↓
+Mathematical Authority
+Science / Phenomena Services
 CAD Core / Product Semantics
-        ↓
 Engineering Resources
-        ↓
 Specialized Engineering Domains
-        ↓
 Application / Workflow / Presentation
 ```
 
-This is a **logical architecture**, not a requirement that every layer be a separate project.
+These are **conceptual ownership strata, not a linear dependency chain**. A domain may consume several authoritative producers through explicit contracts; no rule requires every layer to depend only on the layer immediately above it.
 
 The normative System-CAD structure, C4 Level 1–4 decomposition, canonical evaluation path, domain dependency rules, template/component/sheet model, simulation-adapter boundary, and mandatory early vertical slice are defined in `docs/SYSTEM_CAD_ARCHITECTURE.md`. This section establishes the governing principle; it does not replace that document.
 
@@ -247,8 +241,6 @@ The .NET system owns, where applicable:
 - lifecycle/collaboration integration.
 
 Do not move these responsibilities into the mathematical kernel merely because the kernel can technically carry more data.
-
----
 
 # 5. MATHEMATICAL AUTHORITY RULE
 

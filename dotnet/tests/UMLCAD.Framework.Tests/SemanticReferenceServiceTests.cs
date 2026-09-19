@@ -115,6 +115,36 @@ public sealed class SemanticReferenceServiceTests
     }
 
     [Fact]
+    public void Same_face_target_across_two_results_is_ambiguous_without_result_selector()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding-a", "face", "front-face", "result-a", "brep-face-a");
+            part.TopologyBinding("binding-b", "face", "front-face", "result-b", "brep-face-b");
+            part.Publication("front-a", "face", "front-face", "result-a", "binding-a");
+            part.Publication("front-b", "face", "front-face", "result-b", "binding-b");
+        });
+
+        using var app = builder.Build();
+        var service = app.GetRequiredService<ISemanticReferenceService>();
+
+        var ambiguous = service.Resolve(
+            app.Semantic,
+            new SemanticReference("part", "front-face", "face"));
+
+        var selected = service.Resolve(
+            app.Semantic,
+            new SemanticReference("part", "front-face", "face", "result-b"));
+
+        Assert.Equal(SemanticReferenceStatus.Ambiguous, ambiguous.Status);
+        Assert.Equal(2, ambiguous.Candidates.Count);
+        Assert.Equal(SemanticReferenceStatus.Resolved, selected.Status);
+        Assert.Equal("result-b", selected.Target!.ResultIdentity);
+        Assert.Equal("binding-b", selected.Target.ProvenanceId);
+    }
+
+    [Fact]
     public void Face_reference_with_missing_publication_is_indeterminate_not_geometry()
     {
         var builder = CadApplication.CreateBuilder();

@@ -297,17 +297,6 @@ internal sealed class SemanticReferenceService : ISemanticReferenceService
                 "REFERENCE_AMBIGUOUS",
                 $"Reference target '{reference.TargetId}' is ambiguous within producer '{reference.ProducerId}'.");
 
-        return Fail(
-                reference,
-                SemanticReferenceStatus.Unsupported,
-                "REFERENCE_UNSUPPORTED_TARGET_KIND",
-                $"Reference target kind '{reference.TargetKind}' is unsupported for producer '{reference.ProducerId}'.");
-
-        return Fail(
-            reference,
-            SemanticReferenceStatus.Missing,
-            "REFERENCE_TARGET_MISSING",
-            $"Reference target '{reference.TargetId}' of kind '{reference.TargetKind}' does not exist under producer '{reference.ProducerId}'.");
     }
 
     private static SemanticReferenceResolution Fail(

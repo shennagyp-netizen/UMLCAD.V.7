@@ -297,6 +297,36 @@ class ApplicationArchitectureTests(unittest.TestCase):
             + "\n".join(violations),
         )
 
+    def test_cycle_detector_detects_a_three_project_cycle(self) -> None:
+        a = Path("/synthetic/a.csproj")
+        b = Path("/synthetic/b.csproj")
+        c_path = Path("/synthetic/c.csproj")
+        synthetic = {
+            a: Project(a, "A", (b,)),
+            b: Project(b, "B", (c_path,)),
+            c_path: Project(c_path, "C", (a,)),
+        }
+
+        cycle = cycle_in_graph(synthetic)
+
+        self.assertIsNotNone(cycle)
+        self.assertEqual(
+            [synthetic[node].name for node in cycle],
+            ["A", "B", "C", "A"],
+        )
+
+    def test_cycle_detector_accepts_a_valid_dag(self) -> None:
+        a = Path("/synthetic/a.csproj")
+        b = Path("/synthetic/b.csproj")
+        c_path = Path("/synthetic/c.csproj")
+        synthetic = {
+            a: Project(a, "A", (b, c_path)),
+            b: Project(b, "B", ()),
+            c_path: Project(c_path, "C", ()),
+        }
+
+        self.assertIsNone(cycle_in_graph(synthetic))
+
     def test_project_references_are_internal_and_acyclic(self) -> None:
         violations: list[str] = []
 

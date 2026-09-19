@@ -92,6 +92,7 @@ The .NET System-CAD layer is authoritative for:
 - evaluation planning;
 - deterministic semantic, evaluation and result identity;
 - cache/invalidation behavior;
+- immutable .NET-owned evaluation history/state;
 - authoritative result integration;
 - topology/reference provenance and evolution;
 - Drawing / PMI meaning;
@@ -315,7 +316,7 @@ A CAD domain depends on this contract, not on concrete Rust types or a particula
 
 ### 6.7 Kernel client / native boundary
 
-Provides transport/process isolation where required.
+Provides transport/process isolation where required. The kernel boundary is stateless from the System-CAD perspective: each request contains explicit operation inputs and each response contains a new mathematical result/evidence. The kernel does not persist or advance CAD evaluation history.
 
 It validates:
 
@@ -345,6 +346,8 @@ Maps mathematical results into System-CAD authoritative results while preserving
 
 A mathematical result that cannot be integrated without losing its semantic identity must fail closed.
 
+The resulting evaluation-history snapshot is created and owned by .NET. It records the ordered operation/result/evidence state of the current evaluation and is replaced by a new immutable snapshot on a completed rebuild. It is not a kernel cache, kernel database, or mutable kernel session.
+
 ### 6.9 Topology and provenance
 
 Topology is authoritative only when supported by a certified mathematical result.
@@ -363,7 +366,7 @@ Derived representations include:
 - manufacturing visualization;
 - simulation visualization.
 
-Representation generation is downstream of authoritative results and never feeds semantic truth backward.
+Representation generation is downstream of authoritative results and never feeds semantic truth backward. No FP operation node invokes representation generation as part of authoritative evaluation.
 
 ---
 

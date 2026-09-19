@@ -93,6 +93,12 @@ public sealed record Sketch(
             throw new ArgumentException("Sketch geometry IDs must be unique.");
     }
 
+    public IReadOnlySet<string> ParameterNames =>
+        Constraints
+            .Where(x => x.Value is not null)
+            .SelectMany(x => x.Value!.ParameterNames)
+            .ToHashSet(StringComparer.Ordinal);
+
     public string CanonicalForm =>
         "sketch:" + Id + ":" + Name +
         "|" + string.Join("|",
@@ -100,7 +106,11 @@ public sealed record Sketch(
                 .Select(x => x.CanonicalForm)) +
         "|" + string.Join("|",
             Constraints.OrderBy(x => x.Id.Value, StringComparer.Ordinal)
-                .Select(x => x.CanonicalForm));
+                .Select(x => x.CanonicalForm)) +
+        "|" + string.Join("|",
+            Supports.OrderBy(x => x.Id.Value, StringComparer.Ordinal)
+                .Select(x =>
+                    $"{x.Id}:{x.TargetKind}:{x.ResultId?.Value ?? "-"}:{x.TopologyKind ?? "-"}:{x.TopologyKey ?? "-"}:{x.PublicationId?.Value ?? "-"}"));
 }
 
 public sealed record BodyDefinition(CadId Id, string Name);
@@ -111,6 +121,9 @@ public abstract record CadOperation(
     string OperationKind,
     IReadOnlyList<CadId> InputOperationIds)
 {
+    public virtual IReadOnlySet<string> ParameterNames =>
+        new HashSet<string>(StringComparer.Ordinal);
+
     public IReadOnlyList<CadReference> References { get; init; } =
         Array.Empty<CadReference>();
 
@@ -150,6 +163,9 @@ public sealed record SketchOperation(
     Sketch Definition)
     : CadOperation(Id, BodyId, "Cad.Sketch", Array.Empty<CadId>)
 {
+    public override IReadOnlySet<string> ParameterNames =>
+        Definition.ParameterNames;
+
     public override string CanonicalDefinition() =>
         base.CanonicalDefinition() + "|definition=" + Definition.CanonicalForm;
 }
@@ -162,6 +178,9 @@ public sealed record ExtrusionOperation(
     string Direction)
     : CadOperation(Id, BodyId, "Cad.Extrusion", new[] { SketchOperationId })
 {
+    public override IReadOnlySet<string> ParameterNames =>
+        Distance.ParameterNames;
+
     public ExtrusionOperation
     {
         ArgumentNullException.ThrowIfNull(Distance);
@@ -183,6 +202,11 @@ public sealed record HoleOperation(
     CadExpression Depth)
     : CadOperation(Id, BodyId, "Cad.Hole", new[] { BaseOperationId })
 {
+    public override IReadOnlySet<string> ParameterNames =>
+        Diameter.ParameterNames
+            .Concat(Depth.ParameterNames)
+            .ToHashSet(StringComparer.Ordinal);
+
     public HoleOperation
     {
         ArgumentNullException.ThrowIfNull(Diameter);
@@ -280,6 +304,23 @@ public sealed record CadPartProgram(CadPartDefinition Definition)
 
         if (Definition.Publications.Any(
                 x => x.Id == publication.Id))
+            throw new InvalidOperationException(
+                $"Publication '{publication.Id}' already exists.");
+
+        return this with
+        {
+            Definition = Definition with
+            {
+                Publications = Definition.Publications.Append(publication).ToArray()
+            }
+        };
+    }
+
+    public CadPartProgram AddPublication(Publication publication)
+    {
+        ArgumentNullException.ThrowIfNull(publication);
+
+        if (Definition.Publications.Any(x => x.Id == publication.Id))
             throw new InvalidOperationException(
                 $"Publication '{publication.Id}' already exists.");
 

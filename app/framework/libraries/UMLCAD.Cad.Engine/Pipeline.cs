@@ -164,11 +164,13 @@ public sealed record CadEvaluationSnapshot(
     KernelEvaluationMode Mode,
     IReadOnlySet<CadId> EvaluatedOperationIds,
     IReadOnlyDictionary<CadId, CadEvaluationOutcome> Outcomes,
-    IReadOnlyDictionary<CadId, CadResultId?> CurrentBodyResults)
+    IReadOnlyDictionary<CadId, CadResultId?> CurrentBodyResults,
+    IReadOnlyList<CadDiagnostic> BodyDiagnostics)
 {
     public bool Succeeded =>
         Outcomes.Count == Part.Operations.Count &&
-        Outcomes.Values.All(x => x.Succeeded);
+        Outcomes.Values.All(x => x.Succeeded) &&
+        BodyDiagnostics.Count == 0;
 
     public CadResultId? CurrentBody(CadId bodyId) =>
         CurrentBodyResults.TryGetValue(bodyId, out var result)
@@ -310,9 +312,6 @@ public sealed class CadEvaluationEngine
             : part.Operations.Select(x => x.Id).ToHashSet();
 
         var outcomes = new Dictionary<CadId, CadEvaluationOutcome>();
-        var currentBodies = part.Bodies.ToDictionary(
-            x => x.Id,
-            _ => (CadResultId?)null);
 
         foreach (var operationId in plan.OperationIds)
         {
@@ -372,10 +371,6 @@ public sealed class CadEvaluationEngine
                 _cache.TryGet(identity, out var cached))
             {
                 outcomes[operationId] = cached;
-
-                if (cached.Result?.Kind == CadResultKind.Body)
-                    currentBodies[operation.BodyId] = cached.Result.Id;
-
                 continue;
             }
 
@@ -477,10 +472,10 @@ public sealed class CadEvaluationEngine
 
             outcomes[operationId] = outcome;
             _cache.Put(identity, outcome);
-
-            if (result.Kind == CadResultKind.Body)
-                currentBodies[operation.BodyId] = result.Id;
         }
+
+        var (currentBodies, bodyDiagnostics) =
+            ResolveCurrentBodies(part, outcomes);
 
         _previous.Clear();
 
@@ -496,8 +491,94 @@ public sealed class CadEvaluationEngine
             outcomes.Keys.ToHashSet(),
             new ReadOnlyDictionary<CadId, CadEvaluationOutcome>(outcomes),
             new ReadOnlyDictionary<CadId, CadResultId?>(
-                currentBodies));
+                currentBodies),
+            bodyDiagnostics);
     }
+    private static (
+        IReadOnlyDictionary<CadId, CadResultId?> Results,
+        IReadOnlyList<CadDiagnostic> Diagnostics)
+        ResolveCurrentBodies(
+            CadPartDefinition part,
+            IReadOnlyDictionary<CadId, CadEvaluationOutcome> outcomes)
+    {
+        var results = part.Bodies.ToDictionary(
+            body => body.Id,
+            _ => (CadResultId?)null);
+
+        var diagnostics = new List<CadDiagnostic>();
+        var operationsByBody = part.Operations
+            .GroupBy(operation => operation.BodyId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.ToArray());
+
+        foreach (var body in part.Bodies)
+        {
+            if (!operationsByBody.TryGetValue(body.Id, out var operations))
+                continue;
+
+            var bodyOperations = operations
+                .Where(operation => operation.OutputKind == CadResultKind.Body)
+                .ToArray();
+
+            if (bodyOperations.Length == 0)
+                continue;
+
+            var consumedByBodyOperation = bodyOperations
+                .SelectMany(operation => operation.InputOperationIds)
+                .ToHashSet();
+
+            var terminal = bodyOperations
+                .Where(operation => !consumedByBodyOperation.Contains(operation.Id))
+                .OrderBy(operation => operation.Id.Value, StringComparer.Ordinal)
+                .ToArray();
+
+            if (terminal.Length != 1)
+            {
+                diagnostics.Add(
+                    new CadDiagnostic(
+                        terminal.Length == 0
+                            ? "CAD_BODY_PIPELINE_CYCLE_OR_NO_TERMINAL"
+                            : "CAD_BODY_PIPELINE_MULTIPLE_TERMINALS",
+                        $"Body '{body.Id}' does not have exactly one terminal body result.",
+                        CadEvaluationStatus.Indeterminate,
+                        body.Id));
+                continue;
+            }
+
+            if (!outcomes.TryGetValue(
+                    terminal[0].Id,
+                    out var outcome) ||
+                outcome.Result is null)
+            {
+                diagnostics.Add(
+                    new CadDiagnostic(
+                        "CAD_CURRENT_BODY_UNAVAILABLE",
+                        $"Terminal body operation '{terminal[0].Id}' has no authoritative result.",
+                        CadEvaluationStatus.Failed,
+                        body.Id));
+                continue;
+            }
+
+            if (outcome.Result.Kind != CadResultKind.Body)
+            {
+                diagnostics.Add(
+                    new CadDiagnostic(
+                        "CAD_CURRENT_BODY_KIND_MISMATCH",
+                        $"Terminal operation '{terminal[0].Id}' did not produce a Body result.",
+                        CadEvaluationStatus.Failed,
+                        body.Id));
+                continue;
+            }
+
+            results[body.Id] = outcome.Result.Id;
+        }
+
+        return (
+            new ReadOnlyDictionary<CadId, CadResultId?>(results),
+            diagnostics.AsReadOnly());
+    }
+
     private static IReadOnlyList<CadReferenceResolution> ResolveReferences(
         CadPartDefinition part,
         CadOperation operation,

@@ -388,7 +388,8 @@ FeatureSpecification
  -> validate authoritative result
  -> integrate topology/provenance
  -> update cache/invalidation
- -> derive representation
+ -> publish immutable .NET evaluation-history snapshot
+ -> [representation request is a separate downstream operation]
  -> expose semantic selection
 ```
 
@@ -889,7 +890,7 @@ FullRecompute(M)
 IncrementalRecompute(M)
 ```
 
-Incremental evaluation uses explicit dependency/change closure.
+Incremental evaluation uses explicit dependency/change closure. The .NET evaluation history records the resulting operation/result commitments and is replaced by a new immutable snapshot. Kernel evaluation does not mutate that history.
 
 Invalidation cannot be inferred from incidental execution order.
 

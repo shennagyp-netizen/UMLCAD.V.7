@@ -62,6 +62,43 @@ public sealed class SystemCadAcceptanceTests
     }
 
     [Fact]
+    public void Published_face_resolves_only_after_authoritative_result_integration()
+    {
+        var builder = CadApplication.CreateBuilder();
+        builder.AddPart("part", "solid", part =>
+        {
+            part.TopologyBinding("binding", "face", "front-face", "result-r1", "brep-face-6");
+            part.Publication("front", "face", "front-face", "result-r1", "binding");
+        });
+
+        using var app = builder.Build();
+        var beforeIdentity = app.Semantic.BuildIdentity;
+        var resultService = app.GetRequiredService<IAuthoritativeResultIntegrationService>();
+        var referenceService = app.GetRequiredService<ISemanticReferenceService>();
+
+        var integrated = resultService.Integrate(
+            app.Semantic,
+            new AuthoritativeResultSemantic(
+                "result-r1",
+                "part",
+                "operation-1",
+                "contract-v1",
+                "evidence-1",
+                AuthoritativeResultStatus.Authoritative));
+
+        var result = referenceService.Resolve(
+            integrated,
+            new SemanticReference("part", "front-face", "face", "result-r1"));
+
+        Assert.Equal(beforeIdentity, integrated.BuildIdentity);
+        Assert.Single(integrated.AuthoritativeResults);
+        Assert.Equal(SemanticReferenceStatus.Resolved, result.Status);
+        Assert.Equal("brep-face-6", app.Semantic.Parts.Single(x => x.Id == "part")
+            .TopologyBindings.Single(x => x.Id == "binding")
+            .AuthoritativeTopologyId);
+    }
+
+    [Fact]
     public void Compiled_constraint_reference_and_semantic_reference_resolve_to_the_same_target()
     {
         var builder = CadApplication.CreateBuilder();

@@ -687,7 +687,7 @@ The purpose of this layer is to provide a programmable System-CAD environment in
 \toprule
 Library & Intended responsibility & Current state \\
 \midrule
-\texttt{UMLCAD.Kernel} & Single concrete gateway to the UMLCAD kernel; bounded transport, cancellation and result validation. & Foundation implemented. \\
+\texttt{UMLCAD.Kernel.Client} & Single concrete gateway to the UMLCAD kernel; bounded transport, cancellation and result validation. & Foundation implemented. \\
 \texttt{UMLCAD.Cad.Contracts} & Shared immutable CAD build/package/result contracts. & Foundation implemented. \\
 \texttt{UMLCAD.Cad.Expressions} & Deterministic typed expression values and identities. & Initial implementation. \\
 \texttt{UMLCAD.Cad.Semantics} & Part, Body, Sketch, References/Publications, Parameters/Expressions, Operations, Results and topology provenance. & \textbf{First semantic core implemented}; broader operation coverage remains incremental. \\
@@ -779,7 +779,7 @@ typed result / topology provenance
 kernel contract
         |
         v
-UMLCAD.Kernel gateway
+UMLCAD.Kernel.Client gateway
         |
         v
 Rust mathematical/native kernel
@@ -1349,7 +1349,7 @@ The principal current Application Layer sources include:
 
 \begin{itemize}
 \item \pathref{app/README.md}
-\item \pathref{app/framework/libraries/UMLCAD.Kernel/KernelApi.cs}
+\item \pathref{app/framework/libraries/UMLCAD.Kernel.Client/KernelClient.cs}
 \item \pathref{app/framework/libraries/UMLCAD.Cad.Contracts/CadContracts.cs}
 \item \pathref{app/framework/libraries/UMLCAD.Cad.Expressions/ExpressionValue.cs}
 \item \pathref{app/framework/libraries/UMLCAD.Cad.Semantics/CadDocument.cs}

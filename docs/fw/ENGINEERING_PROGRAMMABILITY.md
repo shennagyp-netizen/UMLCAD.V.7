@@ -1,55 +1,88 @@
-# Programmable Engineering Knowledge and Rule Services
+# Programmable Engineering Knowledge, Build Rules, and Engineering Supervision
 
 ## 1. Purpose
 
-UMLCAD shall provide a programmable engineering environment in which an engineer can express domain knowledge directly in the host programming language. The platform supplies generic execution, knowledge-access, CAD-control, transaction, dependency, provenance, diagnostics, and validation facilities; it does not attempt to enumerate every possible engineering rule in the core product.
+UMLCAD shall provide a programmable engineering environment in which an engineer can express domain knowledge directly in the host programming language.
 
-An engineer may therefore implement logic such as:
+The platform supplies generic execution, knowledge-access, CAD-control, simulation, transaction, dependency, provenance, diagnostics, caching, and validation facilities. It does not attempt to enumerate every possible engineering rule in the core product.
 
+An engineer-written program may therefore contain:
+
+~~~csharp
+if (...) { ... }
+for (...) { ... }
+try { ... } catch (...) { ... }
+RunSimulation(...);
+Cad.Features.Move(...);
+Cad.Constraints.Add(...);
+Recompute();
 ~~~
-For every laser-cut edge:
-    discover the predicted heat-affected region;
-    inspect material-property degradation in that region;
-    locate functional holes/slots/edges nearby;
-    if a protected load-bearing region overlaps the affected zone:
-        relocate the feature; or
-        add a design constraint; or
-        reject the design; or
-        request a different manufacturing process.
-~~~
 
-The rule implementation is ordinary engineering code. It may contain conditionals, calculations, loops, calls to helper services, local exception handling, and domain-specific algorithms.
+The programming language is the engineering knowledge and control medium. UMLCAD supplies stable semantic services and authority boundaries.
 
 ## 2. Three different responsibilities
 
-The architecture must keep these responsibilities separate:
+The architecture keeps these responsibilities separate:
 
 ~~~
-Physical simulation
-    produces physical facts / fields / influence regions
+Physical / phenomena simulation
+    produces physical facts, fields, influence regions and simulation evidence
 
-Engineering knowledge and rules
-    interpret those facts and make engineering decisions
+Engineering rules / programs
+    interpret facts, enforce engineering requirements, decide actions,
+    and may invoke CAD and simulation services
 
 CAD control services
-    apply those decisions as controlled semantic model changes
+    apply requested actions as controlled semantic CAD changes through the
+    normal CAD evaluation architecture
 ~~~
 
-For example, a laser simulation may produce:
+Simulation does not decide that a hole is forbidden. An engineer-written rule can decide that from the available knowledge.
+
+## 3. Normal build-time engineering enforcement
+
+Engineering rules are part of the normal design-build lifecycle.
+
+When an engineer builds a design:
 
 ~~~
-nominal cut line
-kerf region
-heat-affected region (HAZ)
-temperature history
-geometric deviation field
-material-property change field
-uncertainty / validity evidence
+Engineer CAD program / document
+        |
+        v
+Semantic build
+        |
+        v
+CAD evaluation
+        |
+        v
+Engineering Rule Runtime
+        |
+        +--> inspect design
+        +--> inspect manufacturing knowledge
+        +--> call simulations if required
+        +--> read cached simulation results when valid
+        +--> perform engineering calculations
+        +--> create controlled CAD changes/constraints if appropriate
+        |
+        v
+Validation / recomputation
+        |
+        +--> all mandatory rules satisfied
+        |          |
+        |          v
+        |       build succeeds
+        |
+        +--> rule rejects / vetoes / fails
+                   |
+                   v
+               build refused
 ~~~
 
-The simulation does not decide that a hole is forbidden. A rule can decide that from the available knowledge.
+A build is not successful merely because CAD mathematics evaluated successfully. The engineering-rule layer may reject the build after valid geometry has been produced.
 
-## 3. Rules are executable services
+This is intentional. A geometrically valid design can be engineering-invalid.
+
+## 4. Rules are executable services
 
 The target contract is conceptually:
 
@@ -58,23 +91,29 @@ public interface IEngineeringRule
 {
     RuleIdentity Identity { get; }
     RuleApplicability CheckApplicability(EngineeringContext context);
-    void Execute(EngineeringContext context, IEngineeringServices services);
+
+    RuleExecutionResult Execute(
+        EngineeringContext context,
+        IEngineeringServices services);
 }
 ~~~
 
-The exact API is intentionally deferred until the semantic contracts are refined. The important architectural properties are normative:
+The exact API is intentionally deferred until the semantic contracts are refined.
 
-- rule code is executable host-language code, not restricted to a predeclared DSL;
-- rule code can read generic engineering knowledge;
+Normative properties:
+
+- rule code is executable host-language code, not restricted to a fixed DSL;
+- rule code can read typed engineering knowledge;
 - rule code can invoke controlled CAD operations;
-- rule code can invoke other declared domain services;
-- rule code can implement its own exception handling;
+- rule code can request or invoke phenomena simulations;
+- rule code can query cached simulation results;
+- rule code can implement its own exception handling and recovery;
 - rule code can accept, reject, transform, constrain, or otherwise control engineering state according to its authority and declared scope;
-- the framework preserves transactionality, provenance, dependency tracking, diagnostics, and determinism around execution.
+- the framework records transaction, provenance, dependency, identity, diagnostics, and evidence around execution.
 
-A rule is therefore closer to an engineering service/plugin than to a database check.
+A rule is therefore an engineering program/service, not merely a boolean database check.
 
-## 4. Knowledge access
+## 5. Engineering context and knowledge access
 
 EngineeringContext shall expose stable typed query services rather than a stringly typed dictionary.
 
@@ -87,35 +126,105 @@ EngineeringContext
  ├── Product / assembly structure
  ├── Geometry and topology references
  ├── Drawing / PMI / tolerances
- ├── Material knowledge
- ├── Machine / tool / fixture knowledge
- ├── Process knowledge
+ ├── Materials
+ ├── Machines / tools / fixtures
+ ├── Processes
  ├── Manufacturing simulation results
- ├── Spatial regions and influence regions
+ ├── Spatial regions / influence regions
  ├── Physical fields
  ├── Measurements / inspection results
- └── Configuration / variants
+ └── Configuration / variants / policies
 ~~~
 
-Queries must be semantic and typed. Examples include:
+Queries may include:
 
 ~~~
 Find lines / curves / faces / features
-Find spatial regions around an entity
-Find HAZ / kerf / affected regions generated by an operation
-Sample a field over a region
-Measure minimum distance / overlap / containment
+Find entities near another entity
+Find regions surrounding an entity
+Find HAZ / kerf / affected regions
+Sample a physical/property field over a region
+Measure distance / overlap / containment
 Find material properties at a location or region
-Find tolerance requirements for an entity
+Find tolerance requirements
 Find dependent features / references
-Find process and machine state associated with a manufacturing result
+Find manufacturing provenance
+Find applicable rules
+Find previous simulation executions
 ~~~
 
-A rule may reason about both an entity and its surrounding engineering state. There is no requirement that a physical effect terminate exactly at the nominal geometry boundary.
+A rule can reason about an entity and its surrounding engineering state.
 
-## 5. Spatial knowledge is first-class
+## 6. Simulation calls and simulation-result caching
 
-A manufacturing process can produce spatially distributed effects. The architecture therefore needs a generic SpatialRegion / field model rather than a collection of process-specific properties.
+Rules may request phenomena simulations as part of engineering evaluation.
+
+Conceptually:
+
+~~~csharp
+var result = context.Simulation.GetOrRun(
+    thermalRequest,
+    cachePolicy: CachePolicy.ReuseValid);
+~~~
+
+The rule must not need to know whether the result came from:
+
+~~~
+an in-process solver
+an external solver
+a local process
+a remote service
+CPU
+GPU
+a previous valid simulation execution
+~~~
+
+### Cache identity
+
+A cached simulation result is reusable only when its semantic inputs are equivalent.
+
+The cache identity must include every input that can materially affect the simulation result, including as applicable:
+
+~~~
+phenomenon
+model / solver contract
+geometry/result identity
+material state
+machine/tool/process state
+boundary conditions
+loads
+environment
+mesh/discretization policy when semantically relevant
+numerical settings when semantically relevant
+tolerance / acceptance policy
+configuration
+provider/model version where relevant
+~~~
+
+A cache hit must be semantically equivalent to a fresh execution for the same identity.
+
+A stale, incomplete, invalid, or provenance-incompatible simulation result is not a valid cache hit.
+
+### Simulation during a build
+
+A normal build may therefore be:
+
+~~~
+build
+  -> rule
+      -> simulation request
+          -> valid cache hit
+             OR
+          -> simulation execution
+      -> rule evaluates result
+  -> build succeeds or is rejected
+~~~
+
+Simulation caching is an optimization and reproducibility mechanism, not a shortcut around physical validity.
+
+## 7. Spatial knowledge is first-class
+
+Manufacturing processes can produce spatially distributed effects. The architecture therefore needs generic SpatialRegion and Field semantics.
 
 Conceptually:
 
@@ -149,9 +258,9 @@ MaterialPropertyChangeRegion
 ManufacturingExclusionRegion
 ~~~
 
-These should normally be instances of generic region/field semantics, not mandatory hardcoded subclasses for every phenomenon.
+These should normally be instances of generic region/field semantics, not mandatory hardcoded subclasses for every future phenomenon.
 
-Important physical distinctions must remain explicit:
+Important distinctions remain explicit:
 
 ~~~
 removed material
@@ -161,11 +270,11 @@ removed material
     != surface-quality affected region
 ~~~
 
-A single operation may produce several overlapping regions/fields simultaneously.
+A single operation may produce several overlapping regions and fields simultaneously.
 
-## 6. CAD control from engineering code
+## 8. CAD control from engineering code
 
-The rule layer may control CAD, but it must not mutate private CAD internals or construct raw kernel state. It uses a controlled semantic CAD service.
+The rule layer may control CAD through a controlled semantic CAD service.
 
 Conceptually:
 
@@ -184,9 +293,9 @@ public interface ICadControlService
 }
 ~~~
 
-The actual operation set will be derived from the stable CAD semantic model, not from the Rust API or from internal implementation classes.
+The actual operation set will be derived from the stable CAD semantic model, not from kernel implementation details.
 
-Every mutation is a semantic command/change, not an arbitrary object mutation. This preserves:
+Every mutation is a semantic command/change. This preserves:
 
 - evaluation dependencies;
 - reference semantics;
@@ -197,18 +306,20 @@ Every mutation is a semantic command/change, not an arbitrary object mutation. T
 - authoritative kernel evaluation;
 - undo/redo or transaction semantics where applicable.
 
-The rule can therefore say what engineering action to perform, while the CAD engine remains responsible for executing the semantic operation correctly.
+Human commands, automation, and engineering programs should ultimately use the same semantic CAD command machinery.
 
-## 7. Rules may create engineering constraints
+## 9. Rules may create engineering constraints
 
-A manufacturing effect can be converted into a design restriction without embedding CAM logic inside the CAD core.
+A manufacturing effect can become a design restriction without placing CAM-specific logic inside the CAD core.
+
+Example:
 
 ~~~
 laser operation
-    -> simulation
+    -> phenomena simulation
     -> HAZ / material-strength field
     -> engineering rule
-    -> design constraint
+    -> engineering constraint
     -> CAD evaluation
 ~~~
 
@@ -217,25 +328,23 @@ Examples:
 ~~~
 Hole H must not overlap region R.
 Hole H must remain at least 4 mm from R.
-Mounting surface may not intersect a material-strength-reduction field.
-A critical edge shall not be exposed to a specified thermal history.
-A feature may proceed only if predicted deviation remains within PMI tolerance.
+Mounting surface may not intersect a strength-reduction field.
+A critical edge shall not be exposed to specified thermal history.
+A feature may proceed only when predicted deviation remains within PMI tolerance.
 ~~~
 
-The rule owns the engineering interpretation. The resulting constraint is owned by the appropriate CAD/Knowledge semantic system.
+The rule owns the engineering interpretation. The generated constraint is part of the CAD/Knowledge semantic state and retains provenance to the rule and source evidence.
 
-## 8. Rule execution is transactional
+## 10. Rule execution is transactional
 
-Rule-controlled CAD changes must execute inside a transaction/change set.
-
-Conceptually:
+Rule-controlled CAD changes execute inside a transaction/change set.
 
 ~~~
 Rule starts
     -> inspect context
     -> issue semantic CAD changes
     -> validate/recompute
-    -> run dependent rules if required
+    -> call additional rules/simulations as required
     -> commit
 
 failure / uncaught exception / invalid result
@@ -243,13 +352,52 @@ failure / uncaught exception / invalid result
     -> preserve failure evidence
 ~~~
 
-The rule may catch its own exceptions and choose its own recovery path. If it does not catch an exception, the framework converts the unhandled exception into an explicit rule-execution failure and rolls back the current rule transaction.
+The rule may catch its own exception and intentionally recover.
 
-No rule is allowed to leave partially applied semantic mutations merely because an exception occurred halfway through execution.
+If it does not catch an exception, the framework records an explicit rule-execution failure and rolls back the current rule transaction.
 
-## 9. Rules can intentionally control workflow outcomes
+No rule is allowed to leave partially applied semantic mutations because of an exception.
 
-A rule is not restricted to a boolean test. Its controlled outcome may be:
+## 11. Build refusal and expressive engineering diagnostics
+
+Mandatory engineering rules run as part of build validation.
+
+A rule can refuse the build with an expressive result such as:
+
+~~~
+ENGINEERING_RULE_FAILED
+
+Rule:
+    CriticalMountingRegion.HazExclusion v4
+
+Affected entity:
+    Hole H17
+
+Affected region:
+    ManufacturingRegion R42
+
+Reason:
+    Predicted minimum material strength in R42 = 280 MPa
+    Required minimum strength = 350 MPa
+
+Evidence:
+    ThermalSimulationResult T938
+    MaterialField M77
+
+Action:
+    Move the hole, modify the manufacturing process,
+    or change the applicable engineering design.
+~~~
+
+The build framework should expose structured diagnostics to the engineer rather than reducing the outcome to a generic exception message.
+
+Build refusal must be explicit and deterministic.
+
+## 12. Rules can intentionally control workflow outcomes
+
+A rule is not restricted to boolean output.
+
+Possible controlled outcomes include:
 
 ~~~
 Pass
@@ -266,13 +414,13 @@ Unsupported
 Failed
 ~~~
 
-A rule may also produce structured engineering diagnostics and affected-entity/affected-region references.
+A mandatory rejecting rule causes build refusal unless an explicitly authorized recovery/override path resolves it.
 
-## 10. Rule composition and overrides
+## 13. Rule composition and overrides
 
 UMLCAD shall ship default rule implementations, but defaults are not semantic law.
 
-The architecture must support:
+Support:
 
 ~~~
 Default implementation
@@ -283,11 +431,11 @@ Default implementation
        +--> disabled/replaced where policy allows
 ~~~
 
-The selected implementation and precedence must be deterministic.
+Selection and precedence are deterministic.
 
-A rule contract is stable; an implementation can evolve independently subject to version/compatibility rules.
+The selected implementation, version and policy participate in provenance and, when authoritative, in evaluation identity.
 
-## 11. Rule identity and provenance
+## 14. Rule identity and provenance
 
 A rule result must identify at least:
 
@@ -295,7 +443,8 @@ A rule result must identify at least:
 rule identity
 rule implementation/version
 input context identity
-relevant simulation/result identities
+relevant CAD/result identities
+relevant simulation-result identities
 configuration/policy identity
 execution identity
 affected semantic entities
@@ -304,104 +453,172 @@ outcome
 diagnostics/evidence
 ~~~
 
-This makes the result auditable and prevents a hidden code change from appearing to be the same engineering decision.
+If a rule implementation influences an authoritative build result, its identity/version must participate in the relevant evaluation identity.
 
-If a rule implementation influences an authoritative result, the implementation identity/version must participate in the relevant evaluation identity.
+## 15. Recursion, cycles and termination
 
-## 12. Recursion, cycles, and termination
+Because rules can modify CAD and those modifications can trigger further evaluation, rule execution is a graph problem.
 
-Because rules can modify CAD and those modifications can trigger further rules, rule execution is a graph problem. The platform must explicitly detect and control:
+The platform must detect/control:
 
-- direct rule recursion;
-- A -> B -> A rule cycles;
+- direct recursion;
+- A -> B -> A cycles;
 - change/recompute storms;
 - oscillating parameter corrections;
 - repeated identical mutations;
-- excessive rule depth/steps;
-- dependency cycles created by generated constraints.
+- excessive execution depth/steps;
+- constraint cycles;
+- simulation/rule feedback loops.
 
-The engine should use deterministic execution identities, dependency closure, transaction generations, and explicit execution budgets/guards. A cycle or exhausted budget fails closed with evidence rather than silently continuing forever.
+The engine should use deterministic execution identities, dependency closure, transaction generations, simulation cache identity, and explicit execution budgets/guards.
 
-## 13. Deterministic rules versus intentionally stateful services
+A cycle or exhausted budget fails closed with evidence rather than continuing indefinitely.
 
-An engineering rule that contributes to an authoritative build must behave deterministically for the declared inputs. Hidden ambient state, wall-clock time, random numbers, machine-local files, or uncontrolled network responses must not influence an authoritative decision without being modeled as explicit inputs.
+## 16. Determinism and stateful engineering knowledge
 
-A stateful service such as a machine calibration database or tool-life history is legitimate, but the relevant snapshot/version/identity must become an explicit input to the evaluation.
+A rule that contributes to an authoritative build must be deterministic for its declared inputs.
 
-## 14. Rule access is broad; authority is still controlled
+Hidden ambient state, wall-clock time, random numbers, untracked local files, or uncontrolled network responses must not influence authoritative decisions without being modeled as explicit inputs.
 
-The intention is maximum engineering expressiveness with controlled semantic boundaries.
+Stateful facts such as machine calibration, tool-life history, measurement databases, or simulation caches are legitimate, but their relevant snapshot/version/identity must become explicit evaluation inputs.
 
-A rule may be able to read and manipulate a great deal, but it should not bypass the authoritative mechanisms. In particular, a rule must not:
+## 17. Engineering Supervision
 
-- write private kernel memory;
-- fabricate an authoritative B-Rep result;
-- bypass reference resolution;
-- mutate topology identities directly;
-- declare unsupported mathematics to be successful;
-- bypass transaction or provenance recording;
-- silently convert provider failure into engineering success.
+Engineering Supervision is a distinct programmable layer above ordinary build-time rules.
 
-The rule controls engineering intent and decisions through public semantic services. The kernel remains responsible for mathematical authority.
+Its purpose is not merely to ask whether the current design passes rules. It can write sophisticated, general CAD revisions and execute complete engineering scenarios that behave like engineering-level unit tests, integration tests, regression tests, and exploratory design procedures.
 
-## 15. Manufacturing-to-design reasoning
-
-This architecture allows manufacturing restrictions to become design restrictions without making CAM the owner of design semantics.
-
-Example:
+Conceptually:
 
 ~~~
-CAD edge E
-    -> laser manufacturing operation
-    -> thermal + material simulation
-    -> HAZ region R
-    -> strength field S(x,y,z)
-    -> custom engineer rule
-    -> detect torque-bearing hole H in R
-    -> create constraint: H intersects R = empty
-    -> recompute CAD
+Engineering Supervision Program
+        |
+        +--> create temporary/revision CAD state
+        +--> modify CAD through the same semantic control API
+        +--> invoke ordinary engineering rules
+        +--> invoke simulations
+        +--> inspect resulting knowledge/fields
+        +--> assert engineering expectations
+        +--> compare revisions/results
+        +--> commit a deliberate revision
+            OR
+        +--> discard the experimental revision
 ~~~
 
-The same mechanism can be used for milling, grinding, additive manufacturing, forming, welding, machining distortion, tool access, inspection access, or any future process.
+A supervision program is therefore able to express workflows such as:
 
-## 16. Phenomena simulation relationship
+~~~
+Create a sketch on a specified face
+Add a rectangle and three circles
+Create three holes
+Build
+Expect required rules to execute
+Expect a selected rule to reject the build
+Inspect the diagnostic
+Modify the design
+Rebuild
+Run thermal simulation
+Inspect the HAZ field
+Create another revision
+Verify tolerance result
+Commit the acceptable revision
+~~~
 
-Phenomena simulation remains a separate computational capability. Typical phenomena include thermal, structural, fluid, electromagnetic, and coupled/multiphysics analyses. The manufacturing simulator composes such phenomena with manufacturing context, machine/tool/process state, material state, and workpiece evolution.
+This is more powerful than a conventional test fixture because the supervision program itself can construct and modify a realistic engineering scenario using normal CAD semantics.
 
-The simulation produces physical evidence; the rule system interprets it. Neither simulation nor CAM should be forced to contain every engineering decision.
+## 18. Engineering Supervision versus ordinary rules
 
-## 17. Boundary to the UMLCAD Kernel
+The distinction is:
 
-The rule system and all engineering .NET libraries use the UMLCAD Kernel API as one concrete kernel boundary. They must not depend on Rust language constructs, Rust crate names, OCCT classes, Metal types, CUDA types, or transport implementation details.
+~~~
+Engineering Rules
+    protect the design during ordinary engineering builds.
+    They are part of normal build validation and can veto the build.
 
-The current RustKernelService may remain as transitional infrastructure until the kernel-facing implementation is refactored. The future semantic contract should be named for the UMLCAD Kernel capability, not for its current implementation language.
+Engineering Supervision
+    deliberately drives the system through complex scenarios.
+    It can create revisions, mutate designs, invoke rules/simulations,
+    assert expected engineering behavior, and decide whether a revision
+    should be retained.
+~~~
 
-## 18. Security / trust boundary for executable rules
+A supervision program may call rules; ordinary rules do not implicitly become supervision programs.
 
-Because rules are executable code with CAD-write authority, deployment and loading are a trust decision. A production implementation should define:
+Supervision should normally operate in isolated revision/transaction contexts so experimentation cannot silently corrupt the engineer's current authoritative design.
+
+## 19. Engineering Supervision as executable engineering tests
+
+Engineering Supervision can express tests at several levels:
+
+~~~
+Unit-like:
+    test one engineering rule or CAD semantic operation.
+
+Integration-like:
+    create a realistic model and verify interactions between CAD,
+    manufacturing, simulation, tolerancing and rules.
+
+System-like:
+    execute a complete design/manufacturing lifecycle.
+
+Regression-like:
+    replay a known engineering scenario against a new system revision.
+
+Exploratory:
+    programmatically generate and evaluate design alternatives.
+~~~
+
+The repository's traditional automated test infrastructure still remains necessary. Engineering Supervision is a product-level engineering verification capability, not a replacement for software unit tests, integration tests, or security testing.
+
+## 20. Boundary to the UMLCAD Kernel
+
+The rule system, Engineering Supervision, and all engineering .NET libraries use the UMLCAD Kernel API as the single concrete kernel boundary.
+
+They must not depend on Rust language constructs, Rust crate names, OCCT classes, Metal types, CUDA types, or transport implementation details.
+
+The current RustKernelService may remain transitional infrastructure until the kernel-facing implementation is refactored. The long-term semantic contract is named for the UMLCAD Kernel, not for its implementation language.
+
+## 21. Security and trust boundary
+
+Because rules and supervision are executable code with CAD-write authority, deployment and loading are trust decisions.
+
+A production implementation should define:
 
 - trusted assembly/package sources;
 - version compatibility;
 - capability declarations;
-- deterministic/reproducible build expectations;
+- reproducible build expectations;
 - resource/time limits where needed;
 - isolation policy for untrusted code;
-- audit trail for rule installation and replacement.
+- audit trail for rule/supervision installation and replacement.
 
 Sandboxing protects the host; semantic contracts protect engineering truth.
 
-## 19. Architectural invariant
+## 22. Architectural invariant
 
 ~~~
-Simulation produces facts
-        +
-Rules produce engineering decisions
-        +
-CAD services apply semantic changes
-        +
-Kernel proves mathematical results
-        =
-Programmable System-CAD
+Phenomena simulation
+    -> produces engineering facts
+
+Engineering rule/program
+    -> reads facts
+    -> reasons
+    -> optionally simulates
+    -> optionally changes CAD
+    -> can reject the current build
+
+Engineering Supervision
+    -> deliberately constructs/revises CAD scenarios
+    -> invokes rules/simulation
+    -> verifies system behavior
+    -> retains or discards revisions
+
+CAD services
+    -> apply semantic changes
+
+UMLCAD Kernel
+    -> proves mathematical CAD results
+
+= Programmable, supervised System-CAD
 ~~~
 
-This is the target architecture for future work in docs/fw/.

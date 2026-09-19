@@ -33,7 +33,7 @@ public sealed class CadDependencyGraph
 }
 public sealed record CadEvaluationOptions(string ConfigurationIdentity="default",string TolerancePolicyIdentity="default");
 public sealed record CadEvaluationOutcome(CadId OperationId,string OperationKind,CadEvaluationIdentity EvaluationIdentity,CadEvaluationStatus Status,CadResult? Result,IReadOnlyList<CadDiagnostic> Diagnostics);
-public sealed record CadEvaluationSnapshot(CadPart Part,CadEvaluationPlan Plan,KernelEvaluationMode Mode,IReadOnlySet<CadId> InvalidatedOperationIds,IReadOnlyDictionary<CadId,CadEvaluationOutcome> Outcomes,IReadOnlyDictionary<CadId,CadResultId?> CurrentBodyResults)
+public sealed record CadEvaluationSnapshot(CadPart Part,CadEvaluationPlan Plan,KernelEvaluationMode Mode,KernelHistoryIdentity? KernelHistory,IReadOnlySet<CadId> InvalidatedOperationIds,IReadOnlyDictionary<CadId,CadEvaluationOutcome> Outcomes,IReadOnlyDictionary<CadId,CadResultId?> CurrentBodyResults)
 {
     public bool Succeeded=>Outcomes.Count==Part.Operations.Count&&Outcomes.Values.All(x=>x.Status==CadEvaluationStatus.Succeeded);
     public CadResultId? CurrentBody(CadId bodyId)=>CurrentBodyResults.TryGetValue(bodyId,out var id)?id:null;
@@ -57,13 +57,14 @@ public static class CadEvaluationIdentityBuilder
 public sealed class CadEvaluationEngine
 {
     private readonly IKernelGateway _kernel;private readonly ICadOperationCache _cache;private readonly Dictionary<CadId,CadEvaluationOutcome> _previous=new();
+    private KernelHistoryIdentity? _previousKernelHistory;
     public CadEvaluationEngine(IKernelGateway kernel,ICadOperationCache? cache=null){_kernel=kernel??throw new ArgumentNullException(nameof(kernel));_cache=cache??new InMemoryCadOperationCache();}
     public Task<CadEvaluationSnapshot> EvaluateAsync(CadPart part,CadEvaluationOptions? options=null,CancellationToken cancellationToken=default)=>EvaluateCoreAsync(part,null,options,cancellationToken);
     public Task<CadEvaluationSnapshot> RebuildAsync(CadPart part,IReadOnlySet<CadId> changed,CadEvaluationOptions? options=null,CancellationToken cancellationToken=default)=>EvaluateCoreAsync(part,changed,options,cancellationToken);
     private async Task<CadEvaluationSnapshot> EvaluateCoreAsync(CadPart part,IReadOnlySet<CadId>? changed,CadEvaluationOptions? options,CancellationToken cancellationToken)
     {
         options??=new();var graph=new CadDependencyGraph(part);var plan=graph.Plan();var incremental=changed is not null;var invalidated=incremental?graph.InvalidationClosure(changed!):part.Operations.Select(x=>x.Id).ToHashSet();
-        var byId=part.Operations.ToDictionary(x=>x.Id);var outcomes=new Dictionary<CadId,CadEvaluationOutcome>();var bodies=part.Bodies.ToDictionary(x=>x.Id,_=>(CadResultId?)null);
+        var byId=part.Operations.ToDictionary(x=>x.Id);var outcomes=new Dictionary<CadId,CadEvaluationOutcome>();var bodies=part.Bodies.ToDictionary(x=>x.Id,_=>(CadResultId?)null);var kernelHistory=incremental?_previousKernelHistory:null;
         foreach(var id in plan.OperationIds)
         {
             cancellationToken.ThrowIfCancellationRequested();var op=byId[id];var upstream=graph.DependenciesOf(id).Select(x=>outcomes[x]).ToArray();
@@ -74,7 +75,7 @@ public sealed class CadEvaluationEngine
             var previousResultId=incremental&&_previous.TryGetValue(id,out var previousForOperation)
                 ? previousForOperation.Result?.Id
                 : null;
-            var request=new KernelOperationRequest(CadContractVersions.KernelOperation,identity,part.Id.Value,op.Id,op.OperationKind,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,previousResultId,inputResults,op.SemanticInputs);
+            var request=new KernelOperationRequest(CadContractVersions.KernelOperation,identity,part.Id.Value,op.Id,op.OperationKind,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,previousResultId,inputResults,op.SemanticInputs,kernelHistory);
             KernelOperationResponse response;
             try
             {
@@ -112,12 +113,14 @@ public sealed class CadEvaluationEngine
                     });
                 continue;
             }
-            if(response.Status!=CadEvaluationStatus.Succeeded||response.AuthoritativeResultId is null||string.IsNullOrWhiteSpace(response.EvidenceHash)){outcomes[id]=new CadEvaluationOutcome(id,op.OperationKind,identity,response.Status,null,response.Diagnostics);continue;}
+            if(response.Status!=CadEvaluationStatus.Succeeded||response.AuthoritativeResultId is null||string.IsNullOrWhiteSpace(response.EvidenceHash)||response.HistoryIdentity is null){outcomes[id]=new CadEvaluationOutcome(id,op.OperationKind,identity,response.Status,null,response.Diagnostics);continue;}
+            kernelHistory=response.HistoryIdentity;
             var kind=op is SketchOperation?CadResultKind.SketchProfile:CadResultKind.Body;
             var result=new CadResult(response.AuthoritativeResultId.Value,kind,id,inputResults,response.EvidenceHash!,response.Topology);
             var outcome=new CadEvaluationOutcome(id,op.OperationKind,identity,response.Status,result,response.Diagnostics);outcomes[id]=outcome;_cache.Put(identity,outcome);if(kind==CadResultKind.Body)bodies[op.BodyId]=result.Id;
         }
         _previous.Clear();foreach(var x in outcomes)_previous[x.Key]=x.Value;
-        return new CadEvaluationSnapshot(part,plan,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,invalidated,new ReadOnlyDictionary<CadId,CadEvaluationOutcome>(outcomes),new ReadOnlyDictionary<CadId,CadResultId?>(bodies));
+        _previousKernelHistory=kernelHistory;
+        return new CadEvaluationSnapshot(part,plan,incremental?KernelEvaluationMode.Incremental:KernelEvaluationMode.Full,kernelHistory,new ReadOnlySetAdapter<CadId>(invalidated),new ReadOnlyDictionary<CadId,CadEvaluationOutcome>(outcomes),new ReadOnlyDictionary<CadId,CadResultId?>(bodies));
     }
 }

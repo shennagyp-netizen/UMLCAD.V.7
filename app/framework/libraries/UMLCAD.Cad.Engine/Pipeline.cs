@@ -140,12 +140,19 @@ public sealed record CadEvaluationOptions(
     string TolerancePolicyIdentity = "default",
     string RepresentationPolicyIdentity = "default");
 
+public sealed record CadReferenceResolution(
+    CadReference Reference,
+    CadEvaluationStatus Status,
+    CadResultId? ResolvedResult,
+    string? Diagnostic);
+
 public sealed record CadEvaluationOutcome(
     CadId OperationId,
     string OperationKind,
     CadEvaluationIdentity EvaluationIdentity,
     CadEvaluationStatus Status,
     CadResultEnvelope? Result,
+    IReadOnlyList<CadReferenceResolution> References,
     IReadOnlyList<CadDiagnostic> Diagnostics)
 {
     public bool Succeeded => Status == CadEvaluationStatus.Succeeded;
@@ -202,6 +209,7 @@ public static class CadEvaluationIdentityBuilder
         CadPartDefinition part,
         CadOperation operation,
         IReadOnlyList<CadResultEnvelope> upstream,
+        IReadOnlyList<CadReferenceResolution> references,
         CadEvaluationOptions options)
     {
         var builder = new StringBuilder()
@@ -211,6 +219,19 @@ public static class CadEvaluationIdentityBuilder
             .Append("|configuration=").Append(options.ConfigurationIdentity)
             .Append("|tolerance=").Append(options.TolerancePolicyIdentity)
             .Append("|representation=").Append(options.RepresentationPolicyIdentity);
+
+        foreach (var reference in references
+                     .OrderBy(x => x.Reference.Id.Value, StringComparer.Ordinal))
+        {
+            builder.Append("|reference=")
+                .Append(reference.Reference.Id.Value)
+                .Append(':')
+                .Append(reference.Status)
+                .Append(':')
+                .Append(reference.ResolvedResult?.Value ?? "-")
+                .Append(':')
+                .Append(reference.Diagnostic ?? "-");
+        }
 
         foreach (var parameter in part.Parameters
                      .OrderBy(x => x.Name, StringComparer.Ordinal))
@@ -226,6 +247,153 @@ public static class CadEvaluationIdentityBuilder
                 SHA256.HashData(
                     Encoding.UTF8.GetBytes(builder.ToString())))
                 .ToLowerInvariant());
+    private static IReadOnlyList<CadReferenceResolution> ResolveReferences(
+        CadPartDefinition part,
+        CadOperation operation,
+        IReadOnlyList<CadResultEnvelope> upstream,
+        IReadOnlyDictionary<CadId, CadEvaluationOutcome> outcomes)
+    {
+        var resolutions = new List<CadReferenceResolution>();
+
+        foreach (var reference in operation.References)
+        {
+            switch (reference.TargetKind)
+            {
+                case ReferenceTargetKind.Result:
+                {
+                    var result = outcomes.Values
+                        .Select(x => x.Result)
+                        .FirstOrDefault(x =>
+                            x is not null &&
+                            x.Id == reference.ResultId);
+
+                    resolutions.Add(result is null
+                        ? new CadReferenceResolution(
+                            reference,
+                            CadEvaluationStatus.Failed,
+                            null,
+                            "Referenced authoritative result is unavailable.")
+                        : new CadReferenceResolution(
+                            reference,
+                            CadEvaluationStatus.Succeeded,
+                            result.Id,
+                            null));
+                    break;
+                }
+
+                case ReferenceTargetKind.Topology:
+                {
+                    var result = outcomes.Values
+                        .Select(x => x.Result)
+                        .FirstOrDefault(x =>
+                            x is not null &&
+                            x.Id == reference.ResultId);
+
+                    if (result is null)
+                    {
+                        resolutions.Add(
+                            new CadReferenceResolution(
+                                reference,
+                                CadEvaluationStatus.Failed,
+                                null,
+                                "Referenced topology result is unavailable."));
+                        break;
+                    }
+
+                    var matchCount = result.Topology.Count(x =>
+                        string.Equals(
+                            x.Kind,
+                            reference.TopologyKind,
+                            StringComparison.Ordinal) &&
+                        string.Equals(
+                            x.Key,
+                            reference.TopologyKey,
+                            StringComparison.Ordinal));
+
+                    resolutions.Add(
+                        matchCount switch
+                        {
+                            1 => new CadReferenceResolution(
+                                reference,
+                                CadEvaluationStatus.Succeeded,
+                                result.Id,
+                                null),
+                            0 => new CadReferenceResolution(
+                                reference,
+                                CadEvaluationStatus.Failed,
+                                null,
+                                "Requested topology entity does not exist in the authoritative result."),
+                            _ => new CadReferenceResolution(
+                                reference,
+                                CadEvaluationStatus.Ambiguous,
+                                null,
+                                "Requested topology entity is multiply bound.")
+                        });
+                    break;
+                }
+
+                case ReferenceTargetKind.Publication:
+                {
+                    var publication = part.Publications
+                        .Where(x => x.Id == reference.PublicationId)
+                        .ToArray();
+
+                    if (publication.Length != 1)
+                    {
+                        resolutions.Add(
+                            new CadReferenceResolution(
+                                reference,
+                                publication.Length == 0
+                                    ? CadEvaluationStatus.Failed
+                                    : CadEvaluationStatus.Ambiguous,
+                                null,
+                                "Publication cannot be resolved uniquely."));
+                        break;
+                    }
+
+                    var source = outcomes.Values
+                        .Select(x => x.Result)
+                        .FirstOrDefault(x =>
+                            x is not null &&
+                            x.Id == publication[0].SourceResult);
+
+                    resolutions.Add(source is null
+                        ? new CadReferenceResolution(
+                            reference,
+                            CadEvaluationStatus.Failed,
+                            null,
+                            "Publication source result is unavailable.")
+                        : new CadReferenceResolution(
+                            reference,
+                            CadEvaluationStatus.Succeeded,
+                            source.Id,
+                            null));
+                    break;
+                }
+
+                case ReferenceTargetKind.Semantic:
+                    resolutions.Add(
+                        new CadReferenceResolution(
+                            reference,
+                            CadEvaluationStatus.Unsupported,
+                            null,
+                            "Generic semantic references require an explicit semantic catalog."));
+                    break;
+
+                default:
+                    resolutions.Add(
+                        new CadReferenceResolution(
+                            reference,
+                            CadEvaluationStatus.Unsupported,
+                            null,
+                            "Unknown reference target kind."));
+                    break;
+            }
+        }
+
+        return resolutions;
+    }
+
     }
 }
 
@@ -303,11 +471,45 @@ public sealed class CadEvaluationEngine
                 .Cast<CadResultEnvelope>()
                 .ToArray();
 
+            var references = ResolveReferences(
+                part,
+                operation,
+                upstream,
+                outcomes);
+
+            var invalidReference = references.FirstOrDefault(
+                x => x.Status != CadEvaluationStatus.Succeeded);
+
             var identity = CadEvaluationIdentityBuilder.Build(
                 part,
                 operation,
                 upstream,
+                references,
                 options);
+
+            if (invalidReference is not null)
+            {
+                var failed = new CadEvaluationOutcome(
+                    operation.Id,
+                    operation.OperationKind,
+                    identity,
+                    invalidReference.Status,
+                    null,
+                    references,
+                    new[]
+                    {
+                        new CadDiagnostic(
+                            "CAD_REFERENCE_RESOLUTION_FAILED",
+                            invalidReference.Diagnostic ??
+                            $"Reference '{invalidReference.Reference.Id}' failed resolution.",
+                            invalidReference.Status,
+                            operation.Id)
+                    });
+
+                outcomes[operationId] = failed;
+                _cache.Put(identity, failed);
+                break;
+            }
 
             if (incremental &&
                 !invalidated.Contains(operationId) &&
@@ -384,6 +586,7 @@ public sealed class CadEvaluationEngine
                     identity,
                     response.Status,
                     null,
+                    references,
                     response.Diagnostics);
 
                 outcomes[operationId] = failure;
@@ -415,6 +618,7 @@ public sealed class CadEvaluationEngine
                 identity,
                 response.Status,
                 result,
+                references,
                 response.Diagnostics);
 
             outcomes[operationId] = outcome;

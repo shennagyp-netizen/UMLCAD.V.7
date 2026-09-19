@@ -12,5 +12,5 @@ Console.WriteLine($"Pipeline: {string.Join(" -> ",snapshot.Plan.OperationIds)}")
 Console.WriteLine($"Final Body: {snapshot.CurrentBody(new CadId("body"))}");
 sealed class DemoKernel:IKernelGateway
 {
- public Task<KernelOperationResponse> EvaluateAsync(KernelOperationRequest r,CancellationToken c=default)=>Task.FromResult(new KernelOperationResponse(CadEvaluationStatus.Succeeded,new CadResultId("demo:"+r.OperationId.Value),"demo",new[]{new KernelTopologyBinding("operation",r.OperationId.Value)},Array.Empty<CadDiagnostic>()));
+ public Task<KernelOperationResponse> EvaluateAsync(KernelOperationRequest r,CancellationToken c=default)=>Task.FromResult(KernelOperationResponse.Success(r,new CadResultId("demo:"+r.OperationId.Value),"demo",new[]{new KernelTopologyBinding("operation",r.OperationId.Value)}));
 }

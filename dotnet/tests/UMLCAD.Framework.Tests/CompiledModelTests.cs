@@ -109,7 +109,7 @@ public sealed class CompiledModelTests
         using var app = builder.Build();
         var manifest = app.CreateCompiledModelManifest();
 
-        var face = manifest.Nodes.Single(x => x.Id == "definition:part:part/face:front-face");
+        var face = manifest.Nodes.Single(x => x.Id == "definition:part:part/face:front");
         Assert.Equal("Face", face.Kind);
         Assert.Equal("result-r1", face.Metadata["resultIdentity"].GetString());
         Assert.Equal("topology-front", face.Metadata["topologyBindingId"].GetString());

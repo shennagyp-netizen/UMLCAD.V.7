@@ -67,7 +67,7 @@ public sealed class CadEvaluationEngine
         foreach(var id in plan.OperationIds)
         {
             cancellationToken.ThrowIfCancellationRequested();var op=byId[id];var upstream=graph.DependenciesOf(id).Select(x=>outcomes[x]).ToArray();
-            if(upstream.Any(x=>x.Status!=CadEvaluationStatus.Succeeded)){outcomes[id]=new CadEvaluationOutcome(id,op.OperationKind,new CadEvaluationIdentity("blocked:"+id.Value),CadEvaluationStatus.Failed,null,new[]{new CadDiagnostic("DEPENDENCY_FAILED","Unsuccessful upstream operation blocks this operation.",CadEvaluationStatus.Failed,id)});break;}
+            if(upstream.Any(x=>x.Status!=CadEvaluationStatus.Succeeded)){outcomes[id]=new CadEvaluationOutcome(id,op.OperationKind,new CadEvaluationIdentity("blocked:"+id.Value),CadEvaluationStatus.Failed,null,new[]{new CadDiagnostic("DEPENDENCY_FAILED","Unsuccessful upstream operation blocks this operation.",CadEvaluationStatus.Failed,id)});continue;}
             var upstreamResults=upstream.Select(x=>x.Result!).ToArray();var identity=CadEvaluationIdentityBuilder.Build(part.Id.Value,op,upstreamResults,options);
             if(incremental&&!invalidated.Contains(id)&&_previous.TryGetValue(id,out var previous)&&previous.EvaluationIdentity==identity&&_cache.TryGet(identity,out var cached)){outcomes[id]=cached;if(cached.Result?.Kind==CadResultKind.Body)bodies[op.BodyId]=cached.Result.Id;continue;}
             var inputResults=upstreamResults.Select(x=>x.Id).ToArray();
@@ -107,9 +107,9 @@ public sealed class CadEvaluationEngine
                             CadEvaluationStatus.Failed,
                             id)
                     });
-                break;
+                continue;
             }
-            if(response.Status!=CadEvaluationStatus.Succeeded||response.AuthoritativeResultId is null||string.IsNullOrWhiteSpace(response.EvidenceHash)){outcomes[id]=new CadEvaluationOutcome(id,op.OperationKind,identity,response.Status,null,response.Diagnostics);break;}
+            if(response.Status!=CadEvaluationStatus.Succeeded||response.AuthoritativeResultId is null||string.IsNullOrWhiteSpace(response.EvidenceHash)){outcomes[id]=new CadEvaluationOutcome(id,op.OperationKind,identity,response.Status,null,response.Diagnostics);continue;}
             var kind=op is SketchOperation?CadResultKind.SketchProfile:CadResultKind.Body;
             var result=new CadResult(response.AuthoritativeResultId.Value,kind,id,inputResults,response.EvidenceHash!,response.Topology);
             var outcome=new CadEvaluationOutcome(id,op.OperationKind,identity,response.Status,result,response.Diagnostics);outcomes[id]=outcome;_cache.Put(identity,outcome);if(kind==CadResultKind.Body)bodies[op.BodyId]=result.Id;

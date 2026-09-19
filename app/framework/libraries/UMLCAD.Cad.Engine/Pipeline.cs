@@ -249,7 +249,6 @@ public static class CadEvaluationIdentityBuilder
                     Encoding.UTF8.GetBytes(builder.ToString())))
                 .ToLowerInvariant());
     }
-    }
 }
 
 public sealed class CadEvaluationEngine

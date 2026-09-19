@@ -169,7 +169,7 @@ Container / subsystem & Responsibility \\
 
 \chapter{C4 Level 3 - System-CAD Components}
 
-The System-CAD target is decomposed into stable semantic responsibilities. The current repository may combine several responsibilities inside the existing Framework surface; the decomposition is architectural and does not require premature project fragmentation.
+The System-CAD target is decomposed into stable semantic responsibilities. Evaluation history is an Application Layer concern: immutable snapshots represent the authoritative operation/result state used for incremental reuse and auditability. The current repository may combine several responsibilities inside the existing Framework surface; the decomposition is architectural and does not require premature project fragmentation.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -279,14 +279,17 @@ BodyResult_0
 
 At each stage the newly produced result becomes the current body. Earlier results remain addressable only when their identities are required for semantic purposes.
 
-The kernel may realize the transition incrementally:
+The Application Layer may realize the transition incrementally:
 
 \begin{lstlisting}
-previous authoritative result + semantic delta
-        -> kernel history/state realization
+.NET evaluation history snapshot + prior authoritative result
+        -> semantic delta
+        -> immutable kernel operation request
+        -> new immutable mathematical result
+        -> new .NET evaluation history snapshot
 \end{lstlisting}
 
-Kernel history/state realization is an execution mechanism. It is not the semantic model and must not replace the Application Layer pipeline. Rendering is a separate derived-representation operation.
+The mathematical kernel is not the owner of CAD history/state. It evaluates explicit inputs and returns a new immutable result/evidence value. The .NET Application Layer owns, stores, and replaces the immutable evaluation-history snapshot. Rendering is a separate downstream derived-representation operation.
 
 The required equivalence is:
 \[
@@ -392,9 +395,10 @@ Part
   -> Hole
       -> BodyResult_2 = Final/Current Body
   -> topology + provenance
-  -> kernel operation request against current kernel history/state
-  -> authoritative kernel result
-  -> derived representation
+  -> immutable kernel operation request
+  -> authoritative mathematical result
+  -> .NET evaluation-history snapshot
+  -> separately requested derived representation
 \end{lstlisting}
 
 The acceptance test must prove that changing a Sketch input invalidates the Extrusion and all downstream Body results, while changing the Hole input invalidates the Hole and its downstream closure.
@@ -785,10 +789,13 @@ UMLCAD.Kernel.Client gateway
 Rust mathematical/native kernel
         |
         v
-kernel history / authoritative realization
+new immutable mathematical result/evidence
+        |
+        v
+.NET evaluation-history snapshot
 \end{lstlisting}
 
-The Application Layer owns meaning and composition. The kernel owns mathematical authority and realization. No domain library may introduce a second competing Body/geometry authority.
+The Application Layer owns meaning, composition, evaluation history, and authoritative System-CAD result integration. The kernel owns mathematical computation only; it does not persist or advance System-CAD history. No domain library may introduce a second competing Body/geometry authority.
 
 \section{Minimum useful vertical acceptance test}
 
@@ -1461,7 +1468,7 @@ Mandatory rules:
 
 \chapter{Persistence, Identity, and Lifecycle}
 
-Current Framework build history is in-memory. It stores sequence, timestamp, snapshot, and package/build identity.
+The legacy/current Framework build history is in-memory and stores semantic build snapshots with sequence, timestamp, snapshot, and package/build identity. Separately, the new Application Layer evaluation engine owns an immutable \\texttt{CadEvaluationHistory} snapshot containing ordered operation, evaluation-identity, status, result-identity, and evidence commitments. The latter is replaced atomically on each completed evaluation/rebuild; neither form of history is owned by the mathematical kernel.
 
 The target lifecycle model must keep distinct:
 \begin{itemize}

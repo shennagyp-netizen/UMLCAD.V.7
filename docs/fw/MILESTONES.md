@@ -27,7 +27,7 @@ Architecture review of dependency direction, API ownership, build/refusal behavi
 ## FW-01 — Kernel-facing .NET boundary cleanup
 
 ### Objective
-Refine the current transitional UMLCAD.Kernel.Client design so engineering libraries depend only on the UMLCAD Kernel API rather than Rust-specific names.
+Refine the new UMLCAD.Kernel gateway under app/framework/libraries/ so engineering libraries depend only on the UMLCAD Kernel API rather than Rust-specific names.
 
 ### Work
 - define stable kernel operation/result contracts at the correct boundary;

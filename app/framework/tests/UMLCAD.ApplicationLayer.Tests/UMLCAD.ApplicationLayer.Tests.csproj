@@ -21,5 +21,6 @@
     <ProjectReference Include="../../libraries/UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
     <ProjectReference Include="../../libraries/UMLCAD.Cad.Engine/UMLCAD.Cad.Engine.csproj" />
     <ProjectReference Include="../../libraries/UMLCAD.Framework/UMLCAD.Framework.csproj" />
+    <ProjectReference Include="../../libraries/UMLCAD.Engineering.Runtime/UMLCAD.Engineering.Runtime.csproj" />
   </ItemGroup>
 </Project>

@@ -186,5 +186,4 @@ public sealed class EngineeringRuleRuntime
                     commit.TargetId is CadId target ? [target] : [])
             ]);
     }
-    }
 }

@@ -13,3 +13,8 @@ Hole(BodyResult_1) -> BodyResult_2 = CurrentBody
 The engine plans the operation DAG, computes invalidation closure, builds deterministic evaluation identities, reuses unchanged results during incremental rebuild, and sends the current operation/result context to the kernel boundary.
 
 No Feature Tree is permitted as semantic authority. Incremental render is a kernel realization optimization, not the semantic model.
+
+
+## Kernel boundary
+
+`UMLCAD.Cad.Engine` depends only on the stable `IKernelGateway` contract. The only concrete kernel-access implementation in the active application layer is `UMLCAD.Kernel.Client`. Rust, HTTP, endpoint, process, serialization and native implementation details stay inside that library.

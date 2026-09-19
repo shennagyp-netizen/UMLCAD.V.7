@@ -1,10 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Science</RootNamespace>
     <AssemblyName>UMLCAD.Science</AssemblyName>
-    <Description>Scientific quantities, materials, fields, regions, and phenomena contracts.</Description>
+    <RootNamespace>UMLCAD.Science</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" />
-  </ItemGroup>
 </Project>

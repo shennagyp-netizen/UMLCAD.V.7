@@ -1,12 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Engineering.SheetMetal</RootNamespace>
     <AssemblyName>UMLCAD.Engineering.SheetMetal</AssemblyName>
-    <Description>Sheet metal engineering semantics.</Description>
+    <RootNamespace>UMLCAD.Engineering.SheetMetal</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
-    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
     <ProjectReference Include="../UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj" />
   </ItemGroup>
 </Project>

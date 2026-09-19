@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Cad.Contracts</RootNamespace>
     <AssemblyName>UMLCAD.Cad.Contracts</AssemblyName>
-    <Description>Stable semantic contracts shared by the Application Layer.</Description>
+    <RootNamespace>UMLCAD.Cad.Contracts</RootNamespace>
   </PropertyGroup>
 </Project>

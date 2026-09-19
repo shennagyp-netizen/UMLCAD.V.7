@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Cad.Expressions</RootNamespace>
     <AssemblyName>UMLCAD.Cad.Expressions</AssemblyName>
-    <Description>Immutable deterministic CAD expression semantics.</Description>
+    <RootNamespace>UMLCAD.Cad.Expressions</RootNamespace>
   </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
+  </ItemGroup>
 </Project>

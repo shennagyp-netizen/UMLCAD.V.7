@@ -1,44 +1,23 @@
-# UMLCAD.V.7 — New Application Layer
+# UMLCAD.V.7 Application Layer
 
-This is the clean implementation tree for the new UMLCAD Application Layer.
+The production Application Layer is a typed semantic execution system.
 
-The legacy \`dotnet/\` and \`projects/demo/\` trees are intentionally left untouched and are not dependencies of this tree.
+It does not model CAD as a persistent Feature Tree. User actions become typed semantic operations. Operations consume explicit semantic inputs and previous results and produce new authoritative results.
 
-## Structure
+Canonical composition:
 
-\`\`\`
-app/
-├── Directory.Build.props
-├── .editorconfig
-├── framework/
-│   ├── libraries/
-│   │   ├── UMLCAD.Kernel
-│   │   ├── UMLCAD.Cad.Contracts
-│   │   ├── UMLCAD.Cad.Expressions
-│   │   ├── UMLCAD.Cad.Semantics
-│   │   ├── UMLCAD.Cad.Engine
-│   │   ├── UMLCAD.Science
-│   │   ├── UMLCAD.Engineering.Resources
-│   │   ├── UMLCAD.Engineering.SheetMetal
-│   │   ├── UMLCAD.Engineering.Cam
-│   │   ├── UMLCAD.Engineering.Drawing
-│   │   ├── UMLCAD.Integration.Simulation
-│   │   └── UMLCAD.Framework
-│   └── tests/
-│       └── UMLCAD.ApplicationLayer.Tests
-└── application/
-    ├── UMLCAD.Application
-    └── demos/
-        └── BenchVise
-\`\`\`
+Part
+ -> Sketch
+ -> SketchResult
+ -> Extrusion(SketchResult)
+ -> BodyResult_1
+ -> Hole(BodyResult_1)
+ -> BodyResult_2 = Current Body
 
-All production .NET libraries in this tree are Application Layer libraries.
+Previous results are immutable lineage. The newest BodyResult is the current solid state.
 
-The mathematical kernel remains outside \`app/\`.
+The Application Layer owns semantic meaning, functional composition, references/publications, dependency planning, invalidation, evaluation identity, engineering orchestration, and domain contracts.
 
-The only library that owns kernel transport/implementation mechanics is \`UMLCAD.Kernel\`. Other libraries consume only its concrete API.
+The UMLCAD kernel is the mathematical authority and realization boundary.
 
-Tests for the framework are kept under \`app/framework/tests/\`.
-
-Application hosts and demos are kept outside \`framework/\`.
-
+The previous experimental implementation is preserved under app_old/.

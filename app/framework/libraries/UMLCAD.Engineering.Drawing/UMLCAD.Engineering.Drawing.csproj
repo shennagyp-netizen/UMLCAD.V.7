@@ -1,10 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Engineering.Drawing</RootNamespace>
     <AssemblyName>UMLCAD.Engineering.Drawing</AssemblyName>
-    <Description>Drawing, PMI, dimensions, annotations, and associative drafting semantics.</Description>
+    <RootNamespace>UMLCAD.Engineering.Drawing</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
   </ItemGroup>
 </Project>

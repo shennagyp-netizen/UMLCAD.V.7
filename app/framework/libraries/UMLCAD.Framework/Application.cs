@@ -1,64 +1,59 @@
 using UMLCAD.Cad.Contracts;
 using UMLCAD.Cad.Engine;
+using UMLCAD.Cad.Semantics;
 using UMLCAD.Engineering.Runtime;
-using UMLCAD.Kernel;
 using UMLCAD.Science;
 
 namespace UMLCAD.Framework;
 
 public sealed class UmlcadApplication : IDisposable
 {
-    private readonly UmlcadKernel _kernel;
-    private readonly CadEvaluationEngine _evaluation;
+    private readonly IKernelGateway _kernel;
+    private readonly CadEvaluationEngine _cad;
     private bool _disposed;
 
-    private UmlcadApplication(UmlcadKernel kernel)
+    public UmlcadApplication(IKernelGateway kernel)
     {
         _kernel = kernel ?? throw new ArgumentNullException(nameof(kernel));
-        _evaluation = new CadEvaluationEngine(_kernel);
+        _cad = new CadEvaluationEngine(_kernel);
     }
 
-    public static UmlcadApplication ConnectDefault(UmlcadKernelOptions? options = null) =>
-        new(UmlcadKernel.Connect(options));
-
-    internal static UmlcadApplication ForTest(UmlcadKernel kernel) =>
-        new(kernel);
-
-    public Task<EngineeringBuildValidationResult> ValidateEngineeringAsync(
-        CadDocumentDefinition document,
-        IEnumerable<IEngineeringRule> rules,
-        IPhenomenaSimulationService simulation,
+    public Task<CadEvaluationSnapshot> BuildAsync(
+        CadPartDefinition part,
+        CadEvaluationOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(document);
-        ArgumentNullException.ThrowIfNull(rules);
-        ArgumentNullException.ThrowIfNull(simulation);
+        return _cad.EvaluateAsync(part, options, cancellationToken);
+    }
 
-        var store = new CadDocumentStore(document);
-        return new EngineeringBuildValidator().ValidateAsync(
-            store,
-            rules,
-            simulation,
+    public Task<CadEvaluationSnapshot> RebuildAsync(
+        CadPartDefinition part,
+        IReadOnlySet<CadId> changedOperationIds,
+        CadEvaluationOptions? options = null,
+        CancellationToken cancellationToken = default)
+    {
+        ThrowIfDisposed();
+
+        return _cad.EvaluateAsync(
+            part,
+            changedOperationIds,
+            options,
             cancellationToken);
     }
 
-    public Task<KernelEvaluationOutcome> BuildAsync(
-        CadPartDefinition part,
-        CadBuildIdentity identity,
+    public ValueTask<IReadOnlyList<EngineeringRuleResult>> ValidateEngineeringAsync(
+        CadEvaluationSnapshot snapshot,
+        IPhenomenaSimulationService simulation,
+        IEnumerable<IEngineeringRule> rules,
         CancellationToken cancellationToken = default)
     {
         ThrowIfDisposed();
-        ArgumentNullException.ThrowIfNull(part);
-        return _evaluation.EvaluateAsync(part, identity, cancellationToken);
-    }
 
-    public Task<KernelEvaluationOutcome> BuildAsync(
-        CadBuildDefinition definition,
-        CancellationToken cancellationToken = default)
-    {
-        ThrowIfDisposed();
-        return _evaluation.EvaluateAsync(definition, cancellationToken);
+        return new EngineeringRuleRuntime().EvaluateAsync(
+            new EngineeringContext(snapshot, simulation),
+            rules,
+            cancellationToken);
     }
 
     public void Dispose()
@@ -67,7 +62,9 @@ public sealed class UmlcadApplication : IDisposable
             return;
 
         _disposed = true;
-        _kernel.Dispose();
+
+        if (_kernel is IDisposable disposable)
+            disposable.Dispose();
     }
 
     private void ThrowIfDisposed()

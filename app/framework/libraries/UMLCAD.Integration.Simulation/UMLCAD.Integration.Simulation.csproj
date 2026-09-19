@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Integration.Simulation</RootNamespace>
     <AssemblyName>UMLCAD.Integration.Simulation</AssemblyName>
-    <Description>External simulation integration contracts and adapters.</Description>
+    <RootNamespace>UMLCAD.Integration.Simulation</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />

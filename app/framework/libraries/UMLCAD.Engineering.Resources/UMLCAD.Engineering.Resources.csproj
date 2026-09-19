@@ -1,10 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Engineering.Resources</RootNamespace>
     <AssemblyName>UMLCAD.Engineering.Resources</AssemblyName>
-    <Description>Machines, tools, fixtures, processes, and engineering capabilities.</Description>
+    <RootNamespace>UMLCAD.Engineering.Resources</RootNamespace>
   </PropertyGroup>
-  <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
-  </ItemGroup>
 </Project>

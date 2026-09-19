@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Cad.Engine</RootNamespace>
     <AssemblyName>UMLCAD.Cad.Engine</AssemblyName>
-    <Description>CAD dependency planning and authoritative semantic evaluation orchestration.</Description>
+    <RootNamespace>UMLCAD.Cad.Engine</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Expressions/UMLCAD.Cad.Expressions.csproj" />
     <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
     <ProjectReference Include="../UMLCAD.Kernel/UMLCAD.Kernel.csproj" />
   </ItemGroup>

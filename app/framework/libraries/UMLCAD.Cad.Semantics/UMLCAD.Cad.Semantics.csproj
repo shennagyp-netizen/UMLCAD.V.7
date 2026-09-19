@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Cad.Semantics</RootNamespace>
     <AssemblyName>UMLCAD.Cad.Semantics</AssemblyName>
-    <Description>Authoritative CAD semantic model and product meaning.</Description>
+    <RootNamespace>UMLCAD.Cad.Semantics</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />

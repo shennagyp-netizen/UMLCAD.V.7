@@ -1,14 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <RootNamespace>UMLCAD.Engineering.Cam</RootNamespace>
     <AssemblyName>UMLCAD.Engineering.Cam</AssemblyName>
-    <Description>Manufacturing semantics, toolpaths, postprocessing, and NC generation.</Description>
+    <RootNamespace>UMLCAD.Engineering.Cam</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../UMLCAD.Cad.Semantics/UMLCAD.Cad.Semantics.csproj" />
-    <ProjectReference Include="../UMLCAD.Science/UMLCAD.Science.csproj" />
+    <ProjectReference Include="../UMLCAD.Cad.Contracts/UMLCAD.Cad.Contracts.csproj" />
     <ProjectReference Include="../UMLCAD.Engineering.Resources/UMLCAD.Engineering.Resources.csproj" />
-    <ProjectReference Include="../UMLCAD.Engineering.SheetMetal/UMLCAD.Engineering.SheetMetal.csproj" />
-    <ProjectReference Include="../UMLCAD.Kernel/UMLCAD.Kernel.csproj" />
   </ItemGroup>
 </Project>
